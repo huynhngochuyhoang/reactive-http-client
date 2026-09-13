@@ -3,14 +3,15 @@
 > **Status:** active
 > **Theme:** reliable inbound-header access and explicit request-context boundaries
 > **Published/API baseline:** `4.3.0`
-> **Development line:** `4.4.0-SNAPSHOT`
-> **Release scope:** unselected; additive minor only if the proposed public helpers ship
-> **Execution:** [adopted checklist](CHECKLIST.md); implementation and evidence pending
+> **Release candidate:** `4.4.0` (not published)
+> **Release scope:** additive inbound-header access; [release review](RELEASE-DECISION.md)
+> **Execution:** [adopted checklist](CHECKLIST.md); publication and archive gates remain open
 
-The proposal below is now governed by its adopted execution checklist. V31 is
-the sole active execution roadmap; adoption is not implementation or a release
-decision. V1-V30 remain completed records. No public defaults or release scope
-change, and `4.4.0` is not selected merely by the development coordinate.
+The proposal below preserves the adopted scope; its checklist and release review
+record delivered behavior and evidence. V31 is the sole active execution roadmap.
+V1-V30 remain completed records. The `4.4.0` additive candidate is selected by
+Priority 10's scope review, not by its former snapshot coordinate. No public
+default changes or publication are claimed.
 The [resilience activation proposal](../proposals/OPT_IN_RESILIENCE_ACTIVATION.md)
 was adopted by V27 and is not additional V31 work.
 

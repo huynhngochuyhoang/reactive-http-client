@@ -2,8 +2,8 @@
 
 > **Status:** active
 > **Published/API baseline:** `4.3.0`
-> **Development line:** `4.4.0-SNAPSHOT`
-> **Release scope:** unselected
+> **Release candidate:** `4.4.0` (not published)
+> **Release scope:** additive inbound-header access; [release review](RELEASE-DECISION.md)
 
 Companion to [`ROADMAP.md`](ROADMAP.md). Execute priorities in order unless a
 confirmed correctness or release blocker requires reordering. Checklist adoption
@@ -258,7 +258,7 @@ Evidence recorded on 2026-09-12 against base commit
 `6525f67c` with the additive implementation, tests and documentation in a dirty
 working tree; full source revision and SHA-256 copies are retained locally.
 
-- The [named-access contract](../../docs/09-correlation-id.md#named-inbound-header-access-440-development)
+- The [named-access contract](../../docs/09-correlation-id.md#named-inbound-header-access-440-candidate)
   freezes `inboundHeaderValues(ContextView, String): List<String>` and
   `inboundHeader(ContextView, String): Optional<String>`. The first returns
   immutable ordered values; the second rejects all multiplicity, including equal
@@ -767,36 +767,67 @@ test and documentation changes. Priority 10 and release selection remain open.
 
 ## Priority 10 - Release Scope and Go/No-Go
 
-### [ ] 10.1 Freeze the delivered public surface and guidance
+### [x] 10.1 Freeze the delivered public surface and guidance
 
-- [ ] Freeze helper signatures, structural errors, mock assertions and examples
+- [x] Freeze helper signatures, structural errors, mock assertions and examples
       together; verify legacy bulk-map, key and snapshot compatibility.
-- [ ] Keep new metadata/configuration out unless explicitly approved and fully
+- [x] Keep new metadata/configuration out unless explicitly approved and fully
       enforced; no automatic forwarding, propagation, trust or broad casing change.
-- [ ] Reconcile implemented behavior with every accepted priority and record any
+- [x] Reconcile implemented behavior with every accepted priority and record any
       narrowed/deferred work without presenting it as verified.
-- [ ] Confirm release notes make no unverified mesh, memory or performance claim.
+- [x] Confirm release notes make no unverified mesh, memory or performance claim.
 
-### [ ] 10.2 Assemble immutable release evidence
+Priority 10.1 evidence (2026-09-13): the [surface freeze and scope reconciliation](RELEASE-DECISION.md)
+cover all accepted priorities. Relative to published `v4.3.0`, production changes
+are confined to the two additive readers in `RequestContext`; metadata, defaults,
+mock assertion behavior and snapshot/key contracts are unchanged. Candidate
+notes and examples retain caller validation, version boundaries and the explicit
+no-mesh-certification/no-public-performance-claim disposition.
 
-- [ ] Assemble full tests, strict API, dependency matrix, packaging, consumers,
+### [x] 10.2 Assemble immutable release evidence
+
+- [x] Assemble full tests, strict API, dependency matrix, packaging, consumers,
       AOT/native, lifecycle and targeted benchmark disposition from reviewed source.
-- [ ] Record commands, actual counts, clean state, reachable commit, toolchains,
+- [x] Record commands, actual counts, clean state, reachable commit, toolchains,
       artifact/report hashes, Central markers, remaining risk and evidence paths.
-- [ ] Re-run affected checks after fixes; preserve original failures and distinguish
+- [x] Re-run affected checks after fixes; preserve original failures and distinguish
       uncommitted release-preparation changes from clean final-source evidence.
-- [ ] Generate readiness with truthful pending signing/tag/publication steps;
+- [x] Generate readiness with truthful pending signing/tag/publication steps;
       target-only manifests do not certify unexecuted manual checks.
 
-### [ ] 10.3 Select release scope and candidate version
+Priority 10.2 evidence (2026-09-13): the [release review](RELEASE-DECISION.md)
+assembles source/report hashes and original provenance under
+`target/release-evidence/v31/priority10/`. Clean reviewed commit
+`880eb800a783a640c062bb4712108235005bd817` matches the retained Priority 9 source;
+the candidate version/documentation/test patch is explicitly uncommitted.
+Both prior matrix rows passed 1,879 cases each. Final-coordinate verification
+passed 1,877 reactor tests, strict root and starter API checks against separate
+fresh Central 4.3.0 repositories, generation guards and 13 unsigned artifacts,
+74 mock + 11 full + three minimal consumer cases, six native-fixture JVM tests
+and generated-AOT execution, 34 benchmark harness cases, nine support tests and
+203 final context/docs/AOT cases. The benchmark build also reran 1,737 starter
+cases. Native source/binary and smoke measurements retain their exact earlier
+revisions; neither is relabeled as a new candidate compile/measurement. The
+relative hash inventory and structured audit validate the assembled evidence.
 
-- [ ] Record an explicit dated go/no-go decision with reviewed commit and scope.
-- [ ] Select `4.4.0` only if additive public functionality ships; otherwise select
+### [x] 10.3 Select release scope and candidate version
+
+- [x] Record an explicit dated go/no-go decision with reviewed commit and scope.
+- [x] Select `4.4.0` only if additive public functionality ships; otherwise select
       a compatible patch/documentation-only disposition or no-go with rationale.
-- [ ] On go, align final candidate coordinates and rerun affected readiness,
+- [x] On go, align final candidate coordinates and rerun affected readiness,
       generation and release-packaging checks before claiming a release cut.
-- [ ] Keep public/API/consumer/benchmark baselines at `4.3.0` until successful
+- [x] Keep public/API/consumer/benchmark baselines at `4.3.0` until successful
       publication and fresh verification; the snapshot name alone selects nothing.
+
+Priority 10.3 decision (2026-09-13): **GO for the additive `4.4.0` candidate**,
+not publication. Reactor/module/fixture coordinates, candidate-only examples,
+changelog and generated readiness are aligned. The two public readers justify
+the minor scope; the public/API/consumer/benchmark baseline stays `4.3.0`.
+Readiness records `published=false` and pending signed final-artifact preflight,
+reviewed clean final commit/tag, publication, Central verification and published
+assembled consumption. No signing attempt, tag or deployment occurred. Commit
+and review this preparation patch before the still-open 10.4 release workflow.
 
 ### [ ] 10.4 Publish, verify, and archive V31
 

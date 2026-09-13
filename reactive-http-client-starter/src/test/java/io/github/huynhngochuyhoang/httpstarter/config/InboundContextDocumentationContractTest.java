@@ -93,7 +93,7 @@ class InboundContextDocumentationContractTest {
         for (String path : List.of("09-correlation-id", "13-exchange-logging", "14-test-helpers",
                 "16-production-checklist", "26-support-bundles", "30-operations-troubleshooting")) {
             String guide = Files.readString(root().resolve("docs/" + path + ".md"));
-            assertThat(guide).as(path).contains("4.3.0", "4.4.0-SNAPSHOT", "[REDACTED]");
+            assertThat(guide).as(path).contains("4.3.0", "4.4.0", "[REDACTED]");
         }
         String correlation = Files.readString(root().resolve("docs/09-correlation-id.md"));
         assertThat(correlation).doesNotContain("first(headers,", ").getFirst()");

@@ -309,7 +309,7 @@ also have different meanings.
 On published `4.3.0`, map lookups retain exact spelling; use the
 [published workaround](09-correlation-id.md#published-430-named-lookup-workaround)
 for application inspection. The two case-insensitive named helpers are
-`4.4.0-SNAPSHOT` additions, not new logging fields.
+`4.4.0` additions, not new logging fields.
 Only `RequestContext.inboundHeader` rejects multiplicity, including equal duplicates.
 `RequestContext.inboundHeaderValues` returns duplicates and case-alias values unchanged
 in exposed map-iteration and per-list order; callers must validate multiplicity

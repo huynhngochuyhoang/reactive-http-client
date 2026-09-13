@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.0] - Unreleased
+
+- **`4.4.0` release candidate (pending publication).** Additive inbound-header
+  readers preserve the published bulk-map and explicit context-handoff contracts.
+  No configuration, forwarding, automatic propagation or trust default changes.
+  Loopback protocol tests do not certify Istio deployments; no memory reduction
+  or numerical/comparative performance claim is made. See the
+  [V31 release review](roadmaps/v31/RELEASE-DECISION.md).
+
 ### Added
 - **Case-insensitive inbound header readers.** `RequestContext.inboundHeaderValues`
   returns immutable values across case aliases; `RequestContext.inboundHeader`
@@ -1879,7 +1888,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.3.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.4.0...HEAD
+[4.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...v4.2.0
 [4.1.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.0.0...v4.1.0

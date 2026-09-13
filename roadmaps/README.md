@@ -10,7 +10,9 @@ is historical context rather than active work.
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V30 are completed release records. V30 was released as `4.3.0`.
 V31 is the only active execution roadmap, with an adopted checklist.
-The development reactor is `4.4.0-SNAPSHOT`; its release scope has not been selected.
+The reactor is the `4.4.0` release candidate, selected for additive inbound-header
+access. [V31 release preparation](v31/RELEASE-DECISION.md) leaves signing,
+publication and archive closure pending; published baselines remain `4.3.0`.
 
 Deferred design work that is not part of an active execution roadmap is kept
 under [`proposals/`](proposals/). These proposals do not add release gates until

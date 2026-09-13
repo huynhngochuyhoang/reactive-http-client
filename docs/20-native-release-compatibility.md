@@ -1,6 +1,6 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `4.4.0-SNAPSHOT`
+Sections without a version label describe the current `4.4.0`
 development line. Sections labeled V18, V19, V20, V27, or V29 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
@@ -180,11 +180,29 @@ commands, local signing failure and subsequent successful publication.
 
 After fresh Maven Central artifact and assembled-consumer verification, public
 consumer, strict API and benchmark baselines are published `4.3.0`.
-Reactor-only coordinates use `4.4.0-SNAPSHOT`. [V30](../roadmaps/v30/ROADMAP.md)
+Reactor-only coordinates use the `4.4.0` release candidate. [V30](../roadmaps/v30/ROADMAP.md)
 and its [checklist](../roadmaps/v30/CHECKLIST.md) are completed release records.
 [V31](../roadmaps/v31/ROADMAP.md) is the active execution roadmap with an
-[adopted checklist](../roadmaps/v31/CHECKLIST.md); implementation and evidence
-remain pending, and no release scope is selected.
+[adopted checklist](../roadmaps/v31/CHECKLIST.md). Its
+[release review](../roadmaps/v31/RELEASE-DECISION.md) selects the additive minor
+scope; signing, a reviewed clean final commit/tag and publication remain pending.
+
+### V31 additive surface freeze
+
+`RequestContext.inboundHeaderValues(ContextView, String)` returns an immutable
+`List<String>`; `RequestContext.inboundHeader(ContextView, String)` returns an
+`Optional<String>` and rejects multiple values, including equal duplicates.
+Only names use ASCII case-insensitive matching. Null required arguments throw
+`NullPointerException`, invalid names `IllegalArgumentException`, and malformed
+stored input or singleton ambiguity `IllegalStateException`, with value-free
+structural messages. Plural values preserve exposed map-iteration/per-list order.
+The [context guide](09-correlation-id.md) documents
+absence, empty values, redaction and application validation.
+
+Bulk-map spelling/exact lookup, context key aliases, snapshot constructors and
+restore merge semantics, and mock exact-name assertions stay unchanged. No
+configuration property, metadata group, diagnostic schema, meter, automatic
+forwarding/propagation, MVC ingress bridge or header-DTO parser is added.
 
 ### Publishable module staging
 
@@ -395,7 +413,7 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `4.4.0-SNAPSHOT` development line compares
+from the current reactor version. The `4.4.0` candidate compares
 strictly against published `4.3.0`:
 
 ```bash
@@ -886,7 +904,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=4.4.0-SNAPSHOT native:compile
+  -Dreactive-http-client.version=4.4.0 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -948,13 +966,15 @@ latest published consumer version and reports benchmark promotion and Maven
 Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
-V30 is published and archived at `4.3.0`. The current reactor is
-`4.4.0-SNAPSHOT`, with active roadmap `v31`, no selected release scope and no
-`plannedFinalVersion`. Checklist adoption does not complete implementation.
-Generated readiness marks the prospective next version
-as deferred and leaves future manual checks pending; it does not reopen V30.
-The [release decision](../roadmaps/v30/RELEASE-DECISION.md) records actual V30
-publication provenance and the no-public-performance-claim benchmark disposition.
+V30 is published and archived at `4.3.0`. The current reactor is the `4.4.0`
+candidate with active roadmap `v31`, selected additive scope and
+`plannedFinalVersion=4.4.0`. Generated readiness marks it pending publication,
+not published. The [V31 release decision](../roadmaps/v31/RELEASE-DECISION.md)
+records actual external verification separately from the conservative generated
+manual-command list. Signing, final clean commit/tag, publication and fresh
+Central verification remain open. No public performance claim is made, so a
+promoted release-quality benchmark report is not required. This does not reopen
+V30 or relabel its publication evidence.
 
 The root `latest.published.version` property owns public consumer snippets;
 `api.compatibility.baseline.version` remains an independent compatibility policy.
@@ -1054,7 +1074,7 @@ test/runtime dependencies; its classpath must contain no Caffeine artifact. It r
 reactor `target/classes` leakage in either application and records separate mock,
 weighted/current-consumer, and cache-disabled test reports, both consumer classpaths,
 dependency trees and effective POMs, project artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-4.4.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+`target/release-evidence/current-consumer/current-4.4.0/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
 verifier status, including when any test stage fails.
 It also records the last completed stage and exit status when a later

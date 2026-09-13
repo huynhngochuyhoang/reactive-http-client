@@ -235,9 +235,9 @@ trust and enforce decoder size/depth/schema constraints before application JSON
 conversion. Do not include rejected values in exceptions or logs. An untrusted
 sender can also send the literal marker, so its presence alone proves no origin.
 
-## Named inbound header access (4.4.0 development)
+## Named inbound header access (4.4.0 candidate)
 
-The additive `4.4.0-SNAPSHOT` APIs below are not available in published `4.3.0`:
+The additive `4.4.0` APIs below are not available in published `4.3.0`:
 
 | Method | Return type |
 |---|---|
@@ -390,7 +390,7 @@ Choose only validated fields required by the receiving side, with explicit trust
 
 Use the full `RequestContextSnapshot` for short-lived in-process boundaries such as `Sinks.Many`, executor callbacks, or local handoff queues where the event remains inside the process and keeps the same retention expectations as the request.
 
-A candidate-only (`4.4.0-SNAPSHOT`) queue handoff can capture explicit fields
+A candidate-only (`4.4.0`) queue handoff can capture explicit fields
 before enqueue and restore only the values needed before the outbound call.
 On `4.3.0`, adapt the fixed-name workaround above to the selected field instead
 of using the new reader. The application validates any present request ID before
