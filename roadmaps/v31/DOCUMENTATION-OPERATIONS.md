@@ -126,6 +126,6 @@ Logs and the original failing XML are separate under
 rerun uses those same three test classes. Application JSON parsing is unchanged.
 
 ```bash
-mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter -Dtest=InboundContextDocumentationContractTest,DocumentationReleaseArtifactTest,RequestContextHeaderAccessTest,InboundHeadersWebFilterTest test
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter -Dtest=InboundContextDocumentationContractTest,DocumentationReleaseArtifactTest,RequestContextHeaderAccessTest test
 git diff --check
 ```
