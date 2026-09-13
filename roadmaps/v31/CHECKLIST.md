@@ -571,20 +571,20 @@ the boundary matrix and deliberately unchanged behavior.
 - [x] Preserve replacement beans, cache-disabled/no-Caffeine consumption and
       optional OTel absence; introduce no mandatory helper dependency.
 
-### [ ] 7.3 Reprove AOT and native behavior on the final fixture
+### [x] 7.3 Reprove AOT and native behavior on the final fixture
 
 - [x] Exercise the new public access from a real application context in JVM/AOT
       and native smoke, including capture and explicit restoration.
 - [x] Preserve configured replacement metadata/properties/filter beans and avoid
       reflective header-DTO scanning or unrelated runtime hints.
-- [ ] Run clean-commit native compile and executable, recording toolchain, exact
+- [x] Run clean-commit native compile and executable, recording toolchain, exact
       fixture commit, command, executable hash, output and test disposition.
-- [ ] Rerun after relevant fixture/runtime changes; do not close with a pre-fix
+- [x] Rerun after relevant fixture/runtime changes; do not close with a pre-fix
       binary. Keep unsupported optional integration coverage explicitly bounded.
 
 Priority 7 implementation evidence (2026-09-12):
 
-- [Parity evidence and remaining native gate](PARITY-EVIDENCE.md) records the
+- [Parity evidence](PARITY-EVIDENCE.md) records the
   starting revision `cd75725dae3cab2b8b39d46672820180991d561f` plus the dirty
   fixture/test/documentation changes. No production behavior, public API,
   dependency baseline, version or runtime hint changed.
@@ -610,11 +610,34 @@ Priority 7 implementation evidence (2026-09-12):
   commands, per-stage logs/exit status, fresh Surefire XML and source evidence
   are under `target/release-evidence/v31/priority7/`. The two early compile
   fixture errors are retained separately from passing verification.
-- **Pending:** commit the final fixture, then compile and execute native from
-  that clean reachable revision, recording the executable hash and output.
-  The two native evidence checkboxes and 7.3 stay open. No old binary, dirty
-  JVM run, manual mesh behavior or unsupported optional native integration is
-  presented as satisfying that gate.
+
+Priority 7 native completion (2026-09-13):
+
+- Clean fixture commit `f9b94fd207e6c5af1fc36ee047fd2c491a6c0e30`, tree
+  `da53a49e0bb646fa0709dced7e69a7626b154607`, remained unchanged through artifact
+  installation, native compile and executable verification. These completion
+  notes were added only after that clean run.
+- Maven `3.9.9`, GraalVM/native-image `25.0.3`, Java target `21`, Boot `4.0.0`,
+  Linux x86-64-v3 and GCC `13.3.0`. Maven used
+  `MAVEN_OPTS='-Xmx512m -XX:ActiveProcessorCount=2'`; native compilation used
+  `-H:+SharedArenaSupport,-J-Xmx4g,--parallelism=2` with
+  `-Pnative clean native:compile`. Reactor installation skipped tests and
+  Javadocs; the native build reran **6 JVM fixture tests**, all passing with
+  zero failures, errors or skips, and regenerated Spring AOT output.
+- Native compilation exited zero (Maven elapsed 8m18s). The new executable
+  exited zero under a 180-second process bound and emitted
+  `V31 inbound context: capture=3 restored=2 rejected=1; parity passed`.
+  Existing cache/resilience/shutdown and context-recreation checks passed too.
+- Executable SHA-256:
+  `c074e8f5bc3a340f9a8d982136fcc5b752a74c1bf9952c7156e26bd9be1fa5ed`.
+  Fixture source checksums and the executable checksum were revalidated after
+  execution. Commands, logs, test XML, toolchain, clean-state provenance and
+  source archive are in `target/release-evidence/v31/priority7/native-clean/`;
+  final provenance is `completedStage=evidence-verified`, `exitStatus=0`.
+- The memory preflight wait was stopped at the user's request before launching
+  the compiler; its evidence is retained separately. The native compile/run
+  needed no source fix or retry. This closes Priority 7 only, not later release
+  gates or unsupported Istio, MVC, application header-DTO or native OTel coverage.
 
 ## Priority 8 - Documentation and Operations Guidance
 
