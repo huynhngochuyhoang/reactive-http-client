@@ -312,7 +312,9 @@ for application inspection. The two case-insensitive named helpers are
 `4.4.0-SNAPSHOT` additions, not new logging fields.
 Only `RequestContext.inboundHeader` rejects multiplicity, including equal duplicates.
 `RequestContext.inboundHeaderValues` returns duplicates and case-alias values unchanged
-in captured order; callers must validate multiplicity before singleton parsing.
+in exposed map-iteration and per-list order; callers must validate multiplicity
+before singleton parsing. Arbitrary maps may expose unstable order; the helper
+cannot reconstruct capture or wire order that those maps have lost.
 A snapshot does not imply automatic forwarding,
 MDC propagation, or restoration into another subscription. Logger/observer
 records kept by application code retain their snapshots until explicitly released.

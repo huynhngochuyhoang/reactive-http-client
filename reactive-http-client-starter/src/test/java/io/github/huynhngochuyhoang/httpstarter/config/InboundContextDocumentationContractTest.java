@@ -7,8 +7,11 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import reactor.util.context.Context;
 import reactor.util.context.ContextView;
+import tools.jackson.core.StreamReadFeature;
+import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import javax.tools.ToolProvider;
@@ -28,7 +31,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class InboundContextDocumentationContractTest {
-    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final ObjectMapper JSON = JsonMapper.builder()
+            .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+            .build();
     private static final List<String> COUNTS = List.of(
             "matchingNameCount", "valueCount", "emptyValueCount", "redactedValueCount");
 
@@ -100,7 +105,8 @@ class InboundContextDocumentationContractTest {
                 "not** a new diagnostics", "No new meter or public diagnostic field");
         String logging = Files.readString(root().resolve("docs/13-exchange-logging.md"));
         assertThat(logging).contains("Only `RequestContext.inboundHeader` rejects multiplicity",
-                "`RequestContext.inboundHeaderValues` returns duplicates and case-alias values unchanged");
+                "`RequestContext.inboundHeaderValues` returns duplicates and case-alias values unchanged",
+                "exposed map-iteration and per-list order", "Arbitrary maps may expose unstable order");
     }
 
     @Test
@@ -113,6 +119,18 @@ class InboundContextDocumentationContractTest {
             assertThat(observation.path("matchingNameCount").intValue()).isEqualTo(1);
             assertThat(observation.path("valueCount").intValue()).isEqualTo(1);
         }
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "{\"schemaVersion\":\"EXAMPLE_SECRET\",\"schemaVersion\":1}",
+            "{\"versions\":{\"starter\":\"EXAMPLE_SECRET\",\"starter\":\"4.3.0\"}}",
+            "{\"observations\":[{\"fieldAlias\":\"EXAMPLE_SECRET\",\"fieldAlias\":\"field-1\"}]}",
+            "{\"observations\":[{\"field\\u0041lias\":\"EXAMPLE_SECRET\",\"fieldAlias\":\"field-1\"}]}"})
+    void fixtureParserRejectsDuplicatePropertiesBeforeTreeValidation(String rawJson) {
+        assertThatThrownBy(() -> JSON.readTree(rawJson))
+                .isInstanceOf(StreamReadException.class)
+                .hasMessageContaining("Duplicate");
     }
 
     @ParameterizedTest

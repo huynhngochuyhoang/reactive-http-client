@@ -112,6 +112,19 @@ evidence, not counts for this revision. Logs are in
 `target/release-evidence/v31/priority8/policy-review/` (`red.log`, `red.xml`,
 `green.log`, and final `completion.log`). No runtime or fixture data changed.
 
+The subsequent ordering/parser review is based on
+`61cde97b2b51949ebc3c55f4b4340ab36e1bd4cb` plus uncommitted documentation/test
+changes. The logging guide now specifies exposed map-iteration/per-list order
+and warns that arbitrary maps may be unstable. The fixture parser enables
+`STRICT_DUPLICATE_DETECTION` before building the tree. Four negative cases cover
+root, nested, array-contained and Unicode-escaped duplicate property names with
+an unsafe first occurrence. The red run had five expected failures (four parser
+cases plus wording); after the fixes, 124 tests passed: 36 documentation contract,
+49 release-artifact and 39 named-reader cases, with zero failures/errors/skips.
+Logs and the original failing XML are separate under
+`target/release-evidence/v31/priority8/duplicate-key-review/`; the final completion
+rerun uses those same three test classes. Application JSON parsing is unchanged.
+
 ```bash
 mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter -Dtest=InboundContextDocumentationContractTest,DocumentationReleaseArtifactTest,RequestContextHeaderAccessTest,InboundHeadersWebFilterTest test
 git diff --check

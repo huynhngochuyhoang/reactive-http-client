@@ -63,7 +63,10 @@ known filter provenance establishes that a marker was produced by filtering.
 Do not export raw or hashed names/values, tokens, identities, request targets,
 payloads, arbitrary exception messages or additional free-text fields. The
 closed field/type/enum contract is recursively tested, including negative privacy
-and consistency cases. This fixture is not a sanitizer for arbitrary endpoint
+and consistency cases. Reject duplicate JSON properties at every nesting level
+before tree validation, so a later duplicate cannot hide earlier sensitive text.
+The fixture test enables strict duplicate-key detection during parsing.
+This fixture is not a sanitizer for arbitrary endpoint
 responses. No new meter or public diagnostic field is justified: existing
 application capture/read facts distinguish these failures without persistent
 per-request instrumentation or high-cardinality labels.

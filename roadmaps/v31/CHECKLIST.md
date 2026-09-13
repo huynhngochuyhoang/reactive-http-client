@@ -697,6 +697,12 @@ The documentation contract now has 32 cases; the focused docs/helper/filter
 rerun passed 127 cases. See the [review follow-up](DOCUMENTATION-OPERATIONS.md#review-follow-up)
 for the separate failing and passing evidence.
 
+Ordering/parser follow-up (2026-09-13): plural lookup is documented as exposed
+map-iteration/per-list order, and strict duplicate-key parsing rejects hidden
+first occurrences before fixture privacy validation. The documentation contract
+now has 36 cases; 124 focused docs/helper cases passed. Separate logs are in
+`target/release-evidence/v31/priority8/duplicate-key-review/`.
+
 ## Priority 9 - Compatibility and Targeted Performance Evidence
 
 ### [ ] 9.1 Revalidate the supported artifact surface
