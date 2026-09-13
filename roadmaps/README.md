@@ -18,6 +18,11 @@ Deferred design work that is not part of an active execution roadmap is kept
 under [`proposals/`](proposals/). These proposals do not add release gates until
 they are deliberately adopted by a future roadmap.
 
+Proposed next focus: [post-4.4.0 architecture review](proposals/POST_4_4_ARCHITECTURE_REVIEW.md),
+covering missing contracts, practical extension constraints, and evidence-backed
+improvements after V31 publication and closure. It is not an active roadmap or an
+additional `4.4.0` release gate.
+
 | Version | Roadmap | Checklist | Archive status |
 |---|---|---|---|
 | V1 | [Roadmap](v1/ROADMAP.md) | [Checklist](v1/CHECKLIST.md) | Completed before V2 |
