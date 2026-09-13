@@ -297,3 +297,19 @@ reactive:
 ```
 
 See [09-correlation-id.md](09-correlation-id.md) for full details on the inbound headers filter.
+
+That filtering guarantee applies to WebFlux filter capture. Manual context
+writes and custom contributors are application-owned and are not re-filtered by
+a logger or a named reader. Do not dump the map to diagnose a missing field:
+record only bounded presence/count facts under a fake field alias, using the
+[inbound-context support format](26-support-bundles.md#inbound-context-capture).
+Redaction markers are not identities; an omitted field and a present empty string
+also have different meanings.
+
+On published `4.3.0`, map lookups retain exact spelling; use the
+[published workaround](09-correlation-id.md#published-430-named-lookup-workaround)
+for application inspection. The two case-insensitive named helpers are
+`4.4.0-SNAPSHOT` additions, not new logging fields. They reject duplicate values
+before application parsing. A snapshot does not imply automatic forwarding,
+MDC propagation, or restoration into another subscription. Logger/observer
+records kept by application code retain their snapshots until explicitly released.

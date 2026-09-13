@@ -38,6 +38,7 @@ historical evidence.
 
 | Symptom | First bounded evidence | Next check |
 |---|---|---|
+| Field visible in the WebFlux request but absent during context lookup | Published/candidate version, same-request capture/read boundary, exact and case-insensitive presence, counts, filter selection, subscription relationship | [Inbound header and context triage](#inbound-header-and-context-triage) |
 | Unexpected HTTP/1.1, H2, or H2C behavior; malformed-request warning | Client `http2-enabled` policy, downstream-observed protocol, complete decoder warning, ALPN/TLS mode, intermediary path | [Protocol diagnosis](#protocol-and-framing) |
 | Gzip decode failure, unexpected encoded body, or response size unknown | Client `compression-enabled` policy, presence of negotiation/content-encoding headers, post-transport response headers, exception type | [Compression diagnosis](#compression) |
 | Pending requests, acquire timeout, or connection churn | Effective pool policy, active/idle/total/pending gauges, `POOL_ACQUIRE`, health `poolAcquireFailureCount` | [Pool saturation](#pool-saturation) |
@@ -50,6 +51,47 @@ historical evidence.
 | Pod memory grows after enabling response caching | Published/development version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (`4.2.0`+)](#cache-memory-triage-420) |
 | Local cache-work rejection or skipped refresh (V30 / `4.3.0`+) | Selected work bounds, policy current/maximum gauges, fixed rejection/skip reasons, pre-close counter samples | [Cache-work saturation](#cache-work-saturation-v30-430) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
+
+## Inbound header and context triage
+
+This procedure applies to published `4.3.0` capture and explicit snapshots.
+The case-insensitive named readers are candidate-only `4.4.0-SNAPSHOT` APIs;
+use the [published workaround](09-correlation-id.md#published-430-named-lookup-workaround)
+on `4.3.0`. Do not lowercase the legacy map globally or remove deny rules to
+recover a field.
+
+Inspect one request at the application capture boundary and again inside the
+actual reader's `Mono.deferContextual`. Assign an ephemeral ordinal such as
+`request-1` and a fake alias such as `field-1` locally; keep the mapping private
+and discard it after the bounded capture. Do not use correlation IDs, identities,
+raw names/values, hashes of values, request targets or payloads as join keys.
+Record only the [bounded support fields](26-support-bundles.md#inbound-context-capture).
+Do not install global Reactor hooks or change filter order for this inspection.
+
+| Structural observation | Interpretation and next check |
+|---|---|
+| Context key is present and well-formed; exact spelling absent, case-insensitive match present | Case mismatch, not evidence of lost context. Use named access; do not call `getFirst()` on a nullable map value. |
+| Live field present, but capture allow-list decision is omitted | Expected filtering. Check effective filter configuration, including a replacement bean, without broadening capture by default. |
+| Selected denied field contains `[REDACTED]` | Expected redaction; never recover the original credential or parse the marker as an identity. A marker alone does not prove the filter produced it. |
+| Match present with zero values, or one empty string | Empty list and empty string are distinct from a missing name. Decide application semantics before parsing. |
+| More than one value, including equal duplicates or case aliases | Ambiguous singleton input. Reject or apply an explicitly reviewed multivalue contract; do not select the first identity. |
+| Context key missing immediately after expected capture | Check WebFlux versus MVC, actual filter registration/order, capture location, and whether this is the same subscription. A live request read after a later mutation is not the capture-time request. |
+| Key present but map/key/list/element types malformed | Application/custom contributor misuse of a public context key. Record only `malformed`, not the offending object or exception message; inspect the writer locally. |
+| Capture was populated; an independent subscriber has no restored fields | Explicit handoff missing. A sink, queue, callback or manual `subscribe()` does not inherit its emitter's context. Capture/restore an envelope into a fresh target; absent fields do not erase stale worker values. |
+| Same composed chain crosses `publishOn` or `subscribeOn` | Scheduling alone does not explain loss. Check context-write placement, replacement/removal, and actual independent subscriptions before assigning cause. |
+
+Only use map-presence/count comparisons after structural validation. The named
+helpers validate all entries, so an unrelated malformed entry is not an absent
+selected field. Keep required-value errors structural and review application
+decoder limits and ingress trust; the starter does not parse header JSON.
+
+Record each **observed** protocol hop by ordinal, or `unknown` where unobserved.
+The [loopback protocol evidence](../roadmaps/v31/INBOUND-WIRE-BOUNDARIES.md)
+does not certify a Kubernetes/Istio/Envoy deployment. Optional manual mesh
+investigation may compare these same structural facts at approved ingress and
+application boundaries, without packet/header-value dumps. Seeing lowercase at
+the application does not identify a rewriting hop. A sidecar cannot directly
+remove an in-process Reactor context; confirm the application boundary first.
 
 ## Cache-work saturation (V30 4.3.0+)
 

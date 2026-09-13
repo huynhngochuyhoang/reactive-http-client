@@ -641,39 +641,53 @@ Priority 7 native completion (2026-09-13):
 
 ## Priority 8 - Documentation and Operations Guidance
 
-### [ ] 8.1 Consolidate safe public examples
+### [x] 8.1 Consolidate safe public examples
 
-- [ ] Update the correlation/context, exchange logging, test-helper and production
+- [x] Update the correlation/context, exchange logging, test-helper and production
       guides from the same frozen helper/filter/handoff contract.
-- [ ] Replace nullable map-value `getFirst()` examples with explicit absence and
+- [x] Replace nullable map-value `getFirst()` examples with explicit absence and
       multiplicity checks before application parsing.
-- [ ] Preserve empty-string versus absent/redacted distinctions and application
+- [x] Preserve empty-string versus absent/redacted distinctions and application
       size/schema/trust validation; do not describe a redaction marker as identity.
-- [ ] Separate published `4.3.0` workarounds from candidate-only APIs and use fake
+- [x] Separate published `4.3.0` workarounds from candidate-only APIs and use fake
       bounded names/values plus reserved placeholder domains in copyable examples.
-- [ ] State WebFlux/MVC and scheduler/independent-subscription boundaries without
+- [x] State WebFlux/MVC and scheduler/independent-subscription boundaries without
       implying automatic forwarding, MDC bridging or queue context propagation.
 
-### [ ] 8.2 Add a structural troubleshooting path
+### [x] 8.2 Add a structural troubleshooting path
 
-- [ ] Distinguish case mismatch, filtered/redacted fields, wrong filter ordering,
+- [x] Distinguish case mismatch, filtered/redacted fields, wrong filter ordering,
       malformed context and independent-subscription loss using observable checks.
-- [ ] Describe how to compare the same request at capture/read boundaries without
+- [x] Describe how to compare the same request at capture/read boundaries without
       collecting raw header values or attributing an unobserved rewrite to Istio.
-- [ ] Define bounded support fields for versions, protocol hops, capture/read
+- [x] Define bounded support fields for versions, protocol hops, capture/read
       boundary, key/match presence and value counts using fake field aliases.
-- [ ] If a new fixture is needed, add recursive privacy and type/invariant guards;
+- [x] If a new fixture is needed, add recursive privacy and type/invariant guards;
       keep arbitrary header names, tokens, identities, request targets and payloads out.
-- [ ] Do not add meters or schema fields unless existing evidence is insufficient;
+- [x] Do not add meters or schema fields unless existing evidence is insufficient;
       record justification, bounded enums/types and privacy review before publishing.
 
-### [ ] 8.3 Verify documentation is version-correct
+### [x] 8.3 Verify documentation is version-correct
 
-- [ ] Run generated documentation, Markdown-link, archive-status and support
+- [x] Run generated documentation, Markdown-link, archive-status and support
       validation tests with actual totals.
-- [ ] Retain the current snapshot/published baseline split and V30 archived claims.
-- [ ] Cross-check public examples against executable consumer tests; unsupported
+- [x] Retain the current snapshot/published baseline split and V30 archived claims.
+- [x] Cross-check public examples against executable consumer tests; unsupported
       or optional manual mesh instructions must be labeled accurately.
+
+Priority 8 evidence (2026-09-13): [documentation and operations review](DOCUMENTATION-OPERATIONS.md).
+The final public examples, bounded fixture, generated docs/links/archive checks
+and context regressions passed 175 starter cases; additional wire/registration
+checks passed 30, mock parity passed 5, and the two assembled consumer fixtures
+passed 2 each. Existing support sanitizer validation passed 9 Python tests.
+The 29 new documentation cases compile and execute the two Markdown lookup
+examples and reject recursive privacy, type and invariant violations. Evidence
+is under `target/release-evidence/v31/priority8/`, based on committed revision
+`83bb48ef14845e4986e1a53761452167924b0307` plus the uncommitted documentation/test
+changes; it is not clean release/native/mesh certification. No runtime behavior,
+public diagnostics schema, meter, configuration default or version changed;
+published `4.3.0`, candidate `4.4.0-SNAPSHOT`, and archived V30 evidence remain
+distinct. Priorities 9 and 10 remain open.
 
 ## Priority 9 - Compatibility and Targeted Performance Evidence
 

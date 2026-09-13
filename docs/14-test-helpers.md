@@ -650,6 +650,8 @@ StepVerifier.create(sink.asFlux()
                         RequestContext.withCorrelationId(ctx, "cid-7"),
                         Map.of(
                                 "X-Request-Id", List.of("req-7"),
+                                "x-scope", List.of("test-scope"),
+                                "x-many", List.of("one", "two"),
                                 "Authorization", List.of("[REDACTED]"))))
                 .block())
         .expectNext("\"accepted\"")
@@ -683,6 +685,16 @@ an authenticated identity. Recordings intentionally remain available after mock
 close for assertions; retaining a recording retains its snapshot. Both ordinary
 and deterministic cache mocks close their owned single-flight work, but neither automatically
 restores a recording into a new subscription or forwards captured headers.
+
+The envelope supplies two `x-many` list values, not a comma-split value. Use the
+[safe application examples](09-correlation-id.md#published-430-named-lookup-workaround)
+to test absence, equal duplicates across case aliases, empty strings, redaction,
+malformed context, and application size/schema/trust rejection before parsing.
+Manual `withInboundHeaders` writes in a mock do not run ingress filtering;
+exercise `InboundHeadersWebFilter` separately for allow/deny and ordering tests.
+Composed scheduler changes retain subscription context; independent subscribers
+must restore a snapshot into an isolated target. Mock records do not certify a
+WebFlux ingress, Spring MVC integration, or any Istio/Envoy deployment.
 
 ---
 

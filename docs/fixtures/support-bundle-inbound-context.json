@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "versions": {
+    "starter": "4.3.0",
+    "springBoot": "4.0.0",
+    "springFramework": "7.0.1",
+    "reactor": "3.8.0",
+    "mesh": "unknown"
+  },
+  "window": {
+    "startedAt": "2000-01-01T00:00:00Z",
+    "endedAt": "2000-01-01T00:05:00Z",
+    "durationSeconds": 300
+  },
+  "webStack": "webflux",
+  "protocolHops": [
+    {"hop": "hop-1", "protocol": "unknown"},
+    {"hop": "hop-2", "protocol": "HTTP/2"}
+  ],
+  "capturePolicy": {"allowDecision": "selected", "denyDecision": "not-denied"},
+  "observations": [
+    {
+      "boundary": "capture",
+      "observedAt": "2000-01-01T00:01:00Z",
+      "requestAlias": "request-1",
+      "fieldAlias": "field-1",
+      "subscription": "ingress",
+      "liveFieldPresent": true,
+      "contextState": "map",
+      "exactNamePresent": false,
+      "matchingNameCount": 1,
+      "valueCount": 1,
+      "emptyValueCount": 0,
+      "redactedValueCount": 0
+    },
+    {
+      "boundary": "read",
+      "observedAt": "2000-01-01T00:01:01Z",
+      "requestAlias": "request-1",
+      "fieldAlias": "field-1",
+      "subscription": "ingress",
+      "liveFieldPresent": null,
+      "contextState": "map",
+      "exactNamePresent": false,
+      "matchingNameCount": 1,
+      "valueCount": 1,
+      "emptyValueCount": 0,
+      "redactedValueCount": 0
+    }
+  ]
+}

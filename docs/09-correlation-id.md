@@ -132,7 +132,7 @@ reactive:
 | Default allow-list | Empty — capture all headers |
 | Default deny-list | `authorization`, `cookie`, `set-cookie`, `proxy-authorization`, `x-api-key` |
 
-Matching is case-insensitive. Captured snapshots preserve the original inbound header casing, while denied values are replaced with `[REDACTED]` before the snapshot is stored. The stored snapshot is an immutable defensive copy, so later request-header mutation cannot change what loggers or async handoff code observe. Sensitive headers are never stored or logged by default.
+Matching is case-insensitive. Captured snapshots preserve the original inbound header casing, while denied values are replaced with `[REDACTED]` before the snapshot is stored. The stored snapshot is an immutable defensive copy, so later request-header mutation cannot change what loggers or async handoff code observe. The default deny-list protects the listed fields, not every application-specific sensitive field; review both lists for your application.
 
 ---
 
@@ -152,6 +152,10 @@ filters to recover a missing field without reviewing the application's order.
 A replacement `InboundHeadersWebFilter` controls capture; an unrelated
 `WebFilter` does not suppress default registration.
 
+This ingress integration is WebFlux-only. A Spring MVC request does not populate
+the starter's Reactor context automatically. There is no implicit ThreadLocal
+or MDC bridge, even when an MVC controller calls a reactive outbound client.
+
 Capturing or reading inbound fields does not forward them to outbound clients.
 Correlation-ID propagation is a separate filter. Allow-list/deny-list matching
 does not authorize values: an outside-allow-list field is omitted even if denied,
@@ -165,6 +169,71 @@ requires deployment-specific evidence. The named readers below are versioned
 separately from these existing capture/registration semantics.
 
 ---
+
+## Published 4.3.0 named lookup workaround
+
+On published `4.3.0`, the bulk accessor is an exact-key map, not Spring
+`HttpHeaders`. Do not call `getFirst()` on a nullable `Map.get(...)` result.
+For application-owned lookup of a fixed ASCII field name, collect every case
+alias and reject ambiguity before parsing. This standalone example uses only
+published APIs and validates the entire stored shape, including manual writes:
+
+```java
+import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
+import reactor.util.context.ContextView;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+public final class PublishedInboundHeaderExample {
+    public static List<String> fixtureValues(ContextView ctx) {
+        Object stored = ctx.getOrDefault(RequestContext.INBOUND_HEADERS_CONTEXT_KEY, Map.of());
+        if (!(stored instanceof Map<?, ?> fields)) {
+            throw new IllegalStateException("Malformed inbound context");
+        }
+        List<String> matches = new ArrayList<>();
+        for (var entry : fields.entrySet()) {
+            if (!(entry.getKey() instanceof String name)
+                    || !name.matches("[!#$%&'*+.^_`|~0-9A-Za-z-]+")
+                    || !(entry.getValue() instanceof List<?> values)) {
+                throw new IllegalStateException("Malformed inbound context");
+            }
+            for (Object item : values) {
+                if (!(item instanceof String value)) {
+                    throw new IllegalStateException("Malformed inbound context");
+                }
+                if (name.equalsIgnoreCase("X-Fixture-Data")) {
+                    matches.add(value);
+                }
+            }
+        }
+        return List.copyOf(matches);
+    }
+
+    public static String requiredFixtureData(ContextView ctx) {
+        List<String> values = fixtureValues(ctx);
+        if (values.isEmpty()) {
+            throw new IllegalArgumentException("Required fixture field is absent");
+        }
+        if (values.size() != 1) {
+            throw new IllegalStateException("Ambiguous fixture field");
+        }
+        String value = values.getFirst();
+        if (value.isEmpty() || value.equals("[REDACTED]") || value.length() > 4096) {
+            throw new IllegalArgumentException("Unusable fixture field");
+        }
+        return value;
+    }
+}
+```
+
+Read inside `Mono.deferContextual`, not at publisher assembly. The 4096 UTF-16
+code-unit limit is an example application limit, not a starter default. This
+example deliberately rejects empty strings and the redaction marker rather than
+confusing either with absence. It does not authenticate a value: review ingress
+trust and enforce decoder size/depth/schema constraints before application JSON
+conversion. Do not include rejected values in exceptions or logs. An untrusted
+sender can also send the literal marker, so its presence alone proves no origin.
 
 ## Named inbound header access (4.4.0 development)
 
@@ -201,13 +270,32 @@ when the requested name is absent or already has multiple values. Errors use
 fixed structural messages, never header names, values or object descriptions.
 
 Applications decide whether absence, an empty string, a redacted marker, or a
-schema violation is acceptable. For example, inside `Mono.deferContextual`:
+schema violation is acceptable. The candidate equivalent of the published
+example is:
 
 ```java
-String value = RequestContext.inboundHeader(ctx, "X-Fixture-Data")
-        .orElseThrow(() -> new IllegalArgumentException("Required fixture header is absent"));
-// Application-owned: enforce a size/schema limit before parsing value.
+import io.github.huynhngochuyhoang.httpstarter.core.RequestContext;
+import reactor.util.context.ContextView;
+
+public final class CandidateInboundHeaderExample {
+    public static String requiredFixtureData(ContextView ctx) {
+        // inboundHeader rejects multiple values, including equal duplicates.
+        String value = RequestContext.inboundHeader(ctx, "X-Fixture-Data")
+                .orElseThrow(() -> new IllegalArgumentException("Required fixture field is absent"));
+        if (value.isEmpty() || value.equals("[REDACTED]") || value.length() > 4096) {
+            throw new IllegalArgumentException("Unusable fixture field");
+        }
+        return value;
+    }
+}
 ```
+
+Call `CandidateInboundHeaderExample.requiredFixtureData(ctx)` inside
+`Mono.deferContextual`, then apply the same application trust/schema checks as
+the published example. The helper never deserializes a header DTO or supplies
+native reflection hints for application parsing. See the
+[inbound-context troubleshooting path](30-operations-troubleshooting.md#inbound-header-and-context-triage)
+before treating a missing field as lost context.
 
 Manual `withInboundHeaders`, raw context writes, and custom contributors do not
 run ingress allow/deny filtering or authenticate their values. The new readers
@@ -235,7 +323,7 @@ record EventEnvelope<T>(T payload, RequestContextSnapshot context) {}
 
 Mono<Void> publish(OrderCreated event) {
     return Mono.deferContextual(ctx -> {
-        sink.tryEmitNext(new EventEnvelope<>(event, RequestContextSnapshot.capture(ctx)));
+        sink.tryEmitNext(new EventEnvelope<>(event, RequestContextSnapshot.capture(ctx))).orThrow();
         return Mono.empty();
     });
 }
@@ -298,29 +386,43 @@ record OrderEventEnvelope<T>(
         Map<String, String> traceContext) {}
 ```
 
-Good envelope fields are correlation ID, request ID, tenant-like routing keys, and trace context required by the receiving side. Avoid copying large, user-controlled, or sensitive header snapshots into long-lived queues; they increase memory use, metric cardinality, and data-retention exposure.
+Choose only validated fields required by the receiving side, with explicit trust, size and retention rules. Correlation/request IDs and tenant-like routing keys may themselves be sensitive or high-cardinality; they are not metric labels or safe support-bundle values. Avoid copying large, user-controlled, or sensitive header snapshots into long-lived queues.
 
 Use the full `RequestContextSnapshot` for short-lived in-process boundaries such as `Sinks.Many`, executor callbacks, or local handoff queues where the event remains inside the process and keeps the same retention expectations as the request.
 
-A queue handoff can capture explicit fields before enqueue and restore only the values needed before the outbound call:
+A candidate-only (`4.4.0-SNAPSHOT`) queue handoff can capture explicit fields
+before enqueue and restore only the values needed before the outbound call.
+On `4.3.0`, adapt the fixed-name workaround above to the selected field instead
+of using the new reader. The application validates any present request ID before
+enqueueing; an absent ID stays absent, not a fabricated identity:
 
 ```java
 record QueueEnvelope<T>(T payload, String correlationId, String requestId) {}
 
 Mono<Void> enqueue(OrderCreated event) {
     return Mono.deferContextual(ctx -> {
-        Map<String, List<String>> headers = RequestContext.inboundHeaders(ctx);
-        queue.offer(new QueueEnvelope<>(
+        String requestId = RequestContext.inboundHeader(ctx, "X-Request-Id").orElse(null);
+        if (requestId != null && (requestId.isEmpty() || requestId.equals("[REDACTED]")
+                || !requestId.matches("[A-Za-z0-9-]{1,64}"))) {
+            return Mono.error(new IllegalArgumentException("Unusable request ID"));
+        }
+        boolean accepted = queue.offer(new QueueEnvelope<>(
                 event,
                 RequestContext.correlationId(ctx).orElse(null),
-                first(headers, "X-Request-Id")));
+                requestId));
+        if (!accepted) {
+            return Mono.error(new IllegalStateException("Handoff queue is full"));
+        }
         return Mono.empty();
     });
 }
 
 Mono<Void> handle(QueueEnvelope<OrderCreated> envelope) {
     return downstreamClient.send(envelope.payload())
-            .contextWrite(ctx -> RequestContext.withCorrelationId(ctx, envelope.correlationId()));
+            .contextWrite(ctx -> RequestContext.withCorrelationId(ctx
+                    .delete(RequestContext.CORRELATION_ID_CONTEXT_KEY)
+                    .delete(RequestContext.INBOUND_HEADERS_CONTEXT_KEY)
+                    .delete(RequestContext.IDEMPOTENCY_KEY_CONTEXT_KEY), envelope.correlationId()));
 }
 ```
 
