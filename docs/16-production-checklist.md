@@ -199,7 +199,7 @@ for production evidence.
 ## Logging and testing
 
 - Use [safe inbound lookup](09-correlation-id.md#published-430-named-lookup-workaround)
-  on `4.3.0`; the case-insensitive named helpers require `4.4.0-SNAPSHOT`.
+  on `4.3.0`; the case-insensitive named helpers require `4.4.0`.
   Check absence and multiplicity before parsing; apply size/schema/trust checks
   and handle empty strings and `[REDACTED]` explicitly, never as identities.
 - Confirm WebFlux capture registration and security-filter order. There is no

@@ -23,7 +23,7 @@ The [structural inbound-context fixture](fixtures/support-bundle-inbound-context
 is a manually assembled, sanitized application record, **not** a new diagnostics
 endpoint schema or meter. It applies to published `4.3.0` using the
 [bulk-map workaround](09-correlation-id.md#published-430-named-lookup-workaround);
-named readers require `4.4.0-SNAPSHOT`. No mesh deployment is certified.
+named readers require `4.4.0`. No mesh deployment is certified.
 
 Capture one selected field for one request at two boundaries: immediately after
 capture and inside the actual subscription-time reader. Use an isolated probe or

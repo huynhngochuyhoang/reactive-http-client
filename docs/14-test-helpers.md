@@ -668,7 +668,7 @@ The assertions read the filtered snapshot captured from Reactor context. They do
 
 Captured inbound assertion names (`hasInboundHeader`, `hasInboundHeaderValues`,
 `hasRedactedInboundHeader`, `doesNotHaveInboundHeader`) retain **exact spelling**
-semantics, including on the `4.4.0-SNAPSHOT` candidate. They are not HTTP-style
+semantics, including on the `4.4.0` candidate. They are not HTTP-style
 case-insensitive lookups. Candidate-only named access can be tested separately:
 
 ```java

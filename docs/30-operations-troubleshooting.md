@@ -55,7 +55,7 @@ historical evidence.
 ## Inbound header and context triage
 
 This procedure applies to published `4.3.0` capture and explicit snapshots.
-The case-insensitive named readers are candidate-only `4.4.0-SNAPSHOT` APIs;
+The case-insensitive named readers are candidate-only `4.4.0` APIs;
 use the [published workaround](09-correlation-id.md#published-430-named-lookup-workaround)
 on `4.3.0`. Do not lowercase the legacy map globally or remove deny rules to
 recover a field.
