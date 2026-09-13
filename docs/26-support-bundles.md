@@ -15,6 +15,62 @@ on Boot 4. Boot 3.5 applications remain on `2.14.1`; use the
 [4.x migration guide](28-spring-boot-4-jackson-migration.md) before applying the
 Boot 4 health type or native-image instructions.
 
+## Inbound context capture
+
+For a field visible in a live WebFlux request but missing at the context reader,
+follow [inbound context triage](30-operations-troubleshooting.md#inbound-header-and-context-triage).
+The [structural inbound-context fixture](fixtures/support-bundle-inbound-context.json)
+is a manually assembled, sanitized application record, **not** a new diagnostics
+endpoint schema or meter. It applies to published `4.3.0` using the
+[bulk-map workaround](09-correlation-id.md#published-430-named-lookup-workaround);
+named readers require `4.4.0-SNAPSHOT`. No mesh deployment is certified.
+
+Capture one selected field for one request at two boundaries: immediately after
+capture and inside the actual subscription-time reader. Use an isolated probe or
+approved application instrumentation that computes facts in place and retains no
+exchange, map or values. Record unknown where a boundary was not observed; do not
+reconstruct an earlier request from a later live-header read. Compare matching
+local request/field aliases, not actual correlation IDs. Store any alias mapping
+only locally for the finite investigation, never in this bundle.
+
+| Field | Bounded capture contract |
+|---|---|
+| `schemaVersion` | `1` for this fixture format only; independent of Actuator schema V1. |
+| `versions` | `starter`, `springBoot`, `springFramework`, `reactor`, `mesh`: numeric three-part versions with optional `-SNAPSHOT`, or `unknown`; no build labels or host details. |
+| `window` | UTC `startedAt`, `endedAt`, and matching positive `durationSeconds`, at most 300 seconds. |
+| `webStack` | `webflux`, `mvc`, or `unknown`; MVC has no automatic ingress bridge. |
+| `protocolHops` | At most four unique `hop-1` through `hop-4` aliases, each with `HTTP/1.1`, `HTTP/2`, or `unknown`; no addresses or inferred mesh rewrite. |
+| `capturePolicy` | `allowDecision`: `selected`, `omitted`, `unknown`; `denyDecision`: `denied`, `not-denied`, `unknown`. Effective decisions for the one field, no raw configuration names. |
+| `observations` | Exactly two records, `capture` then `read`, with UTC `observedAt` inside the window and the same `request-1` and `field-1` aliases. Repeat the format separately for another field/request instead of aggregating unrelated calls. |
+| `subscription` | `ingress`, `independent`, or `unknown`; identify the boundary, not thread names or IDs. |
+| `liveFieldPresent` | Boolean, or null if no live request was inspected at that boundary. |
+| `contextState` | `absent`, `map`, `malformed`, `unknown`. Validate the entire map/key/list/element structure locally before counting. |
+| `exactNamePresent` | Boolean for a valid/absent map; null for malformed/unknown. This is exact spelling, not an HTTP-style match. |
+| `matchingNameCount`, `valueCount`, `emptyValueCount`, `redactedValueCount` | Integers 0..64, including zero; counts over 64 require narrowing the capture, not clipping. Absent context has zero counts; malformed/unknown has null counts. Matching empty lists can have positive name count and zero values. Empty and literal marker counts are disjoint subsets of value count. |
+
+At the capture boundary, known `omitted` selection requires no matching names
+and zero values, even when the field is denied. For a known `denied` field,
+each captured name contributes exactly one marker: value and redacted counts
+equal the matching-name count, with no empty values. Unknown decisions do not
+prove those transformations, and later read-boundary observations may reflect
+application context changes. A `not-denied` decision does not rule out a
+sender-supplied literal marker.
+
+The fixture illustrates exact spelling absent but one case-insensitive match at
+both boundaries. Counts do not prove value equality, identity, or which hop
+changed spelling. `redactedValueCount` counts literal `[REDACTED]` markers; only
+known filter provenance establishes that a marker was produced by filtering.
+Do not export raw or hashed names/values, tokens, identities, request targets,
+payloads, arbitrary exception messages or additional free-text fields. The
+closed field/type/enum contract is recursively tested, including negative privacy
+and consistency cases. Reject duplicate JSON properties at every nesting level
+before tree validation, so a later duplicate cannot hide earlier sensitive text.
+The fixture test enables strict duplicate-key detection during parsing.
+This fixture is not a sanitizer for arbitrary endpoint
+responses. No new meter or public diagnostic field is justified: existing
+application capture/read facts distinguish these failures without persistent
+per-request instrumentation or high-cardinality labels.
+
 ## Baseline Bundle
 
 Start every bundle with these artifacts:

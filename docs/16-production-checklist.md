@@ -198,6 +198,19 @@ for production evidence.
 
 ## Logging and testing
 
+- Use [safe inbound lookup](09-correlation-id.md#published-430-named-lookup-workaround)
+  on `4.3.0`; the case-insensitive named helpers require `4.4.0-SNAPSHOT`.
+  Check absence and multiplicity before parsing; apply size/schema/trust checks
+  and handle empty strings and `[REDACTED]` explicitly, never as identities.
+- Confirm WebFlux capture registration and security-filter order. There is no
+  MVC ingress bridge, automatic captured-header forwarding, or MDC bridge.
+  Compare capture/read presence and counts on the same request using the
+  [structural triage path](30-operations-troubleshooting.md#inbound-header-and-context-triage),
+  not raw map dumps or an assumed mesh rewrite.
+- Bound handoff queues and retained log/test records. Restore each independent
+  subscription into its own target; absent snapshot fields do not clear old
+  worker values. Ordinary `publishOn`/`subscribeOn` is not an independent handoff.
+
 - Use [Production Support Bundles](26-support-bundles.md) when collecting safe incident evidence.
 - Start incident diagnosis with [Operations Troubleshooting](30-operations-troubleshooting.md)
   and treat a missing failure stage as unknown.
