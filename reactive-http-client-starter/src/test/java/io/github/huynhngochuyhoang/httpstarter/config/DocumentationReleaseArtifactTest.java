@@ -1890,12 +1890,19 @@ class DocumentationReleaseArtifactTest {
                 .contains("<id>v30-current-parity</id>")
                 .contains("<name>consumer.v30.parity</name>")
                 .contains("<source>src/v30-test/java</source>")
+                .contains("<id>v31-current-parity</id>")
+                .contains("<name>consumer.v31.parity</name>")
+                .contains("<source>src/v31-test/java</source>")
                 .contains("<groupId>com.github.ben-manes.caffeine</groupId>");
         assertThat(cacheDisabledPom)
                 .contains("<artifactId>reactive-http-client-starter</artifactId>")
                 .contains("<artifactId>spring-boot-starter-webflux</artifactId>")
                 .doesNotContain("reactive-http-client-test")
                 .doesNotContain("com.github.ben-manes.caffeine");
+        assertThat(cacheDisabledPom)
+                .contains("<id>v31-current-parity</id>")
+                .contains("<source>../boot4-consumer/src/v31-test/java</source>")
+                .doesNotContain("reactive-http-client-otel");
         assertThat(workflow)
                 .contains("boot4-consumer:")
                 .contains("scripts/verify-current-consumer.sh")
@@ -1913,6 +1920,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("-Dconsumer.v29.parity=true")
                 .contains("-Dconsumer.v30.parity=true")
                 .contains("MockCacheWorkParityTest")
+                .contains("MockInboundContextParityTest")
+                .contains("-Dconsumer.v31.parity=true")
+                .contains("stage=\"optional-integrations-checked\"")
                 .contains("stage=\"cache-disabled-tests\"\ncopy_cache_disabled_reports")
                 .contains("cache-disabled-dependency-tree.txt")
                 .contains("cache-disabled-classpath.txt")
@@ -1933,6 +1943,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("exitStatus=$status")
                 .contains("provenance.properties");
         assertThat(publishedConsumerScript)
+                .doesNotContain("consumer.v31.parity", "src/v31-test")
                 .contains("copy_consumer_reports()")
                 .contains("stage=\"consumer-tests\"\ncopy_consumer_reports")
                 .contains("trap preserve_evidence EXIT")

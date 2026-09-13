@@ -79,42 +79,42 @@ stage="reactor-clean"
 "${MAVEN[@]}" -f "$ROOT_DIR/pom.xml" -DskipTests -Dmaven.javadoc.skip=true install
 stage="reactor-install"
 "${MAVEN[@]}" -f "$ROOT_DIR/reactive-http-client-test/pom.xml" \
-  -Dtest=MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest,MockCacheWorkParityTest clean test
+  -Dtest=MockReactiveHttpClientTest,Boot4MockReactiveHttpClientTest,MockCacheWorkParityTest,MockInboundContextParityTest clean test
 stage="mock-tests"
 copy_mock_reports
 
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
   -Dconsumer.v26.observability=true -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true \
-  -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true clean test
+  -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true -Dconsumer.v31.parity=true clean test
 stage="consumer-tests"
 copy_consumer_reports
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
-  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true \
+  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true -Dconsumer.v31.parity=true \
   help:effective-pom -Doutput="$EVIDENCE_DIR/effective-poms/boot4-current-consumer.xml"
 stage="consumer-effective-pom"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
-  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true \
+  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true -Dconsumer.v31.parity=true \
   dependency:tree -DoutputFile="$EVIDENCE_DIR/dependency-tree.txt"
 stage="dependency-tree"
 "${MAVEN[@]}" -f "$FIXTURE_POM" -Dreactive-http-client.version="$PROJECT_VERSION" \
-  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true \
+  -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true -Dconsumer.v31.parity=true \
   dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/classpath.txt"
 stage="classpath"
 
 "${MAVEN[@]}" -f "$CACHE_DISABLED_FIXTURE_POM" \
-  -Dreactive-http-client.version="$PROJECT_VERSION" clean test
+  -Dreactive-http-client.version="$PROJECT_VERSION" -Dconsumer.v31.parity=true clean test
 stage="cache-disabled-tests"
 copy_cache_disabled_reports
 "${MAVEN[@]}" -f "$CACHE_DISABLED_FIXTURE_POM" \
-  -Dreactive-http-client.version="$PROJECT_VERSION" \
+  -Dreactive-http-client.version="$PROJECT_VERSION" -Dconsumer.v31.parity=true \
   help:effective-pom -Doutput="$EVIDENCE_DIR/effective-poms/boot4-cache-disabled-consumer.xml"
 stage="cache-disabled-effective-pom"
 "${MAVEN[@]}" -f "$CACHE_DISABLED_FIXTURE_POM" \
-  -Dreactive-http-client.version="$PROJECT_VERSION" \
+  -Dreactive-http-client.version="$PROJECT_VERSION" -Dconsumer.v31.parity=true \
   dependency:tree -DoutputFile="$EVIDENCE_DIR/cache-disabled-dependency-tree.txt"
 stage="cache-disabled-dependency-tree"
 "${MAVEN[@]}" -f "$CACHE_DISABLED_FIXTURE_POM" \
-  -Dreactive-http-client.version="$PROJECT_VERSION" \
+  -Dreactive-http-client.version="$PROJECT_VERSION" -Dconsumer.v31.parity=true \
   dependency:build-classpath -Dmdep.outputFile="$EVIDENCE_DIR/cache-disabled-classpath.txt"
 stage="cache-disabled-classpath"
 
@@ -130,6 +130,11 @@ if grep -q "/com/github/ben-manes/caffeine/caffeine/" \
   fail "cache-disabled consumer unexpectedly resolved optional Caffeine storage"
 fi
 stage="reactor-leakage-checked"
+if grep -Eq "/io/opentelemetry/|/reactive-http-client-otel/|/reactive-http-client-test/" \
+    "$EVIDENCE_DIR/cache-disabled-classpath.txt"; then
+  fail "minimal consumer unexpectedly resolved optional OTel or mock integrations"
+fi
+stage="optional-integrations-checked"
 
 CHECKSUMS="$EVIDENCE_DIR/project-artifact-sha256.txt"
 parent_pom="$LOCAL_REPOSITORY/$GROUP_PATH/reactive-http-client/$PROJECT_VERSION/reactive-http-client-$PROJECT_VERSION.pom"

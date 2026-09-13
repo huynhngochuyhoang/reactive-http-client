@@ -31,4 +31,17 @@
    <scope>test</scope>
   </dependency>
  </dependencies>
+ <profiles>
+  <profile>
+   <id>v31-current-parity</id>
+   <activation><property><name>consumer.v31.parity</name><value>true</value></property></activation>
+   <build><plugins><plugin>
+    <groupId>org.codehaus.mojo</groupId><artifactId>build-helper-maven-plugin</artifactId><version>3.6.1</version>
+    <executions><execution><id>add-v31-test-source</id><phase>generate-test-sources</phase>
+     <goals><goal>add-test-source</goal></goals>
+     <configuration><sources><source>../boot4-consumer/src/v31-test/java</source></sources></configuration>
+    </execution></executions>
+   </plugin></plugins></build>
+  </profile>
+ </profiles>
 </project>

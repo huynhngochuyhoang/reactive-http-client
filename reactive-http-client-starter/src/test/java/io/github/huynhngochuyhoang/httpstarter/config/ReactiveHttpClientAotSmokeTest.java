@@ -4,10 +4,9 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.*;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.AotSmokeClient;
 import io.github.huynhngochuyhoang.httpstarter.config.smoke.InheritedAotSmokeClient;
-import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
-import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
-import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
+import io.github.huynhngochuyhoang.httpstarter.core.*;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
+import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import org.junit.jupiter.api.Test;
 import org.springframework.aot.generate.ClassNameGenerator;
 import org.springframework.aot.generate.DefaultGenerationContext;
@@ -31,6 +30,7 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -675,6 +675,46 @@ class ReactiveHttpClientAotSmokeTest {
             throw new IllegalStateException(ex);
         }
     }
+
+    @Test
+    void contextAccessNeedsNoHeaderDtoHintsAndPreservesReplacementCapture() {
+        try (var context = new AnnotationConfigApplicationContext(FactoryMethodAotConfiguration.class)) {
+            var settings = new ReactiveHttpClientProperties.InboundHeadersConfig();
+            settings.setAllowList(Set.of("x-scope"));
+            var filter = new InboundHeadersWebFilter(settings);
+            context.getBeanFactory().registerSingleton("replacementCapture", filter);
+            var metadata = new MethodMetadataCache();
+            context.getBeanFactory().registerSingleton("replacementMetadata", metadata);
+            var properties = context.getBean(ReactiveHttpClientProperties.class);
+            var contribution = new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                    .processAheadOfTime(context.getDefaultListableBeanFactory());
+            var generation = newGenerationContext();
+            assertThat(contribution).isNotNull();
+            contribution.applyTo(generation, null);
+            assertThat(context.getBean(MethodMetadataCache.class)).isSameAs(metadata);
+            assertThat(context.getBean(ReactiveHttpClientProperties.class)).isSameAs(properties);
+            assertThat(context.getBean(InboundHeadersWebFilter.class))
+                    .isSameAs(filter);
+            assertThat(generation.getRuntimeHints().reflection().getTypeHint(HeaderDtoOwnedByApplication.class)).isNull();
+            assertThat(generation.getRuntimeHints().reflection().getTypeHint(
+                    RequestContext.class)).isNull();
+            var captured = new java.util.concurrent.atomic.AtomicReference<RequestContextSnapshot>();
+            filter.filter(org.springframework.mock.web.server.MockServerWebExchange.from(
+                    org.springframework.mock.http.server.reactive.MockServerHttpRequest.get("/capture")
+                            .header("x-scope", "bounded").header("x-omitted", "not-retained")),
+                    ignored -> Mono.deferContextual(ctx -> {
+                        captured.set(RequestContextSnapshot.capture(ctx));
+                        return Mono.empty();
+                    })).block(java.time.Duration.ofSeconds(5));
+            var restored = captured.get().writeTo(reactor.util.context.Context.empty());
+            assertThat(RequestContext.inboundHeader(restored, "X-SCOPE"))
+                    .contains("bounded");
+            assertThat(RequestContext.inboundHeader(restored, "X-Omitted"))
+                    .isEmpty();
+        }
+    }
+
+    record HeaderDtoOwnedByApplication(String value) { }
 
     private DefaultGenerationContext newGenerationContext() {
         return new DefaultGenerationContext(
