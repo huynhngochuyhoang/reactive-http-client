@@ -2171,7 +2171,9 @@ class DocumentationReleaseArtifactTest {
                 .contains("<id>benchmark-published-baseline-v28-source-exclusion</id>")
                 .doesNotContain("<id>boot4-spike</id>");
         assertThat(currentBaselineProfile)
-                .doesNotContain("<exclude>", "<testExclude>")
+                .contains("<exclude>**/V31NamedHeaderBenchmark.java</exclude>")
+                .contains("<testExclude>**/V31NamedHeaderBenchmarkTest.java</testExclude>")
+                .doesNotContain("V31ContextSnapshotBenchmark", "V30CacheWork")
                 .doesNotContain("V29WeightedCachePerformanceBenchmark.java",
                         "V29WeightedCachePerformanceBenchmarkTest.java")
                 .doesNotContain("V28SemanticReadCachePerformanceBenchmark.java",

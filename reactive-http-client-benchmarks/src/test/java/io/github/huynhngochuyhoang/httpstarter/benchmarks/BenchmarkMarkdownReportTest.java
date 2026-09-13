@@ -112,6 +112,17 @@ class BenchmarkMarkdownReportTest {
     }
 
     @Test
+    void classifiesV31ContextRowsAndRejectsForeignOwners() throws Exception {
+        assertThat(renderReport(result(
+                "io.github.huynhngochuyhoang.httpstarter.core.V31NamedHeaderBenchmark.contextV31NamedAbsentLookup",
+                "avgt", 1.0, "us/op")))
+                .contains("| contextV31NamedAbsentLookup | V31 no-network context operation |");
+        assertThatThrownBy(() -> BenchmarkFairnessContract.validate(java.util.List.of(
+                new BenchmarkFairnessContract.BenchmarkMethod("ForeignBenchmark", "contextV31NamedAbsentLookup"))))
+                .hasMessageContaining("V31 fixture");
+    }
+
+    @Test
     void classifiesV30WorkRowsAndRejectsForeignOwners() throws Exception {
         String report = renderReport(
                 result("io.github.huynhngochuyhoang.httpstarter.core.V30CacheWorkPerformanceBenchmark.cacheV30NoNetworkLoadRejection",

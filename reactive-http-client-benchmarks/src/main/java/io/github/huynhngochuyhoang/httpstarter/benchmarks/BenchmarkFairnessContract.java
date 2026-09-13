@@ -58,6 +58,11 @@ final class BenchmarkFairnessContract {
         Map<String, Map<String, Integer>> comparisonScenarios = new LinkedHashMap<>();
         for (BenchmarkMethod method : methods) {
             BenchmarkMarkdownReport.validateClassification(method.name());
+            if (method.name().startsWith("contextV31")
+                    && !Set.of("io.github.huynhngochuyhoang.httpstarter.core.V31ContextSnapshotBenchmark",
+                    "io.github.huynhngochuyhoang.httpstarter.core.V31NamedHeaderBenchmark").contains(method.owner())) {
+                throw new IllegalStateException("V31 context benchmark must be owned by its V31 fixture");
+            }
             boolean loopback = LOOPBACK_BENCHMARK.equals(method.owner());
             boolean loopbackClassification = method.name().startsWith(CLIENT_SIDE_PREFIX)
                     || method.name().startsWith("starterFeature")

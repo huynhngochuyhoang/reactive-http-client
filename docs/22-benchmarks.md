@@ -172,6 +172,14 @@ so it does not overwrite the current-workspace release report.
 For an exact historical release environment, check out the release tag and run
 the current-workspace command from that checkout.
 
+The V31 named-header helper rows are candidate-only and are excluded from the
+published `4.3.0` build, including its harness test. The V31 snapshot capture,
+restore and gated explicit-handoff rows use published APIs and remain comparable.
+See the [V31 compatibility and performance audit](../roadmaps/v31/COMPATIBILITY-PERFORMANCE.md)
+for targeted commands, allocation versus retention boundaries, and the
+no-public-performance-claim disposition. Harness smoke is not release-quality
+latency, throughput or deployment memory evidence.
+
 The V27 current-vs-published default-path audit uses the same
 `cacheDisabledProxyInvocationCreatesPublisher` method on both artifacts. Run the
 current cache/resilience set with the release profile, then run only the

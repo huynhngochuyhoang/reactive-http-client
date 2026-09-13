@@ -259,6 +259,12 @@ final class BenchmarkMarkdownReport {
     }
 
     private static Classification classification(String benchmarkName) {
+        if (benchmarkName.startsWith("contextV31")) {
+            String scenario = benchmarkName.substring("contextV31".length());
+            requireScenario(benchmarkName, scenario);
+            return new Classification("V31 no-network context operation", "Starter", scenario,
+                    false, true, sortPrefix("context-v31", scenario));
+        }
         if (benchmarkName.startsWith("cacheV30NoNetwork")) {
             String scenario = benchmarkName.substring("cacheV30NoNetwork".length());
             requireScenario(benchmarkName, scenario);

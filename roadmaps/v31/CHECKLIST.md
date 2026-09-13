@@ -705,38 +705,65 @@ now has 36 cases; 124 focused docs/helper cases passed. Separate logs are in
 
 ## Priority 9 - Compatibility and Targeted Performance Evidence
 
-### [ ] 9.1 Revalidate the supported artifact surface
+### [x] 9.1 Revalidate the supported artifact surface
 
-- [ ] Run strict root and starter-module source/binary checks against independent
+- [x] Run strict root and starter-module source/binary checks against independent
       fresh Central `4.3.0` repositories, including context and mock public APIs.
-- [ ] Run negative compatibility/provenance fixtures and package/generation guards;
+- [x] Run negative compatibility/provenance fixtures and package/generation guards;
       do not relax strict checks to approve an accidental behavior or API break.
-- [ ] Run complete tests and the supported dependency matrix; record actual totals,
+- [x] Run complete tests and the supported dependency matrix; record actual totals,
       commands and toolchains, preserving failures and retried evidence separately.
-- [ ] Include current/published consumers and final composition/shutdown regressions;
+- [x] Include current/published consumers and final composition/shutdown regressions;
       retain AOT/native evidence at its exact source revision.
 
-### [ ] 9.2 Measure the changed path, not an unrelated substitute
+### [x] 9.2 Measure the changed path, not an unrelated substitute
 
-- [ ] Add targeted lookup/capture/restore measurements at realistic bounded header
+- [x] Add targeted lookup/capture/restore measurements at realistic bounded header
       counts and concurrent explicit handoffs, including absent and multi-value cases.
-- [ ] Check transient allocation and post-terminal retention separately; avoid a
+- [x] Check transient allocation and post-terminal retention separately; avoid a
       full-context copy or global retained index for one named lookup.
-- [ ] Compare unchanged cache-disabled/cached invocation paths against `4.3.0`;
+- [x] Compare unchanged cache-disabled/cached invocation paths against `4.3.0`;
       isolate any new-helper-only rows from shared baseline comparisons.
-- [ ] Exercise the real public helper/production state in measured rows and prove
+- [x] Exercise the real public helper/production state in measured rows and prove
       handoff/subscriber attachment with gates rather than short sleep assumptions.
 
-### [ ] 9.3 Review performance disposition explicitly
+### [x] 9.3 Review performance disposition explicitly
 
-- [ ] Run harness tests and smoke to verify wiring; do not treat those numbers as
+- [x] Run harness tests and smoke to verify wiring; do not treat those numbers as
       release-quality performance claims.
-- [ ] Provide reproducible current/baseline commands for a manual release-quality
+- [x] Provide reproducible current/baseline commands for a manual release-quality
       comparison when required, with separate output and fresh baseline repositories.
-- [ ] Review clean-source reports, allocation data, unmatched rows and uncertainty,
+- [x] Review clean-source reports, allocation data, unmatched rows and uncertainty,
       or document why no release-quality run/public claim is required for the scope.
-- [ ] Keep manual work pending until results are supplied and validated; record a
+- [x] Keep manual work pending until results are supplied and validated; record a
       no-public-performance-claim disposition unless reviewed comparable evidence supports it.
+
+Priority 9 evidence (2026-09-13): [compatibility and targeted performance audit](COMPATIBILITY-PERFORMANCE.md).
+Both complete Java 21 / Boot 4.0.0 and 4.1.0 rows passed 1,879 cases each,
+including three assembled-consumer cases per row. Root strict source/binary API
+checks passed on both rows; the independent starter-only Central comparison
+also passed. API/provenance negatives, generation packaging, 74 mock + 11 current
+full-consumer + 3 minimal-consumer + 4 published-consumer cases passed. The
+focused final context/docs/AOT regression passed 202 and the controlled
+post-terminal reachability lane passed 5. Native evidence retains Priority 7's
+exact clean source and binary hash, with no production/native-source changes.
+
+The final benchmark harness passed 34 cases, and the baseline-compatible harness
+passed 24 against fresh Central `4.3.0`. Allocation smoke validated all 50 current
+and 26 baseline rows: 26 matched, 24 helper-only, no baseline-only. Gates prove
+independent overlapping subscriptions and terminal cleanup; executor termination
+is asserted. The first smoke's graceful-disposal wait-thread warning, incomplete
+JDK failure, compile/runner failures and interrupted baseline resolution are
+retained separately from final passing evidence under
+`target/release-evidence/v31/priority9/`. Support sanitizer tests passed 9.
+
+Disposition: **no public performance claim**. A clean release-quality run is
+not required for this additive correctness/usability scope; optional guarded
+manual commands are documented but unexecuted. Smoke review flags are not
+resolved performance regressions or proof of parity, and no manual results are
+claimed. Evidence is based on reachable commit
+`b1cb3c0760c0f0ef584b9a64e7b5f2314059e1de` plus the recorded dirty benchmark,
+test and documentation changes. Priority 10 and release selection remain open.
 
 ## Priority 10 - Release Scope and Go/No-Go
 
