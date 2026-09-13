@@ -8,15 +8,20 @@ branch after a go decision, or an item explicitly labeled deferred/superseded,
 is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
-`CHECKLIST.md`. V1-V30 are completed release records. V30 was released as `4.3.0`.
-V31 is the only active execution roadmap, with an adopted checklist.
-The reactor is the `4.4.0` release candidate, selected for additive inbound-header
-access. [V31 release preparation](v31/RELEASE-DECISION.md) leaves signing,
-publication and archive closure pending; published baselines remain `4.3.0`.
+`CHECKLIST.md`. V1-V31 are completed release records. V31 was released as `4.4.0`.
+No execution roadmap is active. The reactor is `4.5.0-SNAPSHOT`; no next release
+scope is selected. Public/API/consumer/benchmark baselines are verified `4.4.0`.
+[V31 publication and closure](v31/RELEASE-DECISION.md#post-publication-closure)
+records signing, Central artifact verification and assembled-consumer evidence.
 
 Deferred design work that is not part of an active execution roadmap is kept
 under [`proposals/`](proposals/). These proposals do not add release gates until
 they are deliberately adopted by a future roadmap.
+
+Proposed next focus: [post-4.4.0 architecture review](proposals/POST_4_4_ARCHITECTURE_REVIEW.md),
+covering missing contracts, practical extension constraints, and evidence-backed
+improvements after V31 publication and closure. It is not an active roadmap or an
+additional `4.4.0` release gate.
 
 | Version | Roadmap | Checklist | Archive status |
 |---|---|---|---|
@@ -50,4 +55,4 @@ they are deliberately adopted by a future roadmap.
 | V28 | [Roadmap](v28/ROADMAP.md) | [Checklist](v28/CHECKLIST.md) | Completed and released as `4.1.0` |
 | V29 | [Roadmap](v29/ROADMAP.md) | [Checklist](v29/CHECKLIST.md) | Completed and released as `4.2.0` |
 | V30 | [Roadmap](v30/ROADMAP.md) | [Checklist](v30/CHECKLIST.md) | Completed and released as `4.3.0` |
-| V31 | [Roadmap](v31/ROADMAP.md) | [Checklist](v31/CHECKLIST.md) | Active |
+| V31 | [Roadmap](v31/ROADMAP.md) | [Checklist](v31/CHECKLIST.md) | Completed and released as `4.4.0` |

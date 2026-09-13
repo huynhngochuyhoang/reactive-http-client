@@ -235,9 +235,9 @@ trust and enforce decoder size/depth/schema constraints before application JSON
 conversion. Do not include rejected values in exceptions or logs. An untrusted
 sender can also send the literal marker, so its presence alone proves no origin.
 
-## Named inbound header access (4.4.0 candidate)
+## Named inbound header access (4.4.0+)
 
-The additive `4.4.0` APIs below are not available in published `4.3.0`:
+The APIs below are published in `4.4.0` and later; they are not available in `4.3.0`:
 
 | Method | Return type |
 |---|---|
@@ -371,7 +371,7 @@ A timeout outside the starter cancels the inner call; it is not the starter's
 logical-call-timeout classification. The [V31 handoff ownership report](../roadmaps/v31/ASYNC-HANDOFF-OWNERSHIP.md)
 records gated concurrency and terminal/reference-release evidence, without an
 immediate GC or RSS-reduction guarantee. These snapshot semantics also apply to
-published `4.3.0`; the named header readers above are candidate-only additions.
+published `4.3.0`; the named header readers above were added in `4.4.0`.
 
 ### Event envelope guidance
 
@@ -390,7 +390,7 @@ Choose only validated fields required by the receiving side, with explicit trust
 
 Use the full `RequestContextSnapshot` for short-lived in-process boundaries such as `Sinks.Many`, executor callbacks, or local handoff queues where the event remains inside the process and keeps the same retention expectations as the request.
 
-A candidate-only (`4.4.0`) queue handoff can capture explicit fields
+A `4.4.0` or later queue handoff can capture explicit fields
 before enqueue and restore only the values needed before the outbound call.
 On `4.3.0`, adapt the fixed-name workaround above to the selected field instead
 of using the new reader. The application validates any present request ID before

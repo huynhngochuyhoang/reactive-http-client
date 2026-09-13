@@ -9,9 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.4.0] - Unreleased
+## [4.4.0] - 2026-09-13
 
-- **`4.4.0` release candidate (pending publication).** Additive inbound-header
+- **`4.4.0` published release.** Additive inbound-header
   readers preserve the published bulk-map and explicit context-handoff contracts.
   No configuration, forwarding, automatic propagation or trust default changes.
   Loopback protocol tests do not certify Istio deployments; no memory reduction

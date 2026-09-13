@@ -11,7 +11,7 @@ operator composition order, retry-method eligibility, or master-gate meaning.
 
 ## Post-4.2 adoption: optional work admission
 
-Published `4.3.0` does not change the 4.0 resilience migration. Existing
+Published `4.3.0` and `4.4.0` do not change the 4.0 resilience migration. Existing
 `4.2.0` cache policies keep their behavior without a `work` group. To adopt
 work limits, size caller and foreground-load counts per factory/policy; add a
 separate refresh count only for an already refresh-enabled policy. Nothing
@@ -213,9 +213,9 @@ implicitly accepted consequence of the major version.
 ## Release state
 
 - Released major: `4.0.0` from tag `v4.0.0`.
-- Latest published and API baseline: `4.3.0`.
-- Public README and quick-start coordinates: `4.3.0`.
-- Current candidate: `4.4.0`; additive inbound-header access, publication pending.
+- Latest published and API baseline: `4.4.0`.
+- Public README and quick-start coordinates: `4.4.0`.
+- Current development: `4.5.0-SNAPSHOT`; no next release scope selected.
 
 ## Post-`4.1.0` cache compatibility
 

@@ -1,17 +1,19 @@
 # Reactive HTTP Client - Roadmap V31
 
-> **Status:** active
+> **Status:** completed and released as `4.4.0`
 > **Theme:** reliable inbound-header access and explicit request-context boundaries
-> **Published/API baseline:** `4.3.0`
-> **Release candidate:** `4.4.0` (not published)
+> **Implementation baseline:** `4.3.0`; post-publication baseline: `4.4.0`
+> **Release:** `4.4.0` (published 2026-09-13)
 > **Release scope:** additive inbound-header access; [release review](RELEASE-DECISION.md)
-> **Execution:** [adopted checklist](CHECKLIST.md); publication and archive gates remain open
+> **Execution:** [completed checklist](CHECKLIST.md); publication and archive gates verified
 
-The proposal below preserves the adopted scope; its checklist and release review
-record delivered behavior and evidence. V31 is the sole active execution roadmap.
-V1-V30 remain completed records. The `4.4.0` additive candidate is selected by
-Priority 10's scope review, not by its former snapshot coordinate. No public
-default changes or publication are claimed.
+The proposal below preserves the adopted scope; its completed checklist and
+[post-publication review](RELEASE-DECISION.md#post-publication-closure) record
+actual delivery and evidence. V1-V31 are completed release records. The additive
+`4.4.0` release is published and verified. The next development coordinate is
+`4.5.0-SNAPSHOT`, with no release scope or execution roadmap selected. The
+[architecture review proposal](../proposals/POST_4_4_ARCHITECTURE_REVIEW.md)
+remains unadopted. No public default changes are claimed.
 The [resilience activation proposal](../proposals/OPT_IN_RESILIENCE_ACTIVATION.md)
 was adopted by V27 and is not additional V31 work.
 

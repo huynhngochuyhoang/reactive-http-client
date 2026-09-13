@@ -7,7 +7,7 @@ logs, or application metrics.
 
 ## Current release scope
 
-Current consumer instructions apply to published starter `4.3.0` on Spring Boot
+Current consumer instructions apply to published starter `4.4.0` on Spring Boot
 4. The repository may contain a newer snapshot while the next release is being
 prepared. Use the published coordinates from the [Quick Start](01-quick-start.md)
 for applications and reserve snapshot commands for the explicitly labeled
@@ -54,8 +54,8 @@ historical evidence.
 
 ## Inbound header and context triage
 
-This procedure applies to published `4.3.0` capture and explicit snapshots.
-The case-insensitive named readers are candidate-only `4.4.0` APIs;
+This procedure applies to published `4.4.0` capture and explicit snapshots.
+The case-insensitive named readers are available in `4.4.0` and later;
 use the [published workaround](09-correlation-id.md#published-430-named-lookup-workaround)
 on `4.3.0`. Do not lowercase the legacy map globally or remove deny rules to
 recover a field.
