@@ -309,7 +309,10 @@ also have different meanings.
 On published `4.3.0`, map lookups retain exact spelling; use the
 [published workaround](09-correlation-id.md#published-430-named-lookup-workaround)
 for application inspection. The two case-insensitive named helpers are
-`4.4.0-SNAPSHOT` additions, not new logging fields. They reject duplicate values
-before application parsing. A snapshot does not imply automatic forwarding,
+`4.4.0-SNAPSHOT` additions, not new logging fields.
+Only `RequestContext.inboundHeader` rejects multiplicity, including equal duplicates.
+`RequestContext.inboundHeaderValues` returns duplicates and case-alias values unchanged
+in captured order; callers must validate multiplicity before singleton parsing.
+A snapshot does not imply automatic forwarding,
 MDC propagation, or restoration into another subscription. Logger/observer
 records kept by application code retain their snapshots until explicitly released.

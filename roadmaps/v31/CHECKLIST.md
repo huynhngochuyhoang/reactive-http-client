@@ -689,6 +689,14 @@ public diagnostics schema, meter, configuration default or version changed;
 published `4.3.0`, candidate `4.4.0-SNAPSHOT`, and archived V30 evidence remain
 distinct. Priorities 9 and 10 remain open.
 
+Priority 8 review follow-up (2026-09-13): the logging guide now distinguishes
+singleton ambiguity rejection from unchanged plural values. Capture-policy
+guards reject omitted names and denied values without one marker per captured
+name, without imposing those rules on later reads or unknown observations.
+The documentation contract now has 32 cases; the focused docs/helper/filter
+rerun passed 127 cases. See the [review follow-up](DOCUMENTATION-OPERATIONS.md#review-follow-up)
+for the separate failing and passing evidence.
+
 ## Priority 9 - Compatibility and Targeted Performance Evidence
 
 ### [ ] 9.1 Revalidate the supported artifact surface

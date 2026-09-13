@@ -48,6 +48,14 @@ only locally for the finite investigation, never in this bundle.
 | `exactNamePresent` | Boolean for a valid/absent map; null for malformed/unknown. This is exact spelling, not an HTTP-style match. |
 | `matchingNameCount`, `valueCount`, `emptyValueCount`, `redactedValueCount` | Integers 0..64, including zero; counts over 64 require narrowing the capture, not clipping. Absent context has zero counts; malformed/unknown has null counts. Matching empty lists can have positive name count and zero values. Empty and literal marker counts are disjoint subsets of value count. |
 
+At the capture boundary, known `omitted` selection requires no matching names
+and zero values, even when the field is denied. For a known `denied` field,
+each captured name contributes exactly one marker: value and redacted counts
+equal the matching-name count, with no empty values. Unknown decisions do not
+prove those transformations, and later read-boundary observations may reflect
+application context changes. A `not-denied` decision does not rule out a
+sender-supplied literal marker.
+
 The fixture illustrates exact spelling absent but one case-insensitive match at
 both boundaries. Counts do not prove value equality, identity, or which hop
 changed spelling. `redactedValueCount` counts literal `[REDACTED]` markers; only

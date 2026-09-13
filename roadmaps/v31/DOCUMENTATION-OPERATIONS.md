@@ -93,3 +93,26 @@ fresh Central published-consumer verification. Full release compatibility,
 benchmark disposition and release gates remain in Priorities 9 and 10. Priority
 7 native evidence remains at its recorded fixture revision, not reattributed to
 this documentation-only change.
+
+## Review Follow-Up
+
+2026-09-13, based on `198c2e5e842875cb85cbaa419179324ad86304e3` plus uncommitted
+documentation/test fixes. Only the singleton `inboundHeader` rejects duplicate
+values; `inboundHeaderValues` returns duplicates and case aliases unchanged.
+The support validator now cross-checks known policy decisions at capture:
+omitted names have zero counts, and each captured denied name has one marker
+and no empty values. Unknown decisions and later read-boundary changes remain
+representable; a not-denied field may contain a sender-supplied literal marker.
+
+The regression-first run recorded three expected failures (wording, omitted
+capture, denied capture). After the fixes, 127 cases passed: 32 documentation
+contract, 49 release-artifact, 39 named-reader and 7 inbound-filter cases, with
+zero failures/errors/skips. The earlier totals above remain their original-run
+evidence, not counts for this revision. Logs are in
+`target/release-evidence/v31/priority8/policy-review/` (`red.log`, `red.xml`,
+`green.log`, and final `completion.log`). No runtime or fixture data changed.
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter -Dtest=InboundContextDocumentationContractTest,DocumentationReleaseArtifactTest,RequestContextHeaderAccessTest,InboundHeadersWebFilterTest test
+git diff --check
+```

@@ -98,6 +98,9 @@ class InboundContextDocumentationContractTest {
         String support = Files.readString(root().resolve("docs/26-support-bundles.md"));
         assertThat(support).contains("fixtures/support-bundle-inbound-context.json",
                 "not** a new diagnostics", "No new meter or public diagnostic field");
+        String logging = Files.readString(root().resolve("docs/13-exchange-logging.md"));
+        assertThat(logging).contains("Only `RequestContext.inboundHeader` rejects multiplicity",
+                "`RequestContext.inboundHeaderValues` returns duplicates and case-alias values unchanged");
     }
 
     @Test
@@ -202,6 +205,53 @@ class InboundContextDocumentationContractTest {
         validate(fixture);
     }
 
+    @Test
+    void fixtureRejectsOmittedNamesAtTheCaptureBoundaryEvenWithEmptyLists() throws Exception {
+        for (int values : List.of(0, 1)) {
+            JsonNode fixture = fixture();
+            ((ObjectNode) fixture.path("capturePolicy")).put("allowDecision", "omitted");
+            ((ObjectNode) fixture.at("/observations/0")).put("valueCount", values);
+            assertThatThrownBy(() -> validate(fixture)).isInstanceOf(AssertionError.class);
+        }
+    }
+
+    @Test
+    void fixtureRejectsDeniedCaptureCountsWithoutExactlyOneMarkerPerName() throws Exception {
+        for (int[] counts : List.of(
+                new int[]{1, 1, 0, 0}, new int[]{1, 0, 0, 0}, new int[]{1, 2, 0, 2},
+                new int[]{1, 2, 1, 1}, new int[]{2, 1, 0, 1}, new int[]{2, 2, 0, 1})) {
+            JsonNode fixture = fixture();
+            ((ObjectNode) fixture.path("capturePolicy")).put("denyDecision", "denied");
+            ObjectNode capture = (ObjectNode) fixture.at("/observations/0");
+            for (int i = 0; i < COUNTS.size(); i++) { capture.put(COUNTS.get(i), counts[i]); }
+            assertThatThrownBy(() -> validate(fixture)).isInstanceOf(AssertionError.class);
+        }
+    }
+
+    @Test
+    void fixturePreservesOmissionPrecedenceUnknownPolicyAndLaterReadChanges() throws Exception {
+        for (String allow : List.of("selected", "omitted", "unknown")) {
+            for (String deny : List.of("denied", "not-denied", "unknown")) {
+                JsonNode fixture = fixture();
+                ((ObjectNode) fixture.path("capturePolicy")).put("allowDecision", allow).put("denyDecision", deny);
+                ObjectNode capture = (ObjectNode) fixture.at("/observations/0");
+                if (allow.equals("omitted")) {
+                    COUNTS.forEach(count -> capture.put(count, 0));
+                } else if (deny.equals("denied")) {
+                    capture.put("matchingNameCount", 2).put("valueCount", 2).put("redactedValueCount", 2);
+                } else {
+                    // A literal marker can be supplied by the sender, not just by the deny-list.
+                    capture.put("redactedValueCount", 1);
+                }
+                // The read record deliberately remains populated and unredacted.
+                validate(fixture);
+                capture.put("contextState", "unknown").putNull("exactNamePresent");
+                COUNTS.forEach(capture::putNull);
+                validate(fixture);
+            }
+        }
+    }
+
     private static void validate(JsonNode fixture) {
         fields(fixture, "schemaVersion", "versions", "window", "webStack", "protocolHops", "capturePolicy", "observations");
         assertThat(integer(fixture.path("schemaVersion"), 1, 1)).isEqualTo(1);
@@ -262,6 +312,16 @@ class InboundContextDocumentationContractTest {
             }
             assertThat(observation.path("emptyValueCount").intValue()
                     + observation.path("redactedValueCount").intValue()).isLessThanOrEqualTo(values);
+            if (i == 0) {
+                if (fixture.at("/capturePolicy/allowDecision").asText().equals("omitted")) {
+                    assertThat(matching).isZero();
+                }
+                if (fixture.at("/capturePolicy/denyDecision").asText().equals("denied")) {
+                    assertThat(values).isEqualTo(matching);
+                    assertThat(observation.path("redactedValueCount").intValue()).isEqualTo(matching);
+                    assertThat(observation.path("emptyValueCount").intValue()).isZero();
+                }
+            }
         }
     }
 
