@@ -181,11 +181,13 @@ commands, local signing failure and subsequent successful publication.
 After fresh Maven Central artifact and assembled-consumer verification, public
 consumer, strict API and benchmark baselines are published `4.4.0`.
 Reactor-only coordinates use `4.5.0-SNAPSHOT`. V1-V31 are completed release
-records; no execution roadmap or next release scope is selected.
+records. [V32](../roadmaps/v32/ROADMAP.md) has an
+[adopted execution checklist](../roadmaps/v32/CHECKLIST.md) for architecture
+review; implementation and next release scope remain unselected.
 The [V31 release review](../roadmaps/v31/RELEASE-DECISION.md#post-publication-closure)
 records verified signing, packaging, publication and Central consumption.
 The [architecture proposal](../roadmaps/proposals/POST_4_4_ARCHITECTURE_REVIEW.md)
-is not adopted execution work.
+remains the historical design input; adoption does not approve production changes.
 
 ### V31 additive surface freeze
 
@@ -967,9 +969,11 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V31 is published and archived at `4.4.0`. The current reactor is
-`4.5.0-SNAPSHOT`, with no active roadmap, unselected release scope and
-`plannedFinalVersion=null`. Generated readiness leaves future publication
-deferred until a release cut. The
+`4.5.0-SNAPSHOT`, with active roadmap `v32`, unselected release scope and
+`plannedFinalVersion=null`. Architecture-review adoption does not select a final
+release. Generated readiness leaves future publication deferred until a release
+cut; a review-only closure may make release-only checks not applicable with a
+recorded decision. The
 [V31 release decision](../roadmaps/v31/RELEASE-DECISION.md#post-publication-closure)
 records completed external verification separately from the conservative
 generated manual-command list. Future pending checks do not reopen V31.

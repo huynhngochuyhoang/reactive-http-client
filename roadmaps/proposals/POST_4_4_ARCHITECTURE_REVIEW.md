@@ -1,6 +1,8 @@
 # Post-4.4.0 Architecture Review Proposal
 
-> **Status:** proposed; not adopted by an execution roadmap
+> **Status:** adopted by [Roadmap V32](../v32/ROADMAP.md); not part of V31
+> execution or release scope
+> **Adopted:** 2026-09-14
 > **Timing:** after verified `4.4.0` publication and V31 closure
 > **Theme:** missing contracts, extension constraints, and justified improvements
 > **Compatibility:** review first; classify each accepted change separately
@@ -16,11 +18,13 @@ selecting more features. Answer four questions:
 4. Which improvements are genuinely needed, and which should remain unchanged,
    application-owned, documented limitations, or deferred proposals?
 
-This is a proposal for the next roadmap, not an active V32 checklist or a promise
-of a `4.5.0` release. It adds no V31 release gate and does not claim that `4.4.0`
-has been published. Review preparation may happen now; execution adopts a verified
-published baseline after [V31](../v31/ROADMAP.md) closes. A review that justifies no
-production change is a valid outcome.
+Originally proposed before `4.4.0` publication, this review is now adopted by V32
+after [V31 publication and closure](../v31/RELEASE-DECISION.md#post-publication-closure).
+The [V32 execution checklist](../v32/CHECKLIST.md) records current progress and
+requires an explicit maintainer scope decision before production changes.
+Adoption adds no V31 release gate and does not promise a `4.5.0` release. A review
+that justifies no production change is a valid outcome. The scope and review
+sequence below preserve the original proposal.
 
 ## Starting Points
 
@@ -169,7 +173,7 @@ Do not make completion depend on resolving every possible architectural concern.
 - Keep V1-V31 evidence and the already-adopted resilience proposal unchanged.
   This proposal neither changes coordinates nor authorizes publication.
 
-## Adoption Criteria
+## Original Adoption Criteria
 
 The proposal is ready to become the next execution roadmap when `4.4.0`
 publication and V31 closure are verified, review deliverables and scope exclusions
