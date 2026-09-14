@@ -9,9 +9,9 @@
 
 Execution companion to [`ROADMAP.md`](ROADMAP.md), developed from the
 [architecture review proposal](../proposals/POST_4_4_ARCHITECTURE_REVIEW.md).
-Adoption starts the review; it does not complete Priority 1, confirm a defect,
-authorize a refactor or select `4.5.0` for publication. All execution items begin
-unchecked. V1-V31 and their release evidence remain unchanged.
+Adoption started the review; it did not complete Priority 1, confirm a defect,
+authorize a refactor or select `4.5.0` for publication. Completion below requires
+recorded evidence. V1-V31 and their release evidence remain unchanged.
 
 Execute priorities in order. Reordering characterization work requires a recorded
 dependency/risk reason. Production edits require Priority 8's explicit maintainer
@@ -75,55 +75,98 @@ or swap dependencies merely to satisfy a review item.
 
 ## Review Records
 
-The following records are planned outputs, not existing evidence. Keep detailed
-matrices as sections in these records unless their size justifies a separate file.
+The baseline and finding register now exist; the remaining records are planned
+outputs, not completed evidence. Keep detailed matrices as sections in these
+records unless their size justifies a separate file.
 
 | Record | Contents |
 |---|---|
-| `BASELINE-SCOPE.md` | Verified baseline, historical decision inventory and review coverage |
+| [BASELINE-SCOPE.md](BASELINE-SCOPE.md) | Verified baseline, historical decision inventory and review coverage |
 | `ARCHITECTURE-MAP.md` | Module, decision, composition and ownership maps with source/test references |
 | `EXTENSION-SCENARIOS.md` | External-consumer attempts, observations and supported/limited/gap classifications |
-| `FINDINGS.md` | Stable finding IDs, evidence, alternatives, priorities and dispositions |
+| [FINDINGS.md](FINDINGS.md) | Register structure and decision gate; no confirmed findings yet |
 | `ARCHITECTURE-DECISION.md` | Maintainer scope decision, selected-item verification and final review/release disposition |
 
 ---
 
 ## Priority 1 - Post-`4.4.0` Baseline and V32 Scope Integrity
 
-### [ ] 1.1 Align published, development and execution state
+### [x] 1.1 Align published, development and execution state
 
-- [ ] Verify root/module and current-consumer/native/benchmark fixture coordinates
+- [x] Verify root/module and current-consumer/native/benchmark fixture coordinates
       remain `4.5.0-SNAPSHOT`, with no adoption-only version or dependency bump.
-- [ ] Verify public examples, published consumer, strict API and benchmark
+- [x] Verify public examples, published consumer, strict API and benchmark
       baselines remain `4.4.0`; include shipped V31 rows in baseline discovery.
-- [ ] Verify V32's roadmap/checklist/index and archive guard agree on active review;
+- [x] Verify V32's roadmap/checklist/index and archive guard agree on active review;
       readiness keeps implementation/release scope unselected and no planned final
       version. Checklist adoption itself is not Priority 1 completion.
-- [ ] Preserve V1-V31 and proposal history; distinguish adopted design input from
+- [x] Preserve V1-V31 and proposal history; distinguish adopted design input from
       proposals that remain outside V32.
 
-### [ ] 1.2 Establish reproducible baseline evidence
+### [x] 1.2 Establish reproducible baseline evidence
 
-- [ ] Record the reachable reviewed source, release tag and clean/dirty state;
+- [x] Record the reachable reviewed source, release tag and clean/dirty state;
       identify which V31 artifacts and claims can be reused unchanged.
-- [ ] Verify all 13 parent/module POM, binary, source and Javadoc artifacts and
+- [x] Verify all 13 parent/module POM, binary, source and Javadoc artifacts and
       assembled published consumption from isolated Central-only repositories;
       fresh verification or reused exact evidence must be identified explicitly.
-- [ ] Preserve versions, hashes, Central markers, consumer classpaths, effective
+- [x] Preserve versions, hashes, Central markers, consumer classpaths, effective
       POMs, dependency trees and actual test totals; reject reactor-output leakage.
-- [ ] Record Java/Boot support and existing API, native and benchmark evidence
+- [x] Record Java/Boot support and existing API, native and benchmark evidence
       with exact provenance; do not present old runs as new V32 validation.
 
-### [ ] 1.3 Freeze review coverage, not implementation
+### [x] 1.3 Freeze review coverage, not implementation
 
-- [ ] Reconcile V1-V31 decisions and reports into delivered, superseded, relevant
+- [x] Reconcile V1-V31 decisions and reports into delivered, superseded, relevant
       constraints and unverified hypotheses, without reopening proposal boxes.
-- [ ] List reviewed modules, extension needs and explicit exclusions; identify
+- [x] List reviewed modules, extension needs and explicit exclusions; identify
       reported application cases separately from exploratory cases.
-- [ ] Create the baseline/scope record and finding-register structure, including
+- [x] Create the baseline/scope record and finding-register structure, including
       evidence requirements and the Priority 8 maintainer decision gate.
-- [ ] Verify documentation links, archive/readiness consistency and applicable
+- [x] Verify documentation links, archive/readiness consistency and applicable
       baseline guards; record actual results without selecting a release.
+
+Completed on 2026-09-14. [BASELINE-SCOPE.md](BASELINE-SCOPE.md) records the
+reachable clean starting commit `e284ced3219aa69c11e7a92405e8d949644127b8`,
+release tag/commit, all V1-V31 dispositions, reported versus exploratory cases,
+coverage and exclusions. [FINDINGS.md](FINDINGS.md) establishes stable IDs and
+evidence/decision fields without inventing findings or approving implementation.
+
+- Exact V31 artifact and consumer evidence was reused and revalidated, not
+  freshly downloaded or rerun. Both sealed historical inventories passed;
+  all 13 published artifacts, Central markers, POM/JAR versions and packaged
+  main sources were checked. Four baseline and eleven full-profile published
+  consumer cases retain passing XML, effective POMs, dependency trees and
+  isolated artifact-only classpaths. The sealed fixture source archive is
+  bridged to reachable `v4.4.0`; squash-local hashes are not treated as ancestors.
+- Strict API, current/published discovery (34 cases each), native and Boot
+  matrix evidence retains original source/toolchain provenance. Historical
+  1,879-case matrix rows, native fixture/binary and benchmark source/report
+  hashes were checked. No new API comparison, native build, matrix execution
+  or timing/allocation measurement is claimed. V31's no-public-performance-claim
+  disposition remains intact.
+- Fresh Maven `validate` passed all four reactor projects. Published-baseline
+  negative fixtures passed (Central provenance, missing/mixed artifacts,
+  attachments, embedded versions and root/module self-comparison). API fixtures
+  passed additive/defaulted-annotation cases and rejected source-only checked
+  exceptions, removed constructors/methods/enum constants and incompatible
+  report-only deltas.
+- `DocumentationReleaseArtifactTest` passed **53 tests**, zero failures/errors/
+  skips. It checks version/fixture alignment, V31 benchmark row inclusion,
+  archive/adopted-proposal/readiness state and all new record links. Readiness
+  remains active `v32`, snapshot development, release/candidate scope unselected
+  and no planned final version. Script syntax and `git diff --check` passed.
+- Toolchain: Maven 3.9.9, Oracle JDK 21.0.8, Java target 21, Boot 4.0.0 and
+  `.mvn/maven-central-settings.xml`. Validation/reuse began on the clean commit;
+  documentation runs include the recorded uncommitted test/record patch. The
+  expected absent-record red test and unsuccessful temporary matrix recount
+  remain separate from passing results.
+- Commands, actual reports, source state, original/reused provenance, current
+  readiness and artifact/report hashes are under
+  `target/release-evidence/v32/priority1/`, covered by `SHA256SUMS`. Preserve the
+  referenced V31 bundles before a root clean. No production, dependency,
+  coordinate, historical-roadmap or proposal edit, signing or publication was
+  performed. Priorities 2-12 remain open; Priority 8 still gates production work.
 
 ## Priority 2 - Architecture, Contract, and Ownership Map
 

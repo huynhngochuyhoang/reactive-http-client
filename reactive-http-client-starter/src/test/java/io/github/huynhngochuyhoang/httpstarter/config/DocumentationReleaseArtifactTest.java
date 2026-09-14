@@ -196,6 +196,40 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32BaselineRecordsHistoryAndEvidenceWithoutAuthorizingImplementation() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v32");
+        String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
+        String findings = Files.readString(directory.resolve("FINDINGS.md"));
+
+        assertThat(baseline)
+                .contains("> **Published baseline:** `4.4.0`")
+                .contains("> **Development coordinate:** `4.5.0-SNAPSHOT`")
+                .contains("> **Implementation and release scope:** unselected")
+                .contains("## Reused Evidence", "## Historical Decision Inventory",
+                        "## Review Coverage", "## Reported and Exploratory Cases")
+                .contains("not fresh Central downloads", "not a new native build",
+                        "no-public-performance-claim", "(FINDINGS.md)");
+        for (int version = 1; version <= 31; version++) {
+            assertThat(baseline).as("V%s historical decision", version)
+                    .contains("[V" + version + "](../v" + version + "/ROADMAP.md)");
+        }
+        assertThat(findings).contains("## Required Finding Fields", "## Decision Gate",
+                "Priority 8.3", "No production change is authorized", "(BASELINE-SCOPE.md)");
+        for (Path document : List.of(directory.resolve("BASELINE-SCOPE.md"), directory.resolve("FINDINGS.md"))) {
+            var links = java.util.regex.Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)")
+                    .matcher(Files.readString(document));
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) {
+                    assertThat(document.getParent().resolve(target).normalize())
+                            .as("%s link to %s", document.getFileName(), target).exists();
+                }
+            }
+        }
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
