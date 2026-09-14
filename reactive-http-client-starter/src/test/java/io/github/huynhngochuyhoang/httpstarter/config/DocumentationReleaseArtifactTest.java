@@ -169,6 +169,30 @@ class DocumentationReleaseArtifactTest {
                 .containsPattern("(?m)^### \\[[ x]\\] 12\\.2 Select review-only or release scope$");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("active roadmap `v32`", "unselected release scope");
+        String proposal = Files.readString(root.resolve("roadmaps/proposals/POST_4_4_ARCHITECTURE_REVIEW.md"));
+        assertThat(proposal.lines().filter(line -> line.startsWith("> **Status:**")).toList())
+                .containsExactly("> **Status:** adopted by [Roadmap V32](../v32/ROADMAP.md); not part of V31");
+        assertThat(proposal).contains("(../v32/CHECKLIST.md)")
+                .doesNotContain("proposed; not adopted", "not an active V32 checklist");
+    }
+
+    @Test
+    void v32ReadinessRemainsActiveThroughReleaseCutAndPublicationBeforeArchive() throws IOException {
+        Path root = projectRoot();
+        List<ReleaseVersionContract> states = List.of(
+                releaseVersionContract("4.5.0-SNAPSHOT", "4.4.0", "## [Unreleased]\n"),
+                releaseVersionContract("4.5.0", "4.4.0", "## [4.5.0] - Unreleased\n"),
+                releaseVersionContract("4.5.0", "4.5.0", "## [4.5.0] - 2026-09-14\n"));
+
+        for (ReleaseVersionContract state : states) {
+            String version = state.developmentVersion() != null ? state.developmentVersion() : "4.5.0";
+            Map<String, Object> readiness = releaseReadiness(root, version, "4.4.0", state,
+                    benchmarkEvidence(version, "4.4.0", state, false), List.of(), List.of());
+
+            assertThat(readiness).as(state.releaseState()).containsEntry("activeRoadmap", "v32");
+            assertThat(readiness.get("releaseCandidate"))
+                    .isEqualTo(majorReleaseCandidate(version, state));
+        }
     }
 
     @Test
@@ -4517,7 +4541,9 @@ class DocumentationReleaseArtifactTest {
         readiness.put("projectVersion", projectVersion);
         readiness.put("apiCompatibilityBaselineVersion", baselineVersion);
         readiness.put("apiCompatibilityBaselineMatchesProjectVersion", projectVersion.equals(baselineVersion));
-        readiness.put("activeRoadmap", "4.5.0-SNAPSHOT".equals(projectVersion) ? "v32" : null);
+        boolean v32Active = Files.readString(root.resolve("roadmaps/v32/CHECKLIST.md"))
+                .lines().anyMatch("> **Status:** active"::equals);
+        readiness.put("activeRoadmap", v32Active ? "v32" : null);
         readiness.put("releaseLane", "4.4.0".equals(projectVersion) ? "additive-minor" : "unselected");
         readiness.put("releaseCandidate", majorReleaseCandidate(projectVersion, versionContract));
         readiness.put("generatedTestEvidence", readinessStatus("pass",
