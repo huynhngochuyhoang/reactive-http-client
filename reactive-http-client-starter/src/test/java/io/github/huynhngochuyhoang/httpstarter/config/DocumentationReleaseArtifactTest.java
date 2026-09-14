@@ -230,6 +230,62 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32ArchitectureMapCoversEveryInvariantWithoutSelectingImplementation() throws IOException {
+        Path root = projectRoot();
+        String architecture = Files.readString(root.resolve("roadmaps/v32/ARCHITECTURE-MAP.md"));
+        String checklist = Files.readString(root.resolve("roadmaps/v32/CHECKLIST.md"));
+        String invariants = checklist.split("## Required Invariants", 2)[1].split("## Review Records", 2)[0];
+
+        for (String row : invariants.lines().filter(line -> line.startsWith("| ")).skip(1).toList()) {
+            String surface = row.split("\\|", -1)[1].trim();
+            assertThat(architecture).as("mapped invariant %s", surface).contains("| " + surface + " |");
+        }
+        assertThat(architecture).contains("> **Implementation and release scope:** unselected",
+                "## Module and Dependency Map", "## Supported Extension Surfaces",
+                "## Authoritative Inputs", "## Execution Sequences", "## State and Synchronization",
+                "## Invariant Evidence", "## Coverage and Open Questions",
+                "not a whole-system proof", "Priority 8.3", "application-owned");
+        assertThat(architecture.lines().filter("sequenceDiagram"::equals).count()).isGreaterThanOrEqualTo(3);
+        Matcher diagrams = Pattern.compile("(?s)```mermaid\\R(.*?)```").matcher(architecture);
+        while (diagrams.find()) {
+            assertThat(diagrams.group(1))
+                    .as("sequence labels must not contain unescaped Mermaid statement separators")
+                    .doesNotContain(";");
+        }
+        assertThat(architecture).contains("startup", "independent", "shared", "refresh", "shutdown");
+    }
+
+    @Test
+    void v32ArchitectureMapReferencesExistingSourcesAndTests() throws IOException {
+        Path root = projectRoot();
+        Path document = root.resolve("roadmaps/v32/ARCHITECTURE-MAP.md");
+        String architecture = Files.readString(document);
+        Matcher references = Pattern.compile("(?m)^\\[([^]]+)]: (\\S+)$").matcher(architecture);
+        Set<String> targets = new HashSet<>();
+        while (references.find()) {
+            String target = references.group(2);
+            Path resolved = document.getParent().resolve(target).normalize();
+            assertThat(resolved).as("architecture reference %s", references.group(1)).exists();
+            targets.add(target);
+        }
+        assertThat(targets.stream().filter(target -> target.contains("/src/main/")).count())
+                .isGreaterThanOrEqualTo(15);
+        assertThat(targets.stream().filter(target -> target.contains("/src/test/")).count())
+                .isGreaterThanOrEqualTo(10);
+        Matcher methods = Pattern.compile("`([A-Za-z0-9]+Test)#([A-Za-z0-9]+)`").matcher(architecture);
+        int methodReferences = 0;
+        while (methods.find()) {
+            String fileName = "/" + methods.group(1) + ".java";
+            String target = targets.stream().filter(path -> path.endsWith(fileName)).findFirst().orElseThrow();
+            assertThat(Files.readString(document.getParent().resolve(target).normalize()))
+                    .as("documented evidence method %s", methods.group())
+                    .contains(methods.group(2) + "(");
+            methodReferences++;
+        }
+        assertThat(methodReferences).isGreaterThanOrEqualTo(10);
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

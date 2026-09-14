@@ -75,14 +75,14 @@ or swap dependencies merely to satisfy a review item.
 
 ## Review Records
 
-The baseline and finding register now exist; the remaining records are planned
-outputs, not completed evidence. Keep detailed matrices as sections in these
+The baseline, architecture map and finding register now exist; the remaining
+records are planned outputs, not completed evidence. Keep detailed matrices in these
 records unless their size justifies a separate file.
 
 | Record | Contents |
 |---|---|
 | [BASELINE-SCOPE.md](BASELINE-SCOPE.md) | Verified baseline, historical decision inventory and review coverage |
-| `ARCHITECTURE-MAP.md` | Module, decision, composition and ownership maps with source/test references |
+| [ARCHITECTURE-MAP.md](ARCHITECTURE-MAP.md) | Module, decision, composition and ownership maps with source/test references |
 | `EXTENSION-SCENARIOS.md` | External-consumer attempts, observations and supported/limited/gap classifications |
 | [FINDINGS.md](FINDINGS.md) | Register structure and decision gate; no confirmed findings yet |
 | `ARCHITECTURE-DECISION.md` | Maintainer scope decision, selected-item verification and final review/release disposition |
@@ -170,34 +170,104 @@ evidence/decision fields without inventing findings or approving implementation.
 
 ## Priority 2 - Architecture, Contract, and Ownership Map
 
-### [ ] 2.1 Map dependencies and supported surfaces
+### [x] 2.1 Map dependencies and supported surfaces
 
-- [ ] Map starter, test-helper, OTel and evidence-tooling dependencies, including
+- [x] Map starter, test-helper, OTel and evidence-tooling dependencies, including
       shared packages, public internal bridges and optional linkage boundaries.
-- [ ] Inventory documented extension points and replacement rules; distinguish
+- [x] Inventory documented extension points and replacement rules; distinguish
       public supported APIs from internal cooperation without assuming removability.
-- [ ] Record authoritative configuration/metadata inputs and dependencies between
+- [x] Record authoritative configuration/metadata inputs and dependencies between
       assembly, declarative planning, invocation, transport, cache and reporting.
-- [ ] Attach source and existing test references; record what remains uninspected.
+- [x] Attach source and existing test references; record what remains uninspected.
 
-### [ ] 2.2 Trace execution and lifetime boundaries
+### [x] 2.2 Trace execution and lifetime boundaries
 
-- [ ] Trace successful and failed startup, ordinary Mono/Flux calls and shutdown.
-- [ ] Trace cache hits, independent misses, shared flights and refresh, including
+- [x] Trace successful and failed startup, ordinary Mono/Flux calls and shutdown.
+- [x] Trace cache hits, independent misses, shared flights and refresh, including
       preparation, non-dispatching probes, transport and terminal publication.
-- [ ] Distinguish factory, method, logical caller, attempt, shared load, refresh,
+- [x] Distinguish factory, method, logical caller, attempt, shared load, refresh,
       connection/stream and application-owned lifetimes in sequence diagrams.
-- [ ] Inventory mutable/frozen state, decision caches, context/scheduler transitions,
+- [x] Inventory mutable/frozen state, decision caches, context/scheduler transitions,
       lock boundaries, bean discovery and resource transfer points.
 
-### [ ] 2.3 Connect invariants to owners and evidence
+### [x] 2.3 Connect invariants to owners and evidence
 
-- [ ] For each required invariant, name its owner, enforcing path, transfer/release
+- [x] For each required invariant, name its owner, enforcing path, transfer/release
       rule and tests that actually observe it.
-- [ ] Separate missing behavior, missing documentation and missing verification;
+- [x] Separate missing behavior, missing documentation and missing verification;
       do not classify file size or duplication alone as an architectural gap.
-- [ ] Publish the as-is map with bounded open questions and a coverage ledger
+- [x] Publish the as-is map with bounded open questions and a coverage ledger
       that later review priorities can extend without duplicating the map.
+
+**Priority 2 evidence (2026-09-14):**
+
+- [ARCHITECTURE-MAP.md](ARCHITECTURE-MAP.md) records the module/optional linkage,
+  supported extension and replacement surfaces, authoritative decision inputs,
+  four execution sequences, state/lock/context ownership and all ten required
+  invariant owners with source-linked observing tests. Q1-Q6 are bounded review
+  questions for Priorities 3-7, not findings or authorization to change production.
+- The map explicitly distinguishes independent caller-owned loads from manager-owned
+  flights/refreshes, local construction rollback from unverified late assembly
+  failure paths, and mutable property objects from enforced frozen cache bounds.
+  No blanket leak, cleanup, configuration immutability or mesh diagnosis is made.
+- Source baseline: reachable commit `876bbda919a9f9720926f3e1277e38fadd95ddaa`.
+  Review began clean; verification includes the recorded uncommitted map/checklist
+  and documentation-test patch. Only those three files changed. Maven 3.9.9,
+  Oracle JDK 21.0.8, Java target 21, Boot 4.0.0 and
+  `.mvn/maven-central-settings.xml`; reactor/baseline stay
+  `4.5.0-SNAPSHOT` / `4.4.0`.
+- Two new documentation tests first errored on the deliberately absent map, then
+  passed. They check invariant coverage, scope, sequence presence, source/test
+  links and named evidence methods. The focused boundary regression passed
+  **313 tests in 12 classes**, zero failures/errors/skips, with this exact selector:
+
+  ```bash
+  mvn -B -ntp -s .mvn/maven-central-settings.xml \
+    -pl reactive-http-client-starter \
+    '-Dtest=DocumentationReleaseArtifactTest,ReactiveHttpClientAutoConfigurationTest,ReactiveHttpClientAotSmokeTest,EffectiveResiliencePolicyTest,SubscriptionReportingStateTest,BoundedLocalResponseCacheContractTest,CacheCallerAdmissionContractTest,CacheWorkCompositionContractTest,CacheWorkTelemetryContractTest,ReactiveHttpClientDiagnosticsProviderTest,CacheWorkOwnershipContractTest#valuedSourceKeepsItsReservationUntilCompletionOrCancellationCleanup,TransportResourceOwnershipStressTest#factoryDestroyWaitsForConnectionProviderDisposal' \
+    test
+  ```
+
+  | Class / selected method | Executed cases |
+  |---|---:|
+  | DocumentationReleaseArtifactTest | 55 |
+  | ReactiveHttpClientAutoConfigurationTest | 21 |
+  | ReactiveHttpClientAotSmokeTest | 27 |
+  | EffectiveResiliencePolicyTest | 2 |
+  | SubscriptionReportingStateTest | 4 |
+  | BoundedLocalResponseCacheContractTest | 51 |
+  | CacheCallerAdmissionContractTest | 44 |
+  | CacheWorkCompositionContractTest | 23 |
+  | CacheWorkTelemetryContractTest | 21 |
+  | ReactiveHttpClientDiagnosticsProviderTest | 61 |
+  | CacheWorkOwnershipContractTest: valued-source cleanup only | 3 |
+  | TransportResourceOwnershipStressTest: factory disposal only | 1 |
+
+- Final documentation verification uses the same Maven options with
+  `-Dtest=DocumentationReleaseArtifactTest`: **55 tests passed**, zero
+  failures/errors/skips. `git diff --check` and the new-file whitespace check
+  passed; source scope and XML totals are checked again in the evidence audit.
+- Rendering follow-up (2026-09-14): the original fence/link checks did not parse
+  Mermaid. Mermaid 11.17.2 reproduced all four reported parse failures caused by
+  unescaped semicolons in labels. Replacing those separators with commas preserved
+  the sequence content; all four diagrams then parsed and rendered to nonempty SVGs
+  in headless Chrome. The existing documentation test now rejects raw semicolon
+  separators in these blocks (failed before the fix); all **55 documentation tests
+  passed** afterward. Parser results, original/fixed source, SVGs, screenshots and
+  the cached-tool renderer are preserved under
+  `target/release-evidence/v32/priority2/mermaid-follow-up/`. This is rendering
+  evidence, not another production regression run or a new project dependency.
+- Other map-linked tests are indexed existing coverage, not newly executed proof.
+  Forced-GC ownership probes, full reactor, external consumer, native, API and
+  benchmark lanes were not rerun for this documentation-only review. JVM AOT
+  assertions above do not constitute a new native binary. Prior evidence remains
+  linked through Priority 1 rather than overwritten or relabeled.
+- Logs, exact source/diff snapshots, Surefire XML, baseline source archive,
+  toolchain/settings and hash inventory are retained under
+  `target/release-evidence/v32/priority2/`. Preserve this ignored directory before
+  root clean. The absent-map red run is separate from passing stages. Priority 8.3
+  still gates implementation; no dependency, API, historical roadmap, coordinate,
+  signing or publication change was made.
 
 ## Priority 3 - Real Application Extension Scenarios
 
