@@ -310,6 +310,14 @@ AOT's first-singleton properties fallback differing from runtime precedence.
 The mutation inventory distinguishes frozen work/retained bounds from shallow
 policy references and live configuration reads. No production correction is selected.
 
+Priority 5 follow-up: [invocation/composition review](INVOCATION-COMPOSITION.md)
+traces preparation, finalized identity, publication and distinct caller/load
+lifetimes. Fresh factory traces count defaults/filters/auth/exchange separately;
+strengthened refresh and 307/308 fixtures distinguish hidden work and transport
+replay. Gated continuation/lookup tests bound Q4 without claiming interruption of
+arbitrary application code. No new finding or pipeline extraction is selected;
+Priority 6 retains deeper resource/lock/teardown review.
+
 ### Verification Ledger
 
 The source baseline above is reachable in the reviewed history. Priority 2 changes

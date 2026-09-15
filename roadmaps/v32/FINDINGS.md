@@ -87,6 +87,16 @@ tests are characterization, not desired behavior to preserve after an accepted f
 | Acceptance and rollback | The same preferred properties validate in runtime and AOT for all four cases; invalid preferred configuration still fails, inactive beans cannot mask it, existing primary/environment/foreign-factory tests remain green. Add proportionate current-consumer/native evidence for an accepted correction; roll back if selection instantiates business clients or discards programmatic configuration |
 | Decision reference | Priority 8.3: not selected, no implementation approval. Characterization assertions must change with an accepted fix |
 
+## Priority 5 Composition Disposition
+
+The [invocation/composition review](INVOCATION-COMPOSITION.md) adds counted
+factory/probe/retry/auth paths and strengthens refresh/redirect observations.
+No new confirmed finding; distinct caller/source lifetimes, finalized publication
+checks and frame-aware continuations are retained. F001-F003 remain unresolved.
+Concrete change dependencies are recorded without authorizing an extraction or
+second pipeline. Priority 6 owns remaining resource/teardown questions; Priority
+8.3 still owns implementation scope. Review date: 2026-09-15.
+
 ## Implementation Gate
 
 No production change is authorized by baseline completion or by creating a

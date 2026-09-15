@@ -85,6 +85,7 @@ records unless their size justifies a separate file.
 | [ARCHITECTURE-MAP.md](ARCHITECTURE-MAP.md) | Module, decision, composition and ownership maps with source/test references |
 | [EXTENSION-SCENARIOS.md](EXTENSION-SCENARIOS.md) | External-consumer attempts, observations and supported/limited/gap classifications |
 | [EFFECTIVE-POLICY-SELECTION.md](EFFECTIVE-POLICY-SELECTION.md) | Entry-point/lookup matrix, mutation boundaries and representative parity/drift evidence |
+| [INVOCATION-COMPOSITION.md](INVOCATION-COMPOSITION.md) | Counted request/probe/replay paths, independent lifetimes and concrete change dependencies |
 | [FINDINGS.md](FINDINGS.md) | Three reproduced selection/extension gaps, alternatives and unselected implementation decision |
 | `ARCHITECTURE-DECISION.md` | Maintainer scope decision, selected-item verification and final review/release disposition |
 
@@ -438,36 +439,88 @@ Priority 4 evidence (2026-09-15):
 
 ## Priority 5 - Invocation and Composition Boundaries
 
-### [ ] 5.1 Trace preparation through response publication
+### [x] 5.1 Trace preparation through response publication
 
-- [ ] Map admission, argument/context snapshotting, selected-body serialization,
+- [x] Map admission, argument/context snapshotting, selected-body serialization,
       finalized URI/headers, cache authorization probe, lookup and load startup.
-- [ ] Record filter/defaultRequest/exchange-function ordering and invocation counts
+- [x] Record filter/defaultRequest/exchange-function ordering and invocation counts
       across hits, misses, retries, redirects, auth replay and hidden refreshes.
-- [ ] Trace asynchronous filter continuations and cancellation/timeout while
+- [x] Trace asynchronous filter continuations and cancellation/timeout while
       starter-entered preparation or lookup frames are still active.
-- [ ] Record frozen identity versus auth-visible bytes and successful-attempt
+- [x] Record frozen identity versus auth-visible bytes and successful-attempt
       revalidation before cache publication.
 
-### [ ] 5.2 Verify independent caller and load contracts
+### [x] 5.2 Verify independent caller and load contracts
 
-- [ ] Separate caller deadlines and terminal records from shared load/refresh work,
+- [x] Separate caller deadlines and terminal records from shared load/refresh work,
       including original-caller detachment with remaining waiters.
-- [ ] Characterize retry, redirect and auth replay attempt/subscription accounting
+- [x] Characterize retry, redirect and auth replay attempt/subscription accounting
       without changing published order, idempotency or repeatability rules.
-- [ ] Use observable dispatch and callback evidence for no post-terminal work,
+- [x] Use observable dispatch and callback evidence for no post-terminal work,
       exactly-once reporting and retention of only final-attempt facts.
-- [ ] Preserve cache-local outcomes versus downstream request/health accounting
+- [x] Preserve cache-local outcomes versus downstream request/health accounting
       and optional observer/lifecycle behavior without a metrics backend.
 
-### [ ] 5.3 Assess coupling using concrete changes
+### [x] 5.3 Assess coupling using concrete changes
 
-- [ ] Identify supported changes that require coordinated edits across paths;
+- [x] Identify supported changes that require coordinated edits across paths;
       record the actual contract dependency rather than only a count of edits.
-- [ ] Compare local corrections and existing helpers with possible extractions;
+- [x] Compare local corrections and existing helpers with possible extractions;
       explain any independent testability or complexity benefit.
-- [ ] Update the composition map and findings without merging lifetimes or
+- [x] Update the composition map and findings without merging lifetimes or
       implementing a second pipeline before the scope decision.
+
+Priority 5 evidence (2026-09-15):
+
+- [INVOCATION-COMPOSITION.md](INVOCATION-COMPOSITION.md) traces admission,
+  selected snapshots/body bytes, finalized probe identity, guarded lookup/load
+  startup, successful-attempt publication and terminal accounting. It records
+  five concrete change dependencies and no-change/existing-helper alternatives.
+  No new confirmed finding or extraction; F001-F003 and the Priority 8.3 gate
+  remain unresolved/unselected. The architecture map and finding register link
+  the review, including limits on arbitrary application continuations.
+- Clean starting source `e714af451cce5e24d74183cf23936819278ad086`, plus the
+  recorded eight-file review/test patch. Production, dependencies, `4.4.0`
+  baseline, `4.5.0-SNAPSHOT` development and V1-V31 remain unchanged.
+  Maven 3.9.9, Oracle JDK 21.0.8, Boot 4.0.0, repository Central-only settings;
+  local dependencies were used, not fresh published-artifact resolution.
+- New actual-factory fixture: **seven cases** count ordinary/miss/hit/retry/401
+  replay/combined replay and unauthenticated mutations without MeterRegistry;
+  all observer/lifecycle/log terminal collections are counted. The exchange
+  function is synthetic, not TCP. Existing fake-clock refresh and two real
+  loopback 307/308 cases now also assert default/filter/auth counts. Redirect
+  coalescing uses confirmed flight membership before releasing the response.
+- Fresh composition regression passed **236 tests across 12 classes**, zero
+  failures/errors/skips. Reproduce with
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter`
+  and this selector followed by `test`:
+
+  ```text
+  -Dtest=InvocationCompositionReviewTest,BoundedLocalResponseCacheContractTest,CacheWorkCompositionContractTest,CacheCallerAdmissionContractTest,!CacheCallerAdmissionContractTest#terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen,RetryRedirectAuthReplayCompositionContractTest,SemanticReadReplayTimeoutContractTest,SubscriptionReportingStateTest,DiagnosticContextContractTest,ResilienceOperatorCompositionContractTest,LocalResponseCacheObservabilityTest,MicrometerHttpClientObserverTest,Boot4HttpClientHealthIndicatorTest
+  ```
+
+  Quote the selector as one shell argument. The explicit exclusion omits two
+  forced-GC reachability cases, not cancellation/continuation/lookup coverage;
+  the admission class ran **42 cases**. No collection or process-memory claim.
+- Documentation:
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`:
+  **58 tests passed**, zero failures/errors/skips. The new guard verifies the
+  exact fixture-method references, separated caller/load/transport evidence,
+  explicit scope and review links. Final source-scope, XML/exclusion, reachable
+  baseline, local-link and whitespace checks accompany the SHA-256 inventory.
+- Verification artifacts live in `target/release-evidence/v32/priority5/`:
+  stage commands/logs/fresh XML, timestamps/exit status, baseline commit and source
+  patch copies, toolchain/settings and hashed audit inventory. Preserve before
+  root clean. Retained red runs distinguish a fixture accessor compilation error,
+  seven missing work-config fixture setup errors and the missing-review document
+  guard from production behavior. The initial trace rerun passed eight cases
+  (seven new plus existing refresh); those cases are included in the 236 total,
+  not additional independent coverage.
+- This is targeted current-reactor JVM review evidence, not full reactor, new
+  assembled consumer, AOT/native, strict API, optional-classpath, benchmark,
+  HTTP/2, mesh or deployment-memory validation. Resource/teardown and remaining
+  application callback permutations belong to Priorities 6-7; passing the
+  tested guards is not a universal no-post-terminal-work guarantee.
 
 ## Priority 6 - Resource, Concurrency, and Retention Ownership
 
