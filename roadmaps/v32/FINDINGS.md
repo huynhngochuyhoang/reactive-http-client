@@ -1,11 +1,12 @@
 # V32 Architecture Finding Register
 
-> **Status:** open for review; two confirmed extension gaps, no accepted implementation
+> **Status:** open for review; three confirmed selection/extension gaps, no accepted implementation
 > **Baseline:** [verified scope and evidence](BASELINE-SCOPE.md)
 > **Decision owner:** maintainer, through [Priority 8.3](CHECKLIST.md)
 
 Priority 1 established the register structure. Priority 3 populated F001 and F002
-from the external-consumer scenarios below. This is not an exhaustive defect
+from the external-consumer scenarios below. Priority 4 adds F003 from a paired
+AOT/runtime properties-selection test. This is not an exhaustive defect
 inventory. Other reported hypotheses remain in the baseline record until
 reproduced or bounded by later review.
 
@@ -70,6 +71,22 @@ tests are characterization, not desired behavior to preserve after an accepted f
 | Acceptance and rollback | External fresh valid static metadata dispatches the declared target without access to an internal type; invalid metadata fails with deliberate validation, API-ref alternative remains valid, return/timeout/identity contracts and assembled/AOT checks pass. Roll back if derived precedence or per-method plan behavior changes unintentionally |
 | Decision reference | Priority 8.3: not selected, no implementation approval |
 
+## V32-F003: AOT Properties Selection Bypasses Non-Primary Precedence
+
+| Field | Recorded evidence / disposition |
+|---|---|
+| Need and origin | Exploratory Priority 4: an application has two initialized ReactiveHttpClientProperties beans and selects one with non-fallback, priority or default-candidate metadata |
+| Classification | Confirmed AOT/runtime selection gap. Runtime creates a valid cache-selected client; AOT rejects the same client because it reads the other properties object |
+| Contract and owner | Runtime Factory.getObject uses Spring's direct getBeanProvider(...).getIfAvailable() selection. The AOT processor must validate the effective application properties rather than whichever singleton was registered first. Owner: AOT properties resolution |
+| Evidence | Reachable source `6023a9132d2569108c55b2bf90bbceb7fd00084c`, plus uncommitted review tests. `EffectiveSelectionAotReviewTest#aotFirstSingletonFallbackDiffersFromRuntimeNonPrimarySelection` has four cases: primary passes both paths; non-fallback, comparator priority and sole default candidate pass actual runtime FactoryBean creation but fail AOT with missing selected cache policy. [Selection record](EFFECTIVE-POLICY-SELECTION.md) links source and actual stage results |
+| Enforcing path | [Processor.properties][aot-properties] handles a unique primary, then returns the first containsSingleton bean without applying subsequent Spring candidate selection. The fixture initializes both definitions and proves getBeanProvider selects the second before invoking the processor |
+| Alternatives | Explicitly designate the intended programmatic properties bean primary, as the passing control and existing AOT test demonstrate; retain/document a stricter AOT constraint; or correct this bounded properties lookup to honor effective runtime selection while retaining environment binding and supported build-time replacement beans. No universal diagnostics/runtime resolver is required |
+| Tradeoffs | Misleading AOT rejection or validation of the wrong configuration versus selection-correct build-time resolution. Properties and metadata may legitimately be created for AOT, unlike diagnostic inspection. A correction must preserve primary/environment behavior, parent and FactoryBean constraints, avoid duplicate prototype creation, and not instantiate business clients merely to inspect properties |
+| Priority and dependencies | Reproduced supported-component selection blocker; Priority 7 reviews AOT/module and build-time constraints before the Priority 8.3 implementation decision |
+| Disposition | Unresolved, 2026-09-15. Review owner: maintainer/AOT selection review. Not an observed native-image failure, because only the JVM processor was run. Parent/prototype properties permutations remain unverified, not implicitly covered by this initialized-singleton case |
+| Acceptance and rollback | The same preferred properties validate in runtime and AOT for all four cases; invalid preferred configuration still fails, inactive beans cannot mask it, existing primary/environment/foreign-factory tests remain green. Add proportionate current-consumer/native evidence for an accepted correction; roll back if selection instantiates business clients or discards programmatic configuration |
+| Decision reference | Priority 8.3: not selected, no implementation approval. Characterization assertions must change with an accepted fix |
+
 ## Implementation Gate
 
 No production change is authorized by baseline completion or by creating a
@@ -91,3 +108,4 @@ is a supported final outcome, not a failed release.
 [effective-api]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/EffectiveApi.java
 [handler]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
 [replacement-guide]: ../../docs/18-conflict-cardinality-guardrails.md
+[aot-properties]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientBeanFactoryInitializationAotProcessor.java
