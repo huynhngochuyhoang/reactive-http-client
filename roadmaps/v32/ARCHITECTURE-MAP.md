@@ -318,6 +318,16 @@ replay. Gated continuation/lookup tests bound Q4 without claiming interruption o
 arbitrary application code. No new finding or pipeline extraction is selected;
 Priority 6 retains deeper resource/lock/teardown review.
 
+Priority 6 follow-up: [resource ownership](RESOURCE-OWNERSHIP.md) maps terminal
+owners, nested locks/removal callbacks and construction cleanup. Six new cases
+bound Q1/Q6: early validation, Spring versus direct factory teardown, a live
+application-owned connector, and rejected handler creation with/without another
+meter owner. The latter confirms F004; the manager's local rollback does not
+cover every later assembly failure. Deterministic cleanup/continuation/eviction
+runs narrow Q4, not prove a global lock-order theorem. Historical V29/V30 memory
+conclusions retain their original scope; legacy forced-GC lane migration and
+unexercised component failures remain Priority 7/8 review work.
+
 ### Verification Ledger
 
 The source baseline above is reachable in the reviewed history. Priority 2 changes

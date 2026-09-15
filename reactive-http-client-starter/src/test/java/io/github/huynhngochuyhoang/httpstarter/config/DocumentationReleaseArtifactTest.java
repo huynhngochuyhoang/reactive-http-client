@@ -385,6 +385,38 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32OwnershipReviewNamesCleanupOwnersAndKeepsImplementationUnselected() throws Exception {
+        Path root = projectRoot();
+        String review = Files.readString(root.resolve("roadmaps/v32/RESOURCE-OWNERSHIP.md"));
+        assertThat(review).contains("> **Implementation and release scope:** unselected",
+                "## Resource and Terminal Owners", "## Cache Work Ownership Matrix",
+                "## Construction and Teardown", "## Locks and External Callbacks",
+                "## Retention Classification and Historical Evidence", "V32-F004",
+                "Priority 8.3", "-XX:+DisableExplicitGC", "not fresh memory measurements");
+        Matcher methods = Pattern.compile("`([A-Za-z0-9]+Test)#([A-Za-z0-9]+)`").matcher(review);
+        Set<String> references = new HashSet<>();
+        while (methods.find()) {
+            try (var paths = Files.walk(root.resolve("reactive-http-client-starter/src/test/java"))) {
+                List<Path> matches = paths.filter(path -> path.getFileName().toString()
+                        .equals(methods.group(1) + ".java")).toList();
+                assertThat(matches).as(methods.group()).hasSize(1);
+                assertThat(Files.readString(matches.getFirst())).contains(methods.group(2) + "(");
+            }
+            references.add(methods.group());
+        }
+        assertThat(references).contains(
+                "`ResourceOwnershipReviewTest#earlyValidationDoesNotAcquireAConnectionProvider`",
+                "`ResourceOwnershipReviewTest#lateFactoryFailureIsDisposedBySpringOrTheDirectCaller`",
+                "`ResourceOwnershipReviewTest#replacementConnectorStaysApplicationOwnedAfterFactoryDestroy`",
+                "`ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionLeavesMeterLeasesWithoutAReturnedOwner`");
+        for (String document : List.of("ARCHITECTURE-MAP.md", "FINDINGS.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(root.resolve("roadmaps/v32/" + document))).contains("RESOURCE-OWNERSHIP.md");
+        }
+        assertThat(Files.readString(root.resolve("roadmaps/v32/FINDINGS.md")))
+                .contains("## V32-F004", "No production change is authorized");
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
