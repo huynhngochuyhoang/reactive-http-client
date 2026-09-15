@@ -87,7 +87,8 @@ records unless their size justifies a separate file.
 | [EFFECTIVE-POLICY-SELECTION.md](EFFECTIVE-POLICY-SELECTION.md) | Entry-point/lookup matrix, mutation boundaries and representative parity/drift evidence |
 | [INVOCATION-COMPOSITION.md](INVOCATION-COMPOSITION.md) | Counted request/probe/replay paths, independent lifetimes and concrete change dependencies |
 | [RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) | Resource/terminal and nested-lock matrices, partial construction, external owners and retention limits |
-| [FINDINGS.md](FINDINGS.md) | Three selection/extension gaps and one construction-retention gap, alternatives and unselected implementation decision |
+| [MODULE-EVIDENCE-BOUNDARIES.md](MODULE-EVIDENCE-BOUNDARIES.md) | Mock/optional integration and creation matrices, native triggers, fixture/provenance gaps and test-environment limits |
+| [FINDINGS.md](FINDINGS.md) | Four production gaps and one test-evidence gap, alternatives and unselected implementation decision |
 | `ARCHITECTURE-DECISION.md` | Maintainer scope decision, selected-item verification and final review/release disposition |
 
 ---
@@ -631,37 +632,116 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter 
 
 ## Priority 7 - Module, Optional Integration, and Evidence Boundaries
 
-### [ ] 7.1 Review cross-module and optional dependency contracts
+### [x] 7.1 Review cross-module and optional dependency contracts
 
-- [ ] Inventory production behavior reused or copied by mocks and the public
+- [x] Inventory production behavior reused or copied by mocks and the public
       internal bridges that assembled helpers require.
-- [ ] Check no-Caffeine cache-disabled consumption and applicable absence of
+- [x] Check no-Caffeine cache-disabled consumption and applicable absence of
       resilience, Micrometer and OTel without accidental eager linkage.
-- [ ] Distinguish observability configuration from backend availability; preserve
+- [x] Distinguish observability configuration from backend availability; preserve
       non-Micrometer terminal surfaces and bounded metrics ownership.
-- [ ] Record whether a module or SPI change solves a demonstrated problem rather
+- [x] Record whether a module or SPI change solves a demonstrated problem rather
       than assuming package sharing or optional checks are inherently wrong.
 
-### [ ] 7.2 Review runtime, AOT and native creation boundaries
+### [x] 7.2 Review runtime, AOT and native creation boundaries
 
-- [ ] Compare validation/selection of custom properties, metadata and replacement
+- [x] Compare validation/selection of custom properties, metadata and replacement
       clients in runtime and AOT; record legitimate build-time constraints.
-- [ ] Audit generic/reflection traversal and supported context-only value hints
+- [x] Audit generic/reflection traversal and supported context-only value hints
       using existing regressions before proposing more reflection or scanning.
-- [ ] Identify which accepted-change categories would require a native rerun;
+- [x] Identify which accepted-change categories would require a native rerun;
       do not label existing source/binary evidence as current after affected edits.
-- [ ] Add creation-path and optional-integration outcomes to the architecture map.
+- [x] Add creation-path and optional-integration outcomes to the architecture map.
 
-### [ ] 7.3 Review whether the evidence proves its claims
+### [x] 7.3 Review whether the evidence proves its claims
 
-- [ ] Inspect relevant wire/native/consumer fixtures for missed dispatch routes,
+- [x] Inspect relevant wire/native/consumer fixtures for missed dispatch routes,
       timing-only assumptions, fixture-only defaults and self-confirming counters.
-- [ ] Check ordinary tests tolerate supported JVM/runtime settings; replace no
+- [x] Check ordinary tests tolerate supported JVM/runtime settings; replace no
       fixture during review without recording what behavior it should establish.
-- [ ] Audit provenance for reachable revisions, fresh baseline repositories,
+- [x] Audit provenance for reachable revisions, fresh baseline repositories,
       artifact hashes, actual totals and source changes after measurement.
-- [ ] Record bounded evidence gaps and proportionate remedies; do not expand this
+- [x] Record bounded evidence gaps and proportionate remedies; do not expand this
       into a general release-tooling rewrite or mandatory rerun of every old lane.
+
+**Priority 7 evidence (2026-09-15):**
+
+- [MODULE-EVIDENCE-BOUNDARIES.md](MODULE-EVIDENCE-BOUNDARIES.md) records the
+  cross-module and optional-integration matrices, runtime/AOT creation rules,
+  native rerun triggers and E7-01 through E7-08 evidence gaps with owners and
+  reconsideration triggers. Mock assembly substitutes are distinguished from
+  production cache/identity/admission reuse; public internal bridges are not
+  treated as removable. No demonstrated need for a new module or SPI was found.
+- The minimal consumer now asserts physical absence of Caffeine, four resilience
+  registries, Micrometer Core, OTel API and the mock helper before two counted,
+  bounded loopback calls. Required Micrometer observation/commons remain. The
+  final minimal case and 17 external V32 extension cases passed from installed
+  artifact JARs, with classpaths, dependency trees, effective POMs and JAR/source
+  hashes retained. This used a fresh reactor installation in the existing local
+  Maven repository, **not** a fresh isolated Central baseline run.
+- Focused module regression passed **241 cases in 19 classes**: starter 101,
+  helper 78 and OTel 62, with zero failures/errors/skips and explicit GC disabled.
+  It includes optional selected-cache failure/rollback, no-registry terminal
+  outcomes, shared metric owners, replacement properties/metadata/foreign AOT
+  factories, record hints, mock/work/context parity, OTel and peer-observed
+  GOAWAY/semantic-flight scenarios. It is not a full reactor or native test run.
+- `DocumentationReleaseArtifactTest` passed **60 cases** after the final record
+  update. Its new guard verifies review links and real named test methods across
+  modules, while the existing consumer guard now matches bounded calls and
+  optional-class assertions. Final applicable total: **319 passing cases**
+  (241 module, 18 consumer, 60 documentation), excluding repeated runs and the
+  separate GC experiment.
+- The ordinary-test portability review found **V32-F005**, not a production
+  leak: two existing caller reachability cases fail with SerialGC, 512 MiB heap
+  and `-XX:+DisableExplicitGC`; the same cases pass when only that flag becomes
+  `-XX:-DisableExplicitGC`. Both runs are preserved. Review completion does not
+  claim all ordinary tests tolerate disabled GC. No collection-dependent test
+  was disabled or migrated; the 16-case inventory and controlled-lane remedy
+  remain for the explicit Priority 8 decision. AOT's recursive-generic fixture
+  currently checks an unselected cache path, not execution of its visited guard.
+- Source: clean starting revision `6fb540fa9e7b73657a247caa6ea4c2a19a774d48`
+  plus this six-file test/review patch. Maven 3.9.9, Oracle JDK 21.0.8, Java
+  target 21, Boot 4.0.0 and `.mvn/maven-central-settings.xml`. Production and
+  native fixture sources match reachable `v4.4.0`; historical V31 archive and
+  binary hashes were rechecked without claiming a new native build. Priority 1's
+  sealed inventory and the Priority 6 correction's source-copy bridge to this
+  reachable revision were verified; squash-local ancestry is not assumed.
+- Exact commands, fresh XML, toolchain/settings, diffs/source snapshots, installed
+  artifacts, historical hash checks and audit results are under
+  `target/release-evidence/v32/priority7/`, sealed by `SHA256SUMS`.
+  The expected absent-record red test, intermediate two documentation failures
+  (old consumer source-text assertion and missing full finding ID), and GC
+  characterization failures remain separate from final passing results.
+  `git diff --check` passed. No production, API, POM, coordinate, V1-V31 history,
+  signing or publication change; no new native/API/matrix/performance lane.
+  Priorities 8-12 remain open; implementation and release scope remain unselected.
+
+Principal fresh verification commands (artifact/classpath capture goals and the
+GC control's exact invocation are retained with each stage):
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -DskipTests -Dmaven.javadoc.skip=true install
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -pl reactive-http-client-starter,reactive-http-client-test,reactive-http-client-otel \
+  -DargLine=-XX:+DisableExplicitGC -Dsurefire.failIfNoSpecifiedTests=false \
+  '-Dtest=ReactiveHttpClientAotSmokeTest,EffectiveSelectionAotReviewTest,ReactiveHttpClientAutoConfigurationTest,LocalResponseCacheObservabilityTest,CacheWorkTelemetryContractTest,BoundedLocalResponseCacheContractTest#optionalImplementationIsRequiredOnlyForSelectedPolicies,Http2GoAwayRetirementContractTest,SemanticReadSingleFlightRefreshContractTest,Mock*,Boot4MockReactiveHttpClientTest,OpenTelemetry*,RequestResponseSizeObservabilityContractTest' test
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -f .github/boot4-cache-disabled-consumer/pom.xml -Dreactive-http-client.version=4.5.0-SNAPSHOT \
+  -DargLine=-XX:+DisableExplicitGC clean test
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -f .github/boot4-consumer/pom.xml -Dreactive-http-client.version=4.5.0-SNAPSHOT \
+  -Dconsumer.v32.extensions=true -DargLine=-XX:+DisableExplicitGC -Dtest=ExtensionScenariosTest clean test
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter \
+  -DargLine=-XX:+DisableExplicitGC -Dtest=DocumentationReleaseArtifactTest test
+```
+
+The intentionally failing environment characterization is not a passing CI lane:
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter \
+  '-DargLine=-Xms512m -Xmx512m -XX:+UseSerialGC -XX:+DisableExplicitGC' \
+  -Dtest=CacheCallerAdmissionContractTest#terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen test
+```
 
 ## Priority 8 - Findings, Necessity, and Scope Decision
 

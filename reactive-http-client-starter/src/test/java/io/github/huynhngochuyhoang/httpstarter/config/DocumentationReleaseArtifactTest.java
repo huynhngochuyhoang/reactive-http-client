@@ -417,6 +417,48 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32ModuleReviewSeparatesOptionalCreationAndEvidenceBoundaries() throws Exception {
+        Path root = projectRoot();
+        String review = Files.readString(root.resolve("roadmaps/v32/MODULE-EVIDENCE-BOUNDARIES.md"));
+        assertThat(review).contains("> **Implementation and release scope:** unselected",
+                "## Cross-Module Contract", "## Optional Integration Matrix",
+                "## Runtime and AOT Creation", "## Evidence Gaps", "## Verification",
+                "V32-F003", "V32-F004", "Priority 8.3", "-XX:+DisableExplicitGC",
+                "not a new native build", "micrometer-observation");
+        Matcher links = Pattern.compile("\\]\\((\\.\\.?/[^)#]+)(?:#[^)]*)?\\)").matcher(review);
+        while (links.find()) {
+            assertThat(root.resolve("roadmaps/v32").resolve(links.group(1)).normalize())
+                    .as(links.group()).exists();
+        }
+        Matcher methods = Pattern.compile("`([A-Za-z0-9]+Test)#([A-Za-z0-9]+)`").matcher(review);
+        Set<String> references = new HashSet<>();
+        while (methods.find()) {
+            String className = methods.group(1);
+            List<Path> matches = new ArrayList<>();
+            for (String directory : List.of("reactive-http-client-starter/src/test",
+                    "reactive-http-client-test/src/test", "reactive-http-client-otel/src/test",
+                    ".github/boot4-consumer/src", ".github/boot4-cache-disabled-consumer/src",
+                    ".github/native-smoke/src")) {
+                try (var paths = Files.walk(root.resolve(directory))) {
+                    matches.addAll(paths.filter(path -> path.getFileName().toString()
+                            .equals(className + ".java")).toList());
+                }
+            }
+            assertThat(matches).as(methods.group()).hasSize(1);
+            assertThat(Files.readString(matches.getFirst())).contains(methods.group(2) + "(");
+            references.add(methods.group());
+        }
+        assertThat(references).contains(
+                "`Boot4CacheDisabledConsumerTest#cacheDisabledConsumerRunsWithoutCaffeine`",
+                "`LocalResponseCacheObservabilityTest#cacheObservabilityWithoutMeterRegistryStillRecordsCallerOutcomes`",
+                "`ReactiveHttpClientAotSmokeTest#applicationRuntimeHintsCanCoverContextOnlyCacheRecords`");
+        for (String document : List.of("ARCHITECTURE-MAP.md", "FINDINGS.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(root.resolve("roadmaps/v32/" + document)))
+                    .contains("MODULE-EVIDENCE-BOUNDARIES.md");
+        }
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
@@ -2294,8 +2336,13 @@ class DocumentationReleaseArtifactTest {
         assertThat(cacheDisabledFixtureTest)
                 .contains("cacheDisabledConsumerRunsWithoutCaffeine")
                 .contains("com.github.benmanes.caffeine.cache.Caffeine")
+                .contains("io.micrometer.core.instrument.MeterRegistry")
+                .contains("io.github.resilience4j.retry.RetryRegistry")
+                .contains("io.opentelemetry.api.OpenTelemetry")
                 .contains("isFalse()")
-                .contains("context.getBean(CacheDisabledClient.class).get().block()");
+                .contains("context.getBean(CacheDisabledClient.class)")
+                .contains("client.get().block(Duration.ofSeconds(5))")
+                .contains("assertThat(requests).hasValue(2)");
         assertThat(releaseDocs)
                 .contains("### Boot 4 assembled consumer fixture")
                 .contains("scripts/verify-current-consumer.sh")

@@ -1,6 +1,6 @@
 # V32 Architecture Finding Register
 
-> **Status:** open for review; three selection/extension gaps and one construction-retention gap, no accepted implementation
+> **Status:** open for review; four production gaps and one test-evidence gap, no accepted implementation
 > **Baseline:** [verified scope and evidence](BASELINE-SCOPE.md)
 > **Decision owner:** maintainer, through [Priority 8.3](CHECKLIST.md)
 
@@ -122,6 +122,30 @@ overlapping meter teardown and historical memory limits. F004 is the only new
 confirmed gap. No global deadlock-freedom, universal shutdown deadline, GC
 collectability or current pod/RSS conclusion is claimed. Remaining legacy
 collection-dependent tests are an evidence-lane follow-up for Priority 7.
+
+## V32-F005: Ordinary Reachability Tests Depend on Explicit GC
+
+| Field | Recorded evidence / disposition |
+|---|---|
+| Need and origin | Priority 7 follow-up from ownership review: ordinary Maven tests must not misclassify a collector that ignores System.gc as retained application ownership |
+| Classification | Confirmed test-environment/verification gap, not a production memory leak |
+| Contract and owner | CacheCallerAdmissionContractTest's two terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen cases require weak references to clear after forty GC/sleep requests. Owner: test/ownership maintainer; normal Surefire has no collector prerequisite |
+| Evidence | Reachable source 6fb540fa9e7b73657a247caa6ea4c2a19a774d48, production and reproducer unchanged. SerialGC with 512 MiB heap and -XX:+DisableExplicitGC: two failures at weak-reference assertions; same selector with -XX:-DisableExplicitGC: two passes. Separate original XML/logs and exact commands retained under Priority 7; see [module/evidence review](MODULE-EVIDENCE-BOUNDARIES.md) |
+| Alternatives | Document a restrictive test-JVM prerequisite; or retain deterministic terminal/slot-release assertions in normal tests and move actual reachability probes to a controlled opt-in lane using the existing AsyncHandoffReachabilityIT pattern. Longer sleeps do not create a collection guarantee |
+| Tradeoffs | Test-only scope; no runtime/API dependency or behavior change. Lane migration must not silently delete reachability coverage or make a controlled test appear to have run in the ordinary suite |
+| Priority and dependencies | Test reliability before claiming supported-JVM full-suite compatibility. Review 16 collection-dependent cases identified in E7-02; only the two caller cases were freshly compared under both settings |
+| Disposition | Unresolved, 2026-09-15; maintainer/test ownership, reconsider at Priority 8. No tests disabled or migrated in this review |
+| Acceptance and rollback | Ordinary affected tests pass with explicit GC disabled using deterministic ownership witnesses; opt-in reachability verifies collector/heap prerequisites and retains original object-owner scenarios. Preserve command/count separation; roll back a migration that weakens observable release assertions |
+| Decision reference | Priority 8.3: not selected; no production correction or broad test rewrite authorized |
+
+## Priority 7 Module and Evidence Disposition
+
+[MODULE-EVIDENCE-BOUNDARIES.md](MODULE-EVIDENCE-BOUNDARIES.md) records creation,
+optional linkage, native rerun triggers and E7-01 through E7-08 limitations.
+Minimal physical classpath and focused mock/OTel/AOT checks complement, not
+replace, isolated published evidence. Existing F001-F004 remain unresolved;
+F005 is a separate test-environment finding. Package sharing alone establishes
+no need for a module split or new SPI. No production change is authorized.
 
 ## Implementation Gate
 
