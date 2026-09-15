@@ -749,6 +749,7 @@ class BoundedLocalResponseCacheContractTest {
 
     @Test
     void refreshUsesThePreparedAuthAndResiliencePipelineWithoutDelayingTheStaleCaller() {
+        List<String> trace = new java.util.concurrent.CopyOnWriteArrayList<>();
         AtomicLong ticker = new AtomicLong();
         ReactiveHttpClientProperties.ClientConfig config = config();
         config.setAuthProvider("cache-auth");
@@ -764,13 +765,18 @@ class BoundedLocalResponseCacheContractTest {
         AtomicInteger dispatches = new AtomicInteger();
         RecordingCircuitBreakerApplier applier = new RecordingCircuitBreakerApplier();
         io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider authProvider = request -> {
+            trace.add("auth");
             authCalls.incrementAndGet();
             return Mono.just(AuthContext.builder().header("Authorization", "Bearer refresh-token").build());
         };
         WebClient webClient = WebClient.builder()
                 .baseUrl("http://cache.test")
+                .defaultRequest(request -> trace.add("default"))
+                .filter((request, next) -> { trace.add("upstream"); return next.exchange(request); })
                 .filter(new OutboundAuthFilter("cache-client", authProvider))
+                .filter((request, next) -> { trace.add("downstream"); return next.exchange(request); })
                 .exchangeFunction(request -> {
+                    trace.add("exchange");
                     assertThat(request.headers().getFirst(HttpHeaders.AUTHORIZATION))
                             .isEqualTo("Bearer refresh-token");
                     return Mono.just(ClientResponse.create(HttpStatus.OK)
@@ -787,9 +793,15 @@ class BoundedLocalResponseCacheContractTest {
 
             assertThat(client.get("42", "principal", "tenant", "en-US").block())
                     .isEqualTo("dispatch-1");
+            assertThat(trace).containsExactly("default", "upstream", "auth", "downstream",
+                    "default", "upstream", "downstream", "exchange");
+            trace.clear();
             ticker.addAndGet(Duration.ofMillis(50).toNanos());
             assertThat(client.get("42", "principal", "tenant", "en-US").block())
                     .isEqualTo("dispatch-1");
+            assertThat(trace).containsExactly("default", "upstream", "auth", "downstream",
+                    "default", "upstream", "downstream", "exchange");
+            trace.clear();
 
             assertThat(dispatches).hasValue(2);
             assertThat(authCalls).hasValue(2);
@@ -797,6 +809,7 @@ class BoundedLocalResponseCacheContractTest {
             assertThat(applier.subscriptions).hasValue(2);
             assertThat(client.get("42", "principal", "tenant", "en-US").block())
                     .isEqualTo("dispatch-2");
+            assertThat(trace).containsExactly("default", "upstream", "auth", "downstream");
             manager.close();
         }
     }

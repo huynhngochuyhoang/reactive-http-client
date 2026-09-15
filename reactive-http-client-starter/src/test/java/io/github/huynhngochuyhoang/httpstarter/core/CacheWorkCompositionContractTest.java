@@ -545,6 +545,9 @@ class CacheWorkCompositionContractTest {
     @ParameterizedTest
     @ValueSource(ints = {307, 308})
     void bodyPreservingRedirectUsesOneSlotAndTwoWireBodies(int redirect) throws Exception {
+        AtomicInteger defaults = new AtomicInteger();
+        AtomicInteger filters = new AtomicInteger();
+        AtomicInteger authCalls = new AtomicInteger();
         List<String> bodies = new CopyOnWriteArrayList<>();
         List<String> targets = new CopyOnWriteArrayList<>();
         CountDownLatch arrived = new CountDownLatch(1);
@@ -566,12 +569,19 @@ class CacheWorkCompositionContractTest {
         config.setFollowRedirects(true);
         var connection = reactor.netty.resources.ConnectionProvider.newConnection();
         try (Fixture f = new Fixture(config, new Operators(), request -> {
+            authCalls.incrementAndGet();
             ((byte[]) request.requestBody())[0] = 90;
             return Mono.just(AuthContext.empty());
-        }, WebClient.builder().clientConnector(new ReactorClientHttpConnector(HttpClient.create(connection)
+        }, WebClient.builder()
+                .defaultRequest(request -> defaults.incrementAndGet())
+                .filter((request, next) -> { filters.incrementAndGet(); return next.exchange(request); })
+                .clientConnector(new ReactorClientHttpConnector(HttpClient.create(connection)
                 .disableRetry(true).followRedirect(true).doOnRequest((request, channel) -> writes.incrementAndGet()))))) {
             var first = f.call(true, "redirect").toFuture();
             assertThat(arrived.await(10, TimeUnit.SECONDS)).isTrue();
+            assertThat(defaults).hasValue(2);
+            assertThat(filters).hasValue(2);
+            assertThat(authCalls).hasValue(1);
             var waiter = f.call(true, "redirect").toFuture();
             f.counts(2, 1, 0);
             // Admission includes asynchronous preparation; wait for actual flight attachment before releasing the wire.
@@ -591,6 +601,9 @@ class CacheWorkCompositionContractTest {
             assertThat(f.call(true, "redirect").block(WAIT)).isEqualTo("redirected");
             assertThat(writes).hasValue(2);
             assertThat(f.metric(".loads", "success")).isEqualTo(1);
+            assertThat(defaults).hasValue(5);
+            assertThat(filters).hasValue(5);
+            assertThat(authCalls).hasValue(4);
             f.diagnostics.terminal(f.diagnostics.index(HttpClientCacheOutcome.MISS_LOADER),
                     null, 1, 200, config.getBaseUrl() + "/post/redirect", null,
                     Map.of("X-Final", List.of("yes")));

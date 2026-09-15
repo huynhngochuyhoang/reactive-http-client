@@ -355,6 +355,36 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32CompositionReviewKeepsCallerLoadAndTransportEvidenceSeparate() throws Exception {
+        Path root = projectRoot();
+        String review = Files.readString(root.resolve("roadmaps/v32/INVOCATION-COMPOSITION.md"));
+        assertThat(review).contains("> **Implementation and release scope:** unselected",
+                "## Preparation and Publication", "## Counted Execution Paths",
+                "## Caller and Load Lifetimes", "## Change Dependency Review", "## Disposition",
+                "Priority 8.3", "not TCP dispatch", "no MeterRegistry", "No new confirmed finding");
+        Matcher methods = Pattern.compile("`([A-Za-z0-9]+Test)#([A-Za-z0-9]+)`").matcher(review);
+        Set<String> references = new HashSet<>();
+        while (methods.find()) {
+            String name = methods.group(1) + ".java";
+            Path testRoot = root.resolve("reactive-http-client-starter/src/test/java");
+            try (var paths = Files.walk(testRoot)) {
+                List<Path> matches = paths.filter(path -> path.getFileName().toString().equals(name)).toList();
+                assertThat(matches).as(name).hasSize(1);
+                assertThat(Files.readString(matches.getFirst())).contains(methods.group(2) + "(");
+            }
+            references.add(methods.group());
+        }
+        assertThat(references).contains(
+                "`InvocationCompositionReviewTest#factorySeparatesProbeOuterAttemptAndAuthReplayWithoutAMeterRegistry`",
+                "`InvocationCompositionReviewTest#unauthenticatedHitStillRunsBuilderAndDownstreamMutationsWithoutExchange`",
+                "`CacheWorkCompositionContractTest#bodyPreservingRedirectUsesOneSlotAndTwoWireBodies`",
+                "`BoundedLocalResponseCacheContractTest#refreshUsesThePreparedAuthAndResiliencePipelineWithoutDelayingTheStaleCaller`");
+        for (String document : List.of("ARCHITECTURE-MAP.md", "FINDINGS.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(root.resolve("roadmaps/v32/" + document))).contains("INVOCATION-COMPOSITION.md");
+        }
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
