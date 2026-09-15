@@ -54,7 +54,12 @@ These are bounded fixture observations, not a claim about arbitrary producer imp
 The new [ResourceOwnershipReviewTest][review-test] has six cases:
 
 - `ResourceOwnershipReviewTest#earlyValidationDoesNotAcquireAConnectionProvider`:
-  invalid base URL fails before either provider or manager exists.
+  with caching and telemetry selected, an invalid base URL leaves both provider
+  fields empty and acquires no registry lease. A meter-registration callback
+  also detects a transient allocation even if it is subsequently removed; the
+  factory's unassigned manager field alone is not the cache-allocation proof.
+  Correcting only the URL in the same fixture then creates one observable cache
+  owner with a maximum-entry gauge of 16, validating that the instrumentation is active.
 - `ResourceOwnershipReviewTest#lateFactoryFailureIsDisposedBySpringOrTheDirectCaller`:
   a throwing customizer fails after business-provider assignment. Two cases
   distinguish a registered lazy Spring FactoryBean from a directly constructed

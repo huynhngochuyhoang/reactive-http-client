@@ -122,21 +122,44 @@ class ResourceOwnershipReviewTest {
 
     @Test
     void earlyValidationDoesNotAcquireAConnectionProvider() throws Exception {
+        var registry = new SimpleMeterRegistry();
         try (var context = new GenericApplicationContext()) {
-            var properties = properties(false);
+            var properties = properties(true);
             properties.getClients().get(NAME).setBaseUrl("relative");
+            context.getBeanFactory().registerSingleton("registry", registry);
             context.registerBean(ReactiveHttpClientProperties.class, () -> properties);
             context.refresh();
+            AtomicInteger registrations = new AtomicInteger();
+            registry.config().onMeterAdded(ignored -> registrations.incrementAndGet());
             var factory = new ReactiveHttpClientFactoryBean<Client>();
             factory.setType(Client.class);
             factory.setApplicationContext(context);
             try {
+                assertThat(registry.getMeters()).isEmpty();
+                assertThat(metricOwners(registry)).isEmpty();
                 assertThatThrownBy(factory::getObject).isInstanceOf(IllegalArgumentException.class)
                         .hasMessageContaining("baseUrl");
                 assertThat(field(factory, "connectionProvider")).isNull();
                 assertThat(field(factory, "tokenServiceConnectionProvider")).isNull();
                 assertThat(factory.responseCacheSnapshot()).isNull();
-            } finally { factory.destroy(); }
+                assertThat(registrations).hasValue(0);
+                assertThat(registry.getMeters()).isEmpty();
+                assertThat(metricOwners(registry)).isEmpty();
+
+                // The same selected policy must allocate observable cache resources once the URL is valid.
+                properties.getClients().get(NAME).setBaseUrl("http://localhost");
+                assertThat(factory.getObject()).isNotNull();
+                assertThat(registrations.get()).isPositive();
+                assertThat(metricOwners(registry)).hasSize(1);
+                assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.entries")
+                        .gauge().value()).isEqualTo(16);
+            } finally {
+                factory.destroy();
+                // Avoid leaking an unassigned manager if this regression assertion fails in a future change.
+                metricOwners(registry).forEach(LocalResponseCacheMetrics::close);
+            }
+        } finally {
+            registry.close();
         }
     }
 

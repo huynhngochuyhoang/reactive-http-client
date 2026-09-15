@@ -610,6 +610,25 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter 
   test
 ```
 
+Early-validation review correction (2026-09-15): caching and telemetry are now
+selected in the invalid-URL fixture. It asserts zero meter registrations and
+zero registry leases before cleanup, independently of the factory's unassigned
+manager field. Correcting only the URL then acquires one observable cache owner.
+This strengthens the earlier fixture, not production behavior or F004's scope.
+The focused final rerun passed **65 tests** (six ownership, 59 documentation),
+zero failures/errors/skips, with explicit GC disabled. Source is reachable
+`dc862d7a1ef5533e60e557f1a63783bafcc04b94` plus the recorded three-file patch;
+the earlier 316-case run is not presented as a rerun of this correction.
+Fresh XML, commands, source snapshots and hashes are separately preserved under
+`target/release-evidence/v32/priority6-early-validation/`, including the initial
+fixture compilation failure. `git diff --check` passed.
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter \
+  -DargLine=-XX:+DisableExplicitGC \
+  -Dtest=ResourceOwnershipReviewTest,DocumentationReleaseArtifactTest test
+```
+
 ## Priority 7 - Module, Optional Integration, and Evidence Boundaries
 
 ### [ ] 7.1 Review cross-module and optional dependency contracts
