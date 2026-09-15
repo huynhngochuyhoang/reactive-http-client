@@ -75,16 +75,16 @@ or swap dependencies merely to satisfy a review item.
 
 ## Review Records
 
-The baseline, architecture map and finding register now exist; the remaining
-records are planned outputs, not completed evidence. Keep detailed matrices in these
+The baseline, architecture map, extension scenarios and finding register now exist;
+the decision record remains planned, not completed evidence. Keep detailed matrices in these
 records unless their size justifies a separate file.
 
 | Record | Contents |
 |---|---|
 | [BASELINE-SCOPE.md](BASELINE-SCOPE.md) | Verified baseline, historical decision inventory and review coverage |
 | [ARCHITECTURE-MAP.md](ARCHITECTURE-MAP.md) | Module, decision, composition and ownership maps with source/test references |
-| `EXTENSION-SCENARIOS.md` | External-consumer attempts, observations and supported/limited/gap classifications |
-| [FINDINGS.md](FINDINGS.md) | Register structure and decision gate; no confirmed findings yet |
+| [EXTENSION-SCENARIOS.md](EXTENSION-SCENARIOS.md) | External-consumer attempts, observations and supported/limited/gap classifications |
+| [FINDINGS.md](FINDINGS.md) | Two reproduced extension gaps, alternatives and unselected implementation decision |
 | `ARCHITECTURE-DECISION.md` | Maintainer scope decision, selected-item verification and final review/release disposition |
 
 ---
@@ -271,37 +271,84 @@ evidence/decision fields without inventing findings or approving implementation.
 
 ## Priority 3 - Real Application Extension Scenarios
 
-### [ ] 3.1 Select representative external-consumer cases
+### [x] 3.1 Select representative external-consumer cases
 
-- [ ] Select concrete reported needs first; label hypothetical extensions and
+- [x] Select concrete reported needs first; label hypothetical extensions and
       explain why their exploration is relevant to supported usage.
-- [ ] Place consumer examples outside starter packages, using documented public
+- [x] Place consumer examples outside starter packages, using documented public
       APIs and no reflection or package-private access to make them work.
-- [ ] Cover per-caller auth/tenant gates with cache hits and final identity, plus
+- [x] Cover per-caller auth/tenant gates with cache hits and final identity, plus
       Boot/per-client builder mutations including non-filter callbacks/replacements.
-- [ ] Cover custom auth factory, metadata parser, codec/error decoder, observer or
+- [x] Cover custom auth factory, metadata parser, codec/error decoder, observer or
       lifecycle hook without MeterRegistry, explicit handoff and connector replacement.
 
-### [ ] 3.2 Prove behavior without bypassing safety boundaries
+### [x] 3.2 Prove behavior without bypassing safety boundaries
 
-- [ ] Retain minimal attempted consumers, declared configuration and observed
+- [x] Retain minimal attempted consumers, declared configuration and observed
       selection/order/callback/dispatch behavior rather than descriptions alone.
-- [ ] Exercise cache hit/miss and relevant auth refresh or final-request mutations
+- [x] Exercise cache hit/miss and relevant auth refresh or final-request mutations
       without borrowing another caller's identity or bypassing safety classification.
-- [ ] Show explicit context transfer and target isolation; distinguish application
+- [x] Show explicit context transfer and target isolation; distinguish application
       ownership and connector-replacement limitations from starter defects.
-- [ ] Reuse existing fixtures where they independently prove the scenario; keep
+- [x] Reuse existing fixtures where they independently prove the scenario; keep
       untested deployment assertions labeled unverified.
 
-### [ ] 3.3 Classify extension constraints
+### [x] 3.3 Classify extension constraints
 
-- [ ] Classify each case as directly supported, supported with constraints,
+- [x] Classify each case as directly supported, supported with constraints,
       awkward but correct, dependent on unsupported internals, contradictory to
       a promised contract, or intentionally outside scope.
-- [ ] Identify the exact restriction and affected user. Distinguish deliberate
+- [x] Identify the exact restriction and affected user. Distinguish deliberate
       safety rejection from an accidental extension gap.
-- [ ] Record existing SPI/local/documentation alternatives before proposing a new
+- [x] Record existing SPI/local/documentation alternatives before proposing a new
       mechanism; link genuine gaps to finding IDs without approving fixes yet.
+
+Priority 3 evidence (2026-09-14; final record verified 2026-09-15):
+
+- [EXTENSION-SCENARIOS.md](EXTENSION-SCENARIOS.md) records twelve application
+  scenarios, their configuration, exact observations, constraints and alternatives.
+  The new `example.v32.ExtensionScenariosTest` lives in the separate Boot consumer
+  and uses public APIs, not same-package bridges or reflective internal access.
+- Reachable reviewed source: `c017b234a3770e41c6cc54d16440de611941f347`, plus the
+  recorded uncommitted eight-file test/documentation/verifier patch. No production
+  code, dependency version, published coordinate or historical roadmap changed.
+  Implementation and release scope remain unselected. F001 and F002 are confirmed
+  extension gaps with tested alternatives, **not accepted fixes**; Priority 8.3
+  still owns that decision.
+- Toolchain: Maven 3.9.9, Oracle JDK 21.0.8, Boot 4.0.0. Current artifacts were
+  freshly installed using
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -DskipTests -Dmaven.javadoc.skip=true install`.
+  This used the existing local repository, not fresh Central downloads. Captured
+  effective POM, dependency tree, classpath and matching installed/reactor JAR
+  hashes establish assembled consumption without starter classes-directory leakage.
+- Standalone profile: with
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -f .github/boot4-consumer/pom.xml -Dconsumer.v32.extensions=true -Dtest=ExtensionScenariosTest test`,
+  **17 cases passed in each of three consecutive final runs** (51 executions,
+  zero failures/errors/skips). Its own Caffeine dependency makes this profile
+  independent of the earlier parity profiles. Expected-gap assertions are included
+  in that count, not evidence that F001/F002 are resolved.
+- Combined assembled verification: the same Maven/consumer options, with
+  `-Dconsumer.v26.observability=true -Dconsumer.v27.parity=true -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true -Dconsumer.v30.parity=true -Dconsumer.v31.parity=true -Dconsumer.v32.extensions=true clean test`,
+  passed **28 tests across seven classes**, zero failures/errors/skips. This includes
+  the 17 new cases, not 28 additional cases. The current-consumer verifier now
+  selects V32; its entire fresh-repository script was not rerun in this review.
+- Final documentation command:
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`:
+  **56 tests passed**, zero failures/errors/skips. The added guard checks the
+  consumer boundary, twelve scenario IDs, fourteen referenced test methods,
+  unapproved findings and independently wired profile. Link checks caught two
+  finding anchors, which were corrected before this final run. Shell syntax,
+  whitespace, source scope and final XML totals also passed the evidence audit.
+- Preserve `target/release-evidence/v32/priority3/` before root clean: stage logs,
+  commands, timestamps, XML, exact source snapshots/diffs, baseline archive,
+  installed artifacts, toolchain/settings, `audit.json` and `SHA256SUMS` are there.
+  Initial fixture failures and the missing-record red run remain separate. Final
+  stages capture only their own module's reports; earlier mixed-module copies
+  are not used for final totals.
+- This is not a new ingress protocol/mesh, memory-profile, API, matrix, full-reactor
+  test or native run. The handoff uses mock ingress plus real downstream transport;
+  connector ownership is not a pod-memory diagnosis. Later priorities retain the
+  untested selection, concurrency, optional-classpath and AOT/native combinations.
 
 ## Priority 4 - Effective Policy and Component Selection Review
 

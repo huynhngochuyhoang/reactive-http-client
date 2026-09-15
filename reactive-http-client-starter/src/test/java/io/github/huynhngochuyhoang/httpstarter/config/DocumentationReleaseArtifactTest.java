@@ -286,6 +286,46 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32ExtensionScenariosKeepTheConsumerBoundaryAndFindingsUnapproved() throws Exception {
+        Path root = projectRoot();
+        String scenarios = Files.readString(root.resolve("roadmaps/v32/EXTENSION-SCENARIOS.md"));
+        String consumer = Files.readString(root.resolve(
+                ".github/boot4-consumer/src/v32-test/java/example/v32/ExtensionScenariosTest.java"));
+        assertThat(consumer).startsWith("package example.v32;")
+                .doesNotContain("setAccessible(", "getDeclaredField(", "getDeclaredMethod(", "ReflectionTestUtils",
+                        "ReactiveClientInvocationHandler", "ReactiveHttpClientFactoryBean", "LocalResponseCacheManager");
+        assertThat(scenarios).contains("> **Implementation and release scope:** unselected",
+                "## Scenario Matrix", "## Configuration and Observations", "## Limits and Alternatives",
+                "V32-F001", "V32-F002", "Priority 8.3", "synthetic", "not a mesh diagnosis");
+        for (int index = 1; index <= 12; index++) {
+            assertThat(scenarios).contains("| V32-E%02d |".formatted(index));
+        }
+        Matcher methods = Pattern.compile("`ExtensionScenariosTest#([A-Za-z0-9]+)`").matcher(scenarios);
+        Set<String> referenced = new HashSet<>();
+        while (methods.find()) {
+            assertThat(consumer).contains(methods.group(1) + "(");
+            referenced.add(methods.group(1));
+        }
+        assertThat(referenced).hasSizeGreaterThanOrEqualTo(14);
+        String findings = Files.readString(root.resolve("roadmaps/v32/FINDINGS.md"));
+        assertThat(findings).contains("## V32-F001", "## V32-F002", "No production change is authorized");
+        var factory = DocumentBuilderFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        var pom = factory.newDocumentBuilder().parse(root.resolve(".github/boot4-consumer/pom.xml").toFile());
+        var xpath = javax.xml.xpath.XPathFactory.newInstance().newXPath();
+        String profile = "/project/profiles/profile[id='v32-extension-scenarios']";
+        assertThat(xpath.evaluate(profile + "/activation/property/name", pom)).isEqualTo("consumer.v32.extensions");
+        assertThat((Double) xpath.evaluate("count(" + profile + "/dependencies/dependency["
+                        + "groupId='com.github.ben-manes.caffeine' and artifactId='caffeine' and not(optional='true')"
+                        + " and (not(scope) or scope='compile' or scope='runtime')])",
+                pom, javax.xml.xpath.XPathConstants.NUMBER)).isEqualTo(1.0);
+        assertThat(xpath.evaluate(profile + "/build/plugins/plugin/executions/execution/configuration/sources/source", pom))
+                .isEqualTo("src/v32-test/java");
+        assertThat(Files.readString(root.resolve("scripts/verify-current-consumer.sh")).lines()
+                .filter(line -> line.contains("-Dconsumer.v32.extensions=true")).count()).isEqualTo(4);
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

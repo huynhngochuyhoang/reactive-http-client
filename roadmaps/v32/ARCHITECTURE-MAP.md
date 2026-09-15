@@ -292,7 +292,14 @@ class name. Linked test methods are source-checked by the new documentation guar
 | Public/module extension | Published helper/OTel dependencies and internal package bridges; documented customizers, auth, codecs, error and reporting APIs | Q5 / Priorities 3 and 7: implement outside-package consumer scenarios; distinguish a deliberate safety rejection from a missing extension. API visibility alone is not a support/removal decision |
 | Transport, context and memory | Factory pools/late tracking, streaming transfer, context snapshot and lifecycle boundaries | Q6 / Priority 6: selected application connectors, detached subscriptions and controlled retention probes. No new heap/RSS, production Istio, H2, GC reachability or network-fault experiment was run by this map |
 | Optional integrations and release tools | POM linkage, auto-configuration conditions, current fixture/script roles; [OTel tests][otel-tests] and [mock bridge][mock-cache] indexed | Priority 7/10 choose assembled consumer, OTel, native and compatibility checks by any accepted change. Source reading and JVM AOT tests are not a new native binary |
-| Documentation / missing verification | Ten required invariants have owners and named observations; explicit external independent-load and late-assembly limitations above | No confirmed missing behavior is entered in [FINDINGS.md](FINDINGS.md). A missing assertion is a verification question; missing wording is a documentation question. File size/duplication alone is neither |
+| Documentation / missing verification | Ten required invariants have owners and named observations; explicit external independent-load and late-assembly limitations above | Priority 2 entered no confirmed missing behavior. Priority 3 findings are linked below. A missing assertion is a verification question; missing wording is a documentation question. File size/duplication alone is neither |
+
+Priority 3 follow-up: [external scenarios](EXTENSION-SCENARIOS.md) address Q3/Q5
+with installed-artifact consumers outside starter packages. They reproduce
+[F001/F002](FINDINGS.md): context-based starter-builder classification drift and
+fresh static metadata requiring an inaccessible derived value. Their tested
+public alternatives do not resolve the findings; Priorities 4/7 and the 8.3
+decision gate remain responsible for further review and any accepted correction.
 
 ### Verification Ledger
 
