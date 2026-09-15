@@ -301,6 +301,15 @@ fresh static metadata requiring an inaccessible derived value. Their tested
 public alternatives do not resolve the findings; Priorities 4/7 and the 8.3
 decision gate remain responsible for further review and any accepted correction.
 
+Priority 4 follow-up: the [effective-policy selection matrix](EFFECTIVE-POLICY-SELECTION.md)
+maps factory startup, public handler creation, invocation, diagnostics, mocks and
+AOT to rule owners and evaluation times. It preserves non-instantiating unknowns
+and foreign-factory exclusions rather than requiring a universal resolver. Paired
+registry tests confirm representative runtime/diagnostic selection; F003 records
+AOT's first-singleton properties fallback differing from runtime precedence.
+The mutation inventory distinguishes frozen work/retained bounds from shallow
+policy references and live configuration reads. No production correction is selected.
+
 ### Verification Ledger
 
 The source baseline above is reachable in the reviewed history. Priority 2 changes

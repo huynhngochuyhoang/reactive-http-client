@@ -326,6 +326,35 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32SelectionReviewRecordsLifecycleDifferencesWithoutApprovingImplementation() throws Exception {
+        Path root = projectRoot();
+        String review = Files.readString(root.resolve("roadmaps/v32/EFFECTIVE-POLICY-SELECTION.md"));
+        assertThat(review).contains("> **Implementation and release scope:** unselected",
+                "## Entry-Point Matrix", "## Lookup and Availability", "## Mutation Inventory", "## Disposition",
+                "V32-F001", "V32-F002", "V32-F003", "Priority 8.3", "not a native binary");
+        for (String path : List.of("Factory startup", "Public handler creation", "Invocation",
+                "Diagnostics", "Mock builder", "AOT")) {
+            assertThat(review).contains("| " + path + " |");
+        }
+        Map<String, String> fixtures = Map.of(
+                "ComponentSelectionReviewTest", "core",
+                "EffectiveSelectionAotReviewTest", "config");
+        Matcher methods = Pattern.compile("`(ComponentSelectionReviewTest|EffectiveSelectionAotReviewTest)#([A-Za-z0-9]+)`")
+                .matcher(review);
+        Set<String> references = new HashSet<>();
+        while (methods.find()) {
+            String source = Files.readString(root.resolve("reactive-http-client-starter/src/test/java/"
+                    + "io/github/huynhngochuyhoang/httpstarter/" + fixtures.get(methods.group(1))
+                    + "/" + methods.group(1) + ".java"));
+            assertThat(source).contains(methods.group(2) + "(");
+            references.add(methods.group());
+        }
+        assertThat(references).hasSize(3);
+        assertThat(Files.readString(root.resolve("roadmaps/v32/FINDINGS.md")))
+                .contains("## V32-F003", "No production change is authorized");
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));

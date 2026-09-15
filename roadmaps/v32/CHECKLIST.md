@@ -84,7 +84,8 @@ records unless their size justifies a separate file.
 | [BASELINE-SCOPE.md](BASELINE-SCOPE.md) | Verified baseline, historical decision inventory and review coverage |
 | [ARCHITECTURE-MAP.md](ARCHITECTURE-MAP.md) | Module, decision, composition and ownership maps with source/test references |
 | [EXTENSION-SCENARIOS.md](EXTENSION-SCENARIOS.md) | External-consumer attempts, observations and supported/limited/gap classifications |
-| [FINDINGS.md](FINDINGS.md) | Two reproduced extension gaps, alternatives and unselected implementation decision |
+| [EFFECTIVE-POLICY-SELECTION.md](EFFECTIVE-POLICY-SELECTION.md) | Entry-point/lookup matrix, mutation boundaries and representative parity/drift evidence |
+| [FINDINGS.md](FINDINGS.md) | Three reproduced selection/extension gaps, alternatives and unselected implementation decision |
 | `ARCHITECTURE-DECISION.md` | Maintainer scope decision, selected-item verification and final review/release disposition |
 
 ---
@@ -352,34 +353,88 @@ Priority 3 evidence (2026-09-14; final record verified 2026-09-15):
 
 ## Priority 4 - Effective Policy and Component Selection Review
 
-### [ ] 4.1 Compare decisions across creation and inspection paths
+### [x] 4.1 Compare decisions across creation and inspection paths
 
-- [ ] Build a matrix for startup, public handler creation, invocation, diagnostics,
+- [x] Build a matrix for startup, public handler creation, invocation, diagnostics,
       mocks and AOT covering grammar, effective API, cache, resilience and signing.
-- [ ] Identify one authoritative rule and evaluation time per fact; distinguish
+- [x] Identify one authoritative rule and evaluation time per fact; distinguish
       policy selection, component availability, validation and actual activation.
-- [ ] Preserve legitimate lifecycle differences and unknown values; do not force
+- [x] Preserve legitimate lifecycle differences and unknown values; do not force
       inspection paths to instantiate application components for superficial parity.
-- [ ] Ensure foreign replacement clients remain outside starter-only validation.
+- [x] Ensure foreign replacement clients remain outside starter-only validation.
 
-### [ ] 4.2 Exercise representative selection and mutation cases
+### [x] 4.2 Exercise representative selection and mutation cases
 
-- [ ] Reuse fixtures for primary/order/priority, fallback/default candidates,
+- [x] Reuse fixtures for primary/order/priority, fallback/default candidates,
       candidate resolvers and parent-child shadowing where relevant to each lookup.
-- [ ] Cover lazy/prototype components, cached/uncached FactoryBean products,
+- [x] Cover lazy/prototype components, cached/uncached FactoryBean products,
       factory-method definitions and supported programmatic replacement beans.
-- [ ] Record absent, available and unresolved outcomes without collapsing them;
+- [x] Record absent, available and unresolved outcomes without collapsing them;
       compare diagnostics with the actual runtime selection for the same case.
-- [ ] Inventory mutable configuration, frozen decisions and rejected runtime
+- [x] Inventory mutable configuration, frozen decisions and rejected runtime
       mutation; verify that validation and request behavior consume compatible state.
 
-### [ ] 4.3 Record parity, drift and smallest alternatives
+### [x] 4.3 Record parity, drift and smallest alternatives
 
-- [ ] Attach a reproducer for each confirmed mismatch and name the contract owner.
-- [ ] Explain where apparently repeated logic has different valid requirements;
+- [x] Attach a reproducer for each confirmed mismatch and name the contract owner.
+- [x] Explain where apparently repeated logic has different valid requirements;
       do not require a universal resolver or new immutable policy model by default.
-- [ ] Add the decision/selection matrix to the architecture map and disposition
+- [x] Add the decision/selection matrix to the architecture map and disposition
       each reviewed area, linking only evidence-backed gaps to the finding register.
+
+Priority 4 evidence (2026-09-15):
+
+- [EFFECTIVE-POLICY-SELECTION.md](EFFECTIVE-POLICY-SELECTION.md) maps all six
+  creation/inspection paths, authoritative rules, evaluation times, lookup states,
+  mutable/frozen state and no-change alternatives. The architecture map links that
+  canonical matrix. F001/F002 remain unresolved; new **V32-F003** reproduces AOT
+  choosing the first initialized properties bean despite runtime non-primary
+  precedence. Explicit primary selection is the passing alternative. No finding
+  is approved for implementation; Priority 8.3 still owns the decision.
+- Reachable reviewed source `6023a9132d2569108c55b2bf90bbceb7fd00084c`, plus the
+  recorded seven-file uncommitted review/test patch. Production code, POMs,
+  baseline `4.4.0`, development `4.5.0-SNAPSHOT` and V1-V31 remain unchanged.
+  Maven 3.9.9, Oracle JDK 21.0.8, Boot 4.0.0, repository Central-only settings;
+  existing local dependencies were used, not a fresh Central release lane.
+- New paired fixtures passed **14 cases**: six absent/available/deferred Retry
+  scenarios, four initialized registry-precedence cases, and four AOT/runtime
+  properties cases. Retry behavior uses actual FactoryBean composition around an
+  in-process 503/200 exchange; these are not TCP dispatch measurements. AOT cases
+  invoke the JVM processor and runtime factory, not a native binary.
+- Starter regression passed **320 tests across 16 classes**, zero
+  failures/errors/skips, including those 14 cases. Reproduce with
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter`
+  and the following selector followed by `test`:
+
+  ```text
+  -Dtest=ComponentSelectionReviewTest,EffectiveSelectionAotReviewTest,ReactiveHttpClientDiagnosticsProviderTest,ReactiveHttpClientFactoryBeanDiagnosticsTest,ReactiveHttpClientAotSmokeTest,EffectiveHttpClientContractExporterTest,ReactiveHttpClientContractSnapshotTest,MethodMetadataValidationTest,MethodMetadataTimeoutTest,DeclarativeRequestParameterGrammarTest,DeclarativeReturnTypeGrammarTest,DeclarativeCachePolicyTest,CacheWorkPolicyEnforcementTest,EffectiveResiliencePolicyTest,ExplicitResilienceActivationContractTest,ResilienceOperatorApplierTest,ResponseCacheRetentionOwnershipTest#runtimePolicyBoundsMutationIsRejectedWithoutCreatingAnotherCache
+  ```
+
+  That mixed selector did not discover the nested applier classes. A separate
+  run with the same Maven options and `'-Dtest=ResilienceOperatorApplierTest*' test`
+  passed **35 additional tests** (14 no-op, nine null-registry, twelve real-registry;
+  the enclosing class reports zero). Only the named retention mutation test was
+  selected; no forced-GC retention probe ran.
+- Mock regression:
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am -Dtest=MockReactiveHttpClientTest -Dsurefire.failIfNoSpecifiedTests=false test`:
+  **63 tests passed**, zero failures/errors/skips. Upstream modules were compiled
+  but had no matching tests; this is not a full reactor or newly assembled consumer
+  run. Priority 3 external-consumer evidence retains its original provenance.
+- Final documentation:
+  `mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter -Dtest=DocumentationReleaseArtifactTest test`:
+  **57 tests passed**, zero failures/errors/skips. The added guard was red before
+  the selection record existed and checks all six paths, exact new fixture-method
+  references and unapproved findings. A later missing full finding-ID assertion
+  was corrected before final verification. Whitespace, source scope, reachable
+  baseline and fresh XML totals passed the final audit.
+- Preserve `target/release-evidence/v32/priority4/` before root clean: original
+  failed attempts, successful stage commands/logs/XML, timestamps, source/diff
+  copies, baseline archive, toolchain/settings, `audit.json` and `SHA256SUMS`.
+  The initial three AOT mismatch errors are distinguished from the three
+  fixture Boolean-unboxing errors and one incorrect fixture exception expectation.
+  No native, API, matrix, benchmark, optional-classpath or deployment-memory
+  experiment was rerun. Broader candidate/concurrency permutations remain named
+  limitations for later priorities, not inferred passing evidence.
 
 ## Priority 5 - Invocation and Composition Boundaries
 
