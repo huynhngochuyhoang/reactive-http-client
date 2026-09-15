@@ -1,12 +1,13 @@
 # V32 Architecture Finding Register
 
-> **Status:** open for review; three confirmed selection/extension gaps, no accepted implementation
+> **Status:** open for review; three selection/extension gaps and one construction-retention gap, no accepted implementation
 > **Baseline:** [verified scope and evidence](BASELINE-SCOPE.md)
 > **Decision owner:** maintainer, through [Priority 8.3](CHECKLIST.md)
 
 Priority 1 established the register structure. Priority 3 populated F001 and F002
 from the external-consumer scenarios below. Priority 4 adds F003 from a paired
-AOT/runtime properties-selection test. This is not an exhaustive defect
+AOT/runtime properties-selection test. Priority 6 adds F004 from failed handler
+construction with live registry ownership. This is not an exhaustive defect
 inventory. Other reported hypotheses remain in the baseline record until
 reproduced or bounded by later review.
 
@@ -97,6 +98,31 @@ Concrete change dependencies are recorded without authorizing an extraction or
 second pipeline. Priority 6 owns remaining resource/teardown questions; Priority
 8.3 still owns implementation scope. Review date: 2026-09-15.
 
+## V32-F004: Rejected Handler Construction Abandons Cache Meter Leases
+
+| Field | Recorded evidence / disposition |
+|---|---|
+| Need and origin | Exploratory Q1 / Priority 6: public handler creation rejects authenticated caching when no provider/base URL is supplied, while cache telemetry and a long-lived registry are enabled |
+| Classification | Confirmed partial-construction retention gap. Validation is correct, but each rejected creation leaves a registered metric owner and empty cache graph without a returned cleanup owner |
+| Contract and owner | [Handler.create][handler] creates the manager, then calls a constructor that can reject. [Manager.createForClient][manager] rolls back its own failures, but no guard closes a successfully returned manager if the later constructor throws. Owner: handler assembly before transfer to the factory/caller |
+| Evidence | Reachable source `c11d281330b48bcae3917f83bd2048913d03dcca` plus the recorded review test. `ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionLeavesMeterLeasesWithoutAReturnedOwner` repeats rejection three times, with and without a live same-tag owner. Each rejected call adds one owner and 16 to the maximum-entry gauge; closing the valid owner and context leaves three owners and 48 capacity. [Ownership review](RESOURCE-OWNERSHIP.md) records commands, fresh reports and limits |
+| Root and enforcing path | [Metrics.SHARED][cache-metrics] -> SharedMeter.owners -> metrics instance -> registry; gauge suppliers also retain the cache/removal callback/manager graph. The WeakHashMap registry key does not break this value-to-registry strong path. No GC timing assumption, response dispatch or populated-cache measurement is required to observe these accumulating owners |
+| Alternatives | Use the provider-aware overload with valid auth/base URL, or disable unneeded caching; reject known-invalid inputs before manager allocation; or add a local failure cleanup guard around handler construction. Early validation alone does not cover every later constructor/custom component failure. Test-only reflective lease cleanup is not a public workaround |
+| Tradeoffs | A local assembly guard avoids a new API or hot-path abstraction. It must close only the newly allocated manager, preserve the original exception and suppress cleanup failures, and leave supplied WebClient/auth/registry plus other live owners untouched |
+| Priority and dependencies | Reproduced resource leak on rejected construction, not proof of the earlier production pod-memory report. Priority 7 reviews public/helper creation paths; Priority 8.3 selects any correction. A Spring factory normally passes auth inputs; this exact failure does not establish that all ordinary factory startups leak |
+| Disposition | Unresolved, 2026-09-15. Review owner: maintainer/invocation assembly. Reconsider at Priority 7 and 8.3; no production fix approved |
+| Acceptance and rollback | Repeated rejected creation leaves the registry and same-tag live owner unchanged; no unreturned manager lease remains. Cover auth-input rejection and a later assembly exception, with and without telemetry, preserving no-Caffeine rollback and external component ownership. Run focused lifecycle/consumer tests and assess AOT/native impact for the actual patch; roll back on successful-owner disposal or altered validation |
+| Decision reference | Priority 8.3: not selected, no implementation approval. Current-behavior characterization assertions must change with an accepted fix |
+
+## Priority 6 Ownership Disposition
+
+[RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) records the terminal/lock matrix,
+construction controls, application connector and independent-load ownership,
+overlapping meter teardown and historical memory limits. F004 is the only new
+confirmed gap. No global deadlock-freedom, universal shutdown deadline, GC
+collectability or current pod/RSS conclusion is claimed. Remaining legacy
+collection-dependent tests are an evidence-lane follow-up for Priority 7.
+
 ## Implementation Gate
 
 No production change is authorized by baseline completion or by creating a
@@ -117,5 +143,7 @@ is a supported final outcome, not a failed release.
 [metadata-value]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/MethodMetadata.java
 [effective-api]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/EffectiveApi.java
 [handler]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+[manager]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/LocalResponseCacheManager.java
+[cache-metrics]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/MicrometerLocalResponseCacheMetrics.java
 [replacement-guide]: ../../docs/18-conflict-cardinality-guardrails.md
 [aot-properties]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientBeanFactoryInitializationAotProcessor.java

@@ -86,7 +86,8 @@ records unless their size justifies a separate file.
 | [EXTENSION-SCENARIOS.md](EXTENSION-SCENARIOS.md) | External-consumer attempts, observations and supported/limited/gap classifications |
 | [EFFECTIVE-POLICY-SELECTION.md](EFFECTIVE-POLICY-SELECTION.md) | Entry-point/lookup matrix, mutation boundaries and representative parity/drift evidence |
 | [INVOCATION-COMPOSITION.md](INVOCATION-COMPOSITION.md) | Counted request/probe/replay paths, independent lifetimes and concrete change dependencies |
-| [FINDINGS.md](FINDINGS.md) | Three reproduced selection/extension gaps, alternatives and unselected implementation decision |
+| [RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) | Resource/terminal and nested-lock matrices, partial construction, external owners and retention limits |
+| [FINDINGS.md](FINDINGS.md) | Three selection/extension gaps and one construction-retention gap, alternatives and unselected implementation decision |
 | `ARCHITECTURE-DECISION.md` | Maintainer scope decision, selected-item verification and final review/release disposition |
 
 ---
@@ -524,36 +525,109 @@ Priority 5 evidence (2026-09-15):
 
 ## Priority 6 - Resource, Concurrency, and Retention Ownership
 
-### [ ] 6.1 Inventory resources and terminal owners
+### [x] 6.1 Inventory resources and terminal owners
 
-- [ ] Follow eager InputStream/Reader/channel bodies, pooled buffers, materialized
+- [x] Follow eager InputStream/Reader/channel bodies, pooled buffers, materialized
       responses, selected context snapshots and auth state through ownership transfer.
-- [ ] Map entries/generations, independent loads, flights, refreshes and all three
+- [x] Map entries/generations, independent loads, flights, refreshes and all three
       work reservations to acquisition, publication, finish and cleanup paths.
-- [ ] Record application-owned responses, connectors, executors, retained records
+- [x] Record application-owned responses, connectors, executors, retained records
       and subscriptions separately, including work that may outlive the factory.
-- [ ] Identify partial-construction owners and cleanup obligations when validation,
+- [x] Identify partial-construction owners and cleanup obligations when validation,
       optional dependency resolution or later assembly fails.
 
-### [ ] 6.2 Characterize races and teardown boundaries
+### [x] 6.2 Characterize races and teardown boundaries
 
-- [ ] Cover relevant success/empty/error/timeout/cancel paths, late signals, discard,
+- [x] Cover relevant success/empty/error/timeout/cancel paths, late signals, discard,
       expiry, explicit eviction and stale-token publication with deterministic gates.
-- [ ] Verify cleanup precedes capacity reuse where required; include blocking
+- [x] Verify cleanup precedes capacity reuse where required; include blocking
       cancellation callbacks and asynchronous preparation continuations.
-- [ ] Review lock ordering and external callbacks, late connection tracking,
+- [x] Review lock ordering and external callbacks, late connection tracking,
       shutdown deadlines and concurrent destroy/recreate behavior.
-- [ ] Exercise overlapping meter owners and teardown without attributing another
+- [x] Exercise overlapping meter owners and teardown without attributing another
       live factory's meters or cache resources to the closing owner.
 
-### [ ] 6.3 Classify retention before proposing fixes
+### [x] 6.3 Classify retention before proposing fixes
 
-- [ ] Separate cache occupancy, active work, heap retention, direct/allocator
+- [x] Separate cache occupancy, active work, heap retention, direct/allocator
       capacity and process RSS; reuse applicable V29/V30 evidence with provenance.
-- [ ] Avoid forced-GC success assumptions in the ordinary suite; use controlled
+- [x] Avoid forced-GC success assumptions in the ordinary suite; use controlled
       reachability lanes only when collection is actually needed for the claim.
-- [ ] Add ownership/terminal results and limitations to the map; require a concrete
+- [x] Add ownership/terminal results and limitations to the map; require a concrete
       owner/reproducer before describing a leak or approving a concurrency refactor.
+
+Completed on 2026-09-15. [RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) records
+resource/terminal owners, nested locks and external callbacks, construction
+boundaries and retention classifications. The reachable clean starting source
+is `c11d281330b48bcae3917f83bd2048913d03dcca`; verification includes the recorded
+six-file review/test patch. Production sources, APIs, versions, dependencies and
+V1-V31 evidence are unchanged.
+
+- Six new `ResourceOwnershipReviewTest` cases cover early validation, registered
+  Spring versus direct factory failure cleanup, a real application-owned
+  HTTP/1.1 connector, and rejected public handler creation with/without a live
+  same-tag meter owner. The last two cases confirm **V32-F004**: each rejection
+  adds an abandoned cache metric lease; three rejected calls leave three owners
+  and 48 maximum entries after normal owner/context teardown. The test cleans
+  those owners reflectively only after observing the gap. This is not a fix or
+  a supported application cleanup API. F001-F003 remain unresolved.
+- Fresh ownership regression: **257 tests across 14 classes**, zero failures,
+  errors or skips. These cover streams/readers/channels, pooled-buffer release,
+  multipart and streaming response ownership, stale tokens, all three capacity
+  dimensions, cancellation/discard, late connection tracking, shared transport
+  disposal deadline, overlap/recreation and retained application handoff records.
+  Gates assert source/peer/callback boundaries in addition to internal counters.
+- `DocumentationReleaseArtifactTest`: **59 tests**, zero failures/errors/skips.
+  Its new ownership guard checks record links, executable method references,
+  F004, historical-memory limits and the still-unselected implementation gate.
+  The final combined command below reruns all **316 cases across 15 classes**.
+- All these runs use `-XX:+DisableExplicitGC`; seven collection-dependent cases
+  are explicitly excluded, not counted as passing or skipped. No new test waits
+  for GC. The historical V29 retention suite was not rerun; remaining legacy
+  GC-dependent lane migration is a Priority 7 follow-up, not a silent test edit.
+- Historical V29 memory/retention and V30 active-work/admission records are
+  reused as versioned source conclusions only, with their reachable record
+  revisions and hashes inventoried. Original target-only memory bundles are
+  absent here. No fresh memory measurement or original raw-profile verification
+  is claimed. Occupancy, active work, decoded bytes, heap, allocator/direct
+  memory and RSS remain distinct; no current pod/mesh attribution is made.
+- Oracle JDK 21.0.8, Maven 3.9.9, Java target 21, Boot 4.0.0 and
+  `.mvn/maven-central-settings.xml`. Initial fixture setter/validation-expectation
+  failures and an invalid documentation anchor remain preserved separately.
+  No full-reactor, new assembled consumer, native, API comparison or performance
+  lane was run. Any production correction still requires Priority 8.3 approval.
+- Commands, UTC boundaries, fresh XML, exact source/patch snapshots, toolchain,
+  historical-record provenance and `SHA256SUMS` are under
+  `target/release-evidence/v32/priority6/`. Preserve this bundle before root clean.
+  Source/report inventory and `git diff --check` validate the final review tree.
+
+Final combined verification:
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter \
+  -DargLine=-XX:+DisableExplicitGC \
+  '-Dtest=ResourceOwnershipReviewTest,CacheWorkOwnershipContractTest,!CacheWorkOwnershipContractTest#rejectedAndSkippedClosuresCollectWhileAdmittedOwnersRemainAlive+detachedCallerCollectsWhileSourceRetainsItsOwnState+evictionReleasesValuesBeforeCloseWithoutReleasingRunningLoad,CacheCallerAdmissionContractTest,!CacheCallerAdmissionContractTest#terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen,CacheLoadAdmissionContractTest,CacheRefreshAdmissionContractTest,CacheWorkTelemetryContractTest,LocalResponseCacheObservabilityTest,BoundedLocalResponseCacheContractTest,StreamingUploadOwnershipTest,MultipartWireOwnershipContractTest,TransportResourceOwnershipStressTest,Priority7HousekeepingTest,AsyncHandoffOwnershipContractTest,SubscriptionReportingStateTest,DocumentationReleaseArtifactTest' \
+  test
+```
+
+Early-validation review correction (2026-09-15): caching and telemetry are now
+selected in the invalid-URL fixture. It asserts zero meter registrations and
+zero registry leases before cleanup, independently of the factory's unassigned
+manager field. Correcting only the URL then acquires one observable cache owner.
+This strengthens the earlier fixture, not production behavior or F004's scope.
+The focused final rerun passed **65 tests** (six ownership, 59 documentation),
+zero failures/errors/skips, with explicit GC disabled. Source is reachable
+`dc862d7a1ef5533e60e557f1a63783bafcc04b94` plus the recorded three-file patch;
+the earlier 316-case run is not presented as a rerun of this correction.
+Fresh XML, commands, source snapshots and hashes are separately preserved under
+`target/release-evidence/v32/priority6-early-validation/`, including the initial
+fixture compilation failure. `git diff --check` passed.
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter \
+  -DargLine=-XX:+DisableExplicitGC \
+  -Dtest=ResourceOwnershipReviewTest,DocumentationReleaseArtifactTest test
+```
 
 ## Priority 7 - Module, Optional Integration, and Evidence Boundaries
 
