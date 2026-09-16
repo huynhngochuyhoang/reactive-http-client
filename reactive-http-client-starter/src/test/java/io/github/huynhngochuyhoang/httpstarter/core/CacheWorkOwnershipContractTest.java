@@ -240,6 +240,10 @@ class CacheWorkOwnershipContractTest {
 
     @Test
     void rejectedAndSkippedClosuresCollectWhileAdmittedOwnersRemainAlive() throws Exception {
+        rejectedAndSkippedClosuresCollectWhileAdmittedOwnersRemainAlive(false);
+    }
+
+    void rejectedAndSkippedClosuresCollectWhileAdmittedOwnersRemainAlive(boolean probeReachability) throws Exception {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         try (Fixture f = new Fixture(true, 2, 1)) {
             f.call("refresh-a", () -> Mono.just("a")).block();
@@ -258,7 +262,7 @@ class CacheWorkOwnershipContractTest {
             assertThat(f.manager.workloadSnapshotForTesting().inFlightRefreshes()).isEqualTo(1);
             assertThat(tokens(f.manager)).isEqualTo(1);
             assertThat((java.util.Queue<?>) field(f.scheduler, "queue")).hasSize(1);
-            collected(queue, references);
+            if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, references); }
             assertThat(leader).isNotDone();
             assertThat(waiter).isNotDone();
             f.manager.evictAllForTesting();
@@ -276,18 +280,22 @@ class CacheWorkOwnershipContractTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void detachedCallerCollectsWhileSourceRetainsItsOwnState(boolean detachLeader) throws Exception {
+        detachedCallerCollectsWhileSourceRetainsItsOwnState(detachLeader, false);
+    }
+
+    void detachedCallerCollectsWhileSourceRetainsItsOwnState(boolean detachLeader, boolean probeReachability) throws Exception {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         try (Fixture f = new Fixture(true, 2, 1)) {
             Detached detached = detached(f, queue, detachLeader);
             f.counts(1, 1, 0);
             assertThat(f.manager.hasInFlightLoadWithMembersForTesting(1)).isTrue();
-            collected(queue, detached.callerReferences());
+            if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, detached.callerReferences()); }
             assertThat(detached.sourceReference().get()).isNotNull();
             assertThat(detached.sourceCancellations()).hasValue(0);
             detached.source().tryEmitEmpty().orThrow();
             assertThat(detached.survivor().get(10, TimeUnit.SECONDS)).isEqualTo("result");
             f.counts(0, 0, 0);
-            collected(queue, List.of(detached.sourceReference()));
+            if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, List.of(detached.sourceReference())); }
             assertThat(f.terminals).hasValue(2);
             assertThat(f.acquired).hasValue(2);
             assertThat(f.released).hasValue(2);
@@ -298,6 +306,10 @@ class CacheWorkOwnershipContractTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void evictionReleasesValuesBeforeCloseWithoutReleasingRunningLoad(boolean single) throws Exception {
+        evictionReleasesValuesBeforeCloseWithoutReleasingRunningLoad(single, false);
+    }
+
+    void evictionReleasesValuesBeforeCloseWithoutReleasingRunningLoad(boolean single, boolean probeReachability) throws Exception {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         try (Fixture f = new Fixture(single, 2, 1)) {
             var value = cachedValue(f, queue);
@@ -306,7 +318,7 @@ class CacheWorkOwnershipContractTest {
             f.manager.evictAllForTesting();
             assertThat(f.manager.snapshot().closed()).isFalse();
             assertThat(f.manager.snapshot().currentSize()).isZero();
-            collected(queue, List.of(value));
+            if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, List.of(value)); }
             f.counts(1, 1, 0);
             assertThat(pending).isNotDone();
             assertThat(tokens(f.manager)).isEqualTo(1);
@@ -563,21 +575,6 @@ class CacheWorkOwnershipContractTest {
 
     private static WeakReference<Object> ref(Object value, ReferenceQueue<Object> queue) {
         return new WeakReference<>(value, queue);
-    }
-
-    private static void collected(ReferenceQueue<Object> queue, List<WeakReference<Object>> references)
-            throws Exception {
-        List<java.lang.ref.Reference<?>> enqueued = new ArrayList<>();
-        long deadline = System.nanoTime() + Duration.ofSeconds(5).toNanos();
-        while (System.nanoTime() < deadline && enqueued.size() < references.size()) {
-            System.gc();
-            for (var reference = queue.poll(); reference != null; reference = queue.poll()) {
-                if (references.contains(reference)) { enqueued.add(reference); }
-            }
-            if (enqueued.size() < references.size()) { Thread.sleep(25); }
-        }
-        assertThat(references).allSatisfy(reference -> assertThat(reference.get()).isNull());
-        assertThat(enqueued).hasSize(references.size());
     }
 
     private static Object field(Object owner, String name) throws Exception {

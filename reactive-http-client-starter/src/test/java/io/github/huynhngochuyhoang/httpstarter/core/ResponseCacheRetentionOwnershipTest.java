@@ -31,8 +31,9 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -42,10 +43,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Timeout(30)
 class ResponseCacheRetentionOwnershipTest {
 
-    private static final Duration COLLECTION_TIMEOUT = Duration.ofSeconds(5);
-
     @Test
     void terminalOutcomesReleaseTransientOwnersWhileTheManagerRemainsOpen() throws Exception {
+        terminalOutcomesReleaseTransientOwnersWhileTheManagerRemainsOpen(false);
+    }
+
+    void terminalOutcomesReleaseTransientOwnersWhileTheManagerRemainsOpen(boolean probeReachability) throws Exception {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
         EffectiveCachePolicy.Selection selection = selection("terminal", 60_000, 10, false);
@@ -54,18 +57,22 @@ class ResponseCacheRetentionOwnershipTest {
 
         assertThat(manager.workloadSnapshotForTesting().inFlightLoads()).isZero();
         assertThat(manager.snapshot().currentSize()).isEqualTo(1);
-        assertRetained(references.cachedValue());
-        assertCollected(queue, references.transientOwners());
+        assertRetained(references.cachedValue(), probeReachability);
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, references.transientOwners()); }
 
         manager.evictAllForTesting();
         assertThat(manager.snapshot().currentSize()).isZero();
         assertGenerationOwners(manager, 0);
-        assertCollected(queue, List.of(references.cachedValue()));
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, List.of(references.cachedValue())); }
         manager.close();
     }
 
     @Test
     void expiryCapacityAndRefreshTransitionsReleaseDisplacedOwners() throws Exception {
+        expiryCapacityAndRefreshTransitionsReleaseDisplacedOwners(false);
+    }
+
+    void expiryCapacityAndRefreshTransitionsReleaseDisplacedOwners(boolean probeReachability) throws Exception {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         AtomicLong ticker = new AtomicLong();
         LocalResponseCacheManager manager = LocalResponseCacheManager.testing(ticker::get);
@@ -74,25 +81,25 @@ class ResponseCacheRetentionOwnershipTest {
                 manager, selection("expiry", 100, 10, false), key("expiry"), "expired", queue);
         ticker.addAndGet(Duration.ofMillis(100).toNanos());
         assertThat(manager.snapshot().currentSize()).isZero();
-        assertCollected(queue, List.of(expired));
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, List.of(expired)); }
 
         EffectiveCachePolicy.Selection capacity = selection("capacity", 60_000, 1, false);
         List<TrackedReference> capacityValues = List.of(
                 loadTrackedValue(manager, capacity, key("capacity-one"), "capacity-one", queue),
                 loadTrackedValue(manager, capacity, key("capacity-two"), "capacity-two", queue));
         assertThat(manager.snapshot().currentSize()).isEqualTo(1);
-        assertEventuallyCollectedCount(queue, capacityValues, 1);
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollectedCount(queue, capacityValues, 1); }
 
         RefreshReferences refresh = createRefreshReferences(manager, ticker, queue);
-        assertCollected(queue, List.of(refresh.displacedValue(), refresh.failedRefreshOwner()));
-        assertRetained(refresh.currentValue());
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, List.of(refresh.displacedValue(), refresh.failedRefreshOwner())); }
+        assertRetained(refresh.currentValue(), probeReachability);
 
         manager.evictAllForTesting();
         assertThat(refresh.refreshCancellations()).hasValue(1);
         assertThat(manager.workloadSnapshotForTesting().inFlightRefreshes()).isZero();
         assertGenerationOwners(manager, 0);
-        assertCollected(queue, List.of(refresh.currentValue(), refresh.cancelledRefreshOwner()));
-        assertCollected(queue, capacityValues);
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, List.of(refresh.currentValue(), refresh.cancelledRefreshOwner())); }
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, capacityValues); }
 
         manager.close();
     }
@@ -117,28 +124,36 @@ class ResponseCacheRetentionOwnershipTest {
 
     @Test
     void independentLoadRemainsCallerOwnedAfterManagerCloseAndReleasesAtCallerTerminal() {
+        independentLoadRemainsCallerOwnedAfterManagerCloseAndReleasesAtCallerTerminal(false);
+    }
+
+    void independentLoadRemainsCallerOwnedAfterManagerCloseAndReleasesAtCallerTerminal(boolean probeReachability) {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         IndependentLoadAfterClose active = startIndependentLoadThenClose(queue);
 
         assertThat(active.manager().workloadSnapshotForTesting().inFlightLoads()).isZero();
         assertThat(active.manager().snapshot().closed()).isTrue();
-        assertRetained(active.loadOwner());
+        assertRetained(active.loadOwner(), probeReachability);
 
         active.source().tryEmitEmpty().orThrow();
         assertThat(active.result().join()).isEqualTo("late-value");
         assertThat(active.manager().snapshot()).isEqualTo(
                 new LocalResponseCacheManager.Snapshot(0, 0, 0, 0, true));
-        assertCollected(queue, List.of(active.loadOwner()));
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, List.of(active.loadOwner())); }
     }
 
     @Test
     void detachedWaiterReleasesItsArgumentsContextAndStateBeforeTheLeaderEnds() {
+        detachedWaiterReleasesItsArgumentsContextAndStateBeforeTheLeaderEnds(false);
+    }
+
+    void detachedWaiterReleasesItsArgumentsContextAndStateBeforeTheLeaderEnds(boolean probeReachability) {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         ActiveFlight active = createActiveFlightWithCancelledWaiter(queue);
 
         assertThat(active.manager().hasInFlightLoadWithMembersForTesting(1)).isTrue();
         assertThat(active.sourceCancellations()).hasValue(0);
-        assertCollected(queue, active.waiterOwners());
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, active.waiterOwners()); }
 
         active.result().tryEmitValue("leader-value").orThrow();
         assertThat(active.leaderValue()).containsExactly("leader-value");
@@ -148,12 +163,16 @@ class ResponseCacheRetentionOwnershipTest {
 
     @Test
     void detachedLeaderReleasesItsCallerStateWhileAWaiterKeepsTheLoadAlive() {
+        detachedLeaderReleasesItsCallerStateWhileAWaiterKeepsTheLoadAlive(false);
+    }
+
+    void detachedLeaderReleasesItsCallerStateWhileAWaiterKeepsTheLoadAlive(boolean probeReachability) {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         DetachedLeaderFlight active = createActiveFlightWithCancelledLeader(queue);
 
         assertThat(active.manager().hasInFlightLoadWithMembersForTesting(1)).isTrue();
         assertThat(active.sourceCancellations()).hasValue(0);
-        assertCollected(queue, active.leaderOwners());
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, active.leaderOwners()); }
 
         active.result().tryEmitValue("waiter-value").orThrow();
         assertThat(active.waiterValue()).containsExactly("waiter-value");
@@ -163,12 +182,16 @@ class ResponseCacheRetentionOwnershipTest {
 
     @Test
     void hiddenRefreshTerminalPathsReleaseTheirCapturedState() {
+        hiddenRefreshTerminalPathsReleaseTheirCapturedState(false);
+    }
+
+    void hiddenRefreshTerminalPathsReleaseTheirCapturedState(boolean probeReachability) {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         RefreshTerminalFixture fixture = exerciseRefreshTerminalPaths(queue);
 
         assertThat(fixture.openManager().workloadSnapshotForTesting().inFlightRefreshes()).isZero();
         assertThat(fixture.cancellations()).hasValue(4);
-        assertCollected(queue, fixture.refreshOwners());
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, fixture.refreshOwners()); }
 
         fixture.openManager().close();
         fixture.scheduler().dispose();
@@ -176,6 +199,10 @@ class ResponseCacheRetentionOwnershipTest {
 
     @Test
     void preparedBodyAuthContextFrozenArgumentsAndResponseMetadataEndAtPublication() {
+        preparedBodyAuthContextFrozenArgumentsAndResponseMetadataEndAtPublication(false);
+    }
+
+    void preparedBodyAuthContextFrozenArgumentsAndResponseMetadataEndAtPublication(boolean probeReachability) {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         LocalResponseCacheManager manager = LocalResponseCacheManager.testing(System::nanoTime);
 
@@ -183,18 +210,22 @@ class ResponseCacheRetentionOwnershipTest {
 
         assertThat(manager.snapshot().currentSize()).isEqualTo(1);
         assertThat(manager.workloadSnapshotForTesting().inFlightLoads()).isZero();
-        assertCollected(queue, references.transientOwners());
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, references.transientOwners()); }
         manager.close();
     }
 
     @Test
     void closeRemovesMeterRootsAndRejectsLatePublication() throws Exception {
+        closeRemovesMeterRootsAndRejectsLatePublication(false);
+    }
+
+    void closeRemovesMeterRootsAndRejectsLatePublication(boolean probeReachability) throws Exception {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         SimpleMeterRegistry registry = new SimpleMeterRegistry();
         CloseReferences references = closeMeteredManagerWithLateLoad(registry, queue);
 
         assertThat(registry.getMeters()).noneMatch(ResponseCacheRetentionOwnershipTest::isCacheMeter);
-        assertCollected(queue, references.owners());
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, references.owners()); }
 
         LocalResponseCacheMetrics replacementMetrics =
                 LocalResponseCacheMetrics.enabled(registry, "retention-client");
@@ -210,6 +241,10 @@ class ResponseCacheRetentionOwnershipTest {
 
     @Test
     void retainedDiagnosticsMapDoesNotOwnFactoryManagerCacheOrValue() throws Exception {
+        retainedDiagnosticsMapDoesNotOwnFactoryManagerCacheOrValue(false);
+    }
+
+    void retainedDiagnosticsMapDoesNotOwnFactoryManagerCacheOrValue(boolean probeReachability) throws Exception {
         ReferenceQueue<Object> queue = new ReferenceQueue<>();
         DiagnosticsReferences references = createAndCloseDiagnosticsFixture(queue);
 
@@ -219,7 +254,7 @@ class ResponseCacheRetentionOwnershipTest {
         assertThat(client)
                 .containsEntry("cacheEntryCount", 1L)
                 .doesNotContainKeys("cacheKey", "cacheValue", "requestBody", "requestHeaders");
-        assertCollected(queue, references.owners());
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(queue, references.owners()); }
     }
 
     private static TerminalReferences createTerminalReferences(
@@ -762,77 +797,9 @@ class ResponseCacheRetentionOwnershipTest {
         return new TrackedReference(label, value, queue);
     }
 
-    private static void assertRetained(TrackedReference reference) {
-        for (int attempt = 0; attempt < 3; attempt++) {
-            diagnosticGcCheckpoint();
-        }
+    private static void assertRetained(TrackedReference reference, boolean probeReachability) {
+        if (probeReachability) { CacheOwnershipReachabilityIT.assertRetained(reference); }
         assertThat(reference.get()).as(reference.label()).isNotNull();
-    }
-
-    private static void assertEventuallyCollectedCount(
-            ReferenceQueue<Object> queue,
-            List<TrackedReference> references,
-            int expectedCollected) {
-        long deadline = System.nanoTime() + COLLECTION_TIMEOUT.toNanos();
-        int collected;
-        do {
-            drain(queue);
-            collected = (int) references.stream().filter(reference -> reference.get() == null).count();
-            if (collected >= expectedCollected) {
-                return;
-            }
-            diagnosticGcCheckpoint();
-        }
-        while (System.nanoTime() < deadline);
-        assertThat(collected)
-                .as("collected references: %s", labels(references))
-                .isGreaterThanOrEqualTo(expectedCollected);
-    }
-
-    private static void assertCollected(
-            ReferenceQueue<Object> queue,
-            List<TrackedReference> references) {
-        Set<TrackedReference> pending = Collections.newSetFromMap(new IdentityHashMap<>());
-        pending.addAll(references);
-        long deadline = System.nanoTime() + COLLECTION_TIMEOUT.toNanos();
-        do {
-            drain(queue);
-            pending.removeIf(reference -> reference.get() == null);
-            if (pending.isEmpty()) {
-                return;
-            }
-            diagnosticGcCheckpoint();
-        }
-        while (System.nanoTime() < deadline);
-        assertThat(pending)
-                .extracting(TrackedReference::label)
-                .as("starter-owned references still reachable after bounded collection attempts")
-                .isEmpty();
-    }
-
-    private static void diagnosticGcCheckpoint() {
-        System.gc();
-        byte[][] pressure = new byte[4][];
-        for (int index = 0; index < pressure.length; index++) {
-            pressure[index] = new byte[256 * 1024];
-        }
-        try {
-            TimeUnit.MILLISECONDS.sleep(10);
-        }
-        catch (InterruptedException error) {
-            Thread.currentThread().interrupt();
-            throw new AssertionError("Interrupted while awaiting reference release", error);
-        }
-    }
-
-    private static void drain(ReferenceQueue<Object> queue) {
-        while (queue.poll() != null) {
-            // WeakReference#get is the assertion source; draining bounds queue retention.
-        }
-    }
-
-    private static List<String> labels(List<TrackedReference> references) {
-        return references.stream().map(TrackedReference::label).toList();
     }
 
     private static final class TrackedReference extends WeakReference<Object> {

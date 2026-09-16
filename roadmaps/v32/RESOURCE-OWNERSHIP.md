@@ -12,6 +12,14 @@ It is not evidence that the reported production pod-memory increase has this cau
 
 ## Resource and Terminal Owners
 
+Priority 9 delta, 2026-09-16: [F004/F005 results](ACCEPTED-IMPROVEMENTS.md)
+supersede the failed-construction and ordinary-GC gaps below. Public handler
+creation now closes its newly allocated manager on failure. The renamed
+rejection regression referenced below now asserts no leaked owners instead of
+the original gap; its original result remains tied to this review's baseline.
+All 16 collection scenarios remain in a controlled lane. Broader Priority 10
+verification is pending; other ownership/lock conclusions are unchanged.
+
 | Resource / acquisition | Transfer and terminal owner | Retention boundary / limits |
 |---|---|---|
 | Eager InputStream, Reader or ReadableByteChannel supplied as a body | Handler `RequestBodyOwnership` wraps streams/channels without delegating close to each writer attempt; its atomic release guard closes on request-body or logical termination, including auth timeout and pre-write cancellation | An already-created resource that is never invoked remains application-owned. Repeated subscriptions/replays do not make a single-use resource reopenable; cleanup failures are logged, not proof of successful close |
@@ -47,11 +55,13 @@ These are bounded fixture observations, not a claim about arbitrary producer imp
 | Caller reservation | Each selected cold subscription, before preparation/auth/probe/lookup, including hits and waiters | Terminal intent prevents later guarded advancement. Capacity returns only after entered preparation/subscription/cancellation frames unwind |
 | Load reservation | Independent miss or shared leader before assembly/subscription, not each waiter or retry | Retry/backoff/auth replay/redirect/decoding/publication stay inside the same source owner; terminal cleanup precedes reuse when no owned frame remains |
 | Refresh reservation | Separate policy capacity after entry/duplicate checks | No caller/load slot is consumed. Running cancellation/cleanup retains this capacity until its frame exits; skip does not invent a source terminal |
-| Meter leases | Per-manager owner leases shared registry/name/tag meters; live gauges sum owners, counters retain history until the last close | Closing one owner removes its suppliers, not another owner's meters. Last close removes meters and shared ownership map entries. Failed manager initialization rolls back; later handler construction currently does not (F004) |
+| Meter leases | Per-manager owner leases shared registry/name/tag meters; live gauges sum owners, counters retain history until the last close | Closing one owner removes its suppliers, not another owner's meters. Last close removes meters and shared ownership map entries. Failed manager initialization rolls back; Priority 9 adds rollback for subsequent public handler construction failure (F004) |
 
 ## Construction and Teardown
 
-The new [ResourceOwnershipReviewTest][review-test] has six cases:
+The Priority 6 [ResourceOwnershipReviewTest][review-test] introduced six cases.
+Priority 9 expands it to 17; the rejection description below reflects the current
+regression, with the original leak observation separated afterward.
 
 - `ResourceOwnershipReviewTest#earlyValidationDoesNotAcquireAConnectionProvider`:
   with caching and telemetry selected, an invalid base URL leaves both provider
@@ -72,13 +82,21 @@ The new [ResourceOwnershipReviewTest][review-test] has six cases:
   the starter tracking set stays empty. After factory/context close a separate
   WebClient still dispatches through that connector. The test's application owner
   finally disposes it. Both peer requests are counted.
-- `ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionLeavesMeterLeasesWithoutAReturnedOwner`:
-  two cases, with and without an overlapping valid owner, reject authenticated
-  caching through the provider-less public create overload three times. Each
-  rejection leaves a new lease/cache supplier; the maximum-entry gauge increases
-  by 16 each time. Closing the valid owner and context leaves three owners and
-  a gauge of 48. Test-only reflective cleanup prevents pollution of later tests;
-  that is not a supported application remedy or an implemented fix.
+- `ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionReleasesOnlyItsNewManager`:
+  four cases combine telemetry enabled/disabled with and without an overlapping
+  valid owner, rejecting authenticated caching through the provider-less public
+  create overload three times. Every rejection leaves the meter and owner sets
+  unchanged. With telemetry and a live owner, the maximum-entry gauge remains 16
+  and that owner's manager stays open. After normal owner/context teardown,
+  no owners or meters remain; these assertions precede the defensive reflective
+  cleanup in the test's finally block.
+
+Historical Priority 6 observation: the former method
+`rejectedPublicHandlerConstructionLeavesMeterLeasesWithoutAReturnedOwner`
+ran two cases with telemetry enabled. Each rejection added a lease and 16 maximum
+entries; three rejected calls left three owners and a gauge of 48 after normal
+teardown. Reflective cleanup was then needed to prevent test pollution. That
+result belongs to the reviewed baseline above, not the renamed Priority 9 regression.
 
 Manager-local failure is a passing control:
 `CacheWorkTelemetryContractTest#failedCacheConstructionReleasesMetersWithoutAffectingLiveOwners`

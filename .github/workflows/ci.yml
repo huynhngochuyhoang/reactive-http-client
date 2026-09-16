@@ -31,6 +31,12 @@ jobs:
       - name: Verify generation-specific packaging
         run: bash scripts/verify-generation-packaging.sh
 
+      - name: Verify cache ownership in a controlled reachability JVM
+        run: >-
+          mvn -B -ntp -s .mvn/maven-central-settings.xml
+          -pl reactive-http-client-starter -Pv32-cache-reachability
+          test
+
       - name: Verify support-bundle fixture and copyable sanitizers
         run: python3 scripts/verify-cache-work-support.py
 
@@ -42,7 +48,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: test-results-jdk21
-          path: "**/target/surefire-reports/*.xml"
+          path: |
+            **/target/surefire-reports/*.xml
+            **/target/cache-reachability-reports/*.xml
           retention-days: 7
 
 

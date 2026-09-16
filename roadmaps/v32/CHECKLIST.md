@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.0`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F004 + V32-F005 approved; Priority 9 pending
+> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification pending
 > **Release scope:** unselected; review-only completion is valid
 > **Adopted:** 2026-09-14
 
@@ -89,7 +89,8 @@ detailed matrices in these records unless their size justifies a separate file.
 | [RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) | Resource/terminal and nested-lock matrices, partial construction, external owners and retention limits |
 | [MODULE-EVIDENCE-BOUNDARIES.md](MODULE-EVIDENCE-BOUNDARIES.md) | Mock/optional integration and creation matrices, native triggers, fixture/provenance gaps and test-environment limits |
 | [FINDINGS.md](FINDINGS.md) | Four production gaps and one test-evidence gap; F004/F005 accepted, F001-F003 deferred with workarounds and triggers |
-| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; implementation pending, release unselected |
+| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; Priority 10 pending, release unselected |
+| [ACCEPTED-IMPROVEMENTS.md](ACCEPTED-IMPROVEMENTS.md) | F004 construction rollback, F005 preserved scenario inventory and controlled lane, focused evidence and remaining verification |
 
 ---
 
@@ -868,34 +869,90 @@ claimed by this approval verification.
 
 ## Priority 9 - Bounded Accepted Improvements
 
-### [ ] 9.1 Prepare selected changes or record not applicability
+### [x] 9.1 Prepare selected changes or record not applicability
 
-- [ ] Confirm selected finding IDs and maintainer approval from 8.3; stop if the
+- [x] Confirm selected finding IDs and maintainer approval from 8.3; stop if the
       decision is absent. For review-only, record this priority as not applicable.
-- [ ] For each accepted change, retain a failing regression or behavior baseline
+- [x] For each accepted change, retain a failing regression or behavior baseline
       and identify the smallest affected contract/module boundary.
-- [ ] Keep implementation, public surface and migration scope within the accepted
+- [x] Keep implementation, public surface and migration scope within the accepted
       decision; do not use a spike to imply shipped functionality.
 
-### [ ] 9.2 Implement and verify one accepted boundary at a time
+### [x] 9.2 Implement and verify one accepted boundary at a time
 
-- [ ] Prefer local fixes and existing helpers; extract only for an evidenced
+- [x] Prefer local fixes and existing helpers; extract only for an evidenced
       reduction in complexity or improvement in independent testability.
-- [ ] Preserve explicit activation, ownership, identity, replay, timeout,
+- [x] Preserve explicit activation, ownership, identity, replay, timeout,
       diagnostics and optional-integration contracts through focused regressions.
-- [ ] Keep unrelated cleanup and speculative configurability out; remove only
+- [x] Keep unrelated cleanup and speculative configurability out; remove only
       unused code made obsolete by the accepted change.
-- [ ] Reopen the scope decision when a larger redesign or unapproved compatibility
+- [x] Reopen the scope decision when a larger redesign or unapproved compatibility
       break is needed, rather than silently extending this priority.
 
-### [ ] 9.3 Reconcile outcomes with the reviewed architecture
+### [x] 9.3 Reconcile outcomes with the reviewed architecture
 
-- [ ] Update the maps and finding dispositions with exact delivered behavior and
+- [x] Update the maps and finding dispositions with exact delivered behavior and
       verification; record any narrower result and remaining constraints.
-- [ ] Compare the before/after extension scenario and ownership evidence, not just
+- [x] Compare the before/after extension scenario and ownership evidence, not just
       passing unit counts or reduced lines of code.
-- [ ] Remove unadopted experimental implementation from the proposed release scope;
+- [x] Remove unadopted experimental implementation from the proposed release scope;
       do not leave a partial supported contract represented as complete.
+
+Priority 9 completed on 2026-09-16 from clean reachable
+`59fd8b7b2e6ee20aca65d08ad8ee7aaf871d7977` plus the recorded implementation patch.
+[ACCEPTED-IMPROVEMENTS.md](ACCEPTED-IMPROVEMENTS.md) inventories the exact 16
+reachability cases, commands, ownership correction and remaining constraints.
+Only approved F004/F005 were implemented; no broader extraction was needed,
+no experimental supported surface remains, and F001-F003 remain deferred.
+
+- F005 baseline: two caller-retention cases failed with explicit GC disabled.
+  After separation, all **79 ordinary cases** in the three affected classes
+  passed with `-XX:+DisableExplicitGC`. The controlled profile runs the same
+  16 scenarios with extra collection assertions; it passed **16 cases**.
+  Separate explicit-GC, collector and heap negative checks each failed one
+  prerequisite assertion as intended, not skipped scenarios. V31's lane is unchanged.
+- F004 desired-behavior red run: **15 cases, six failures**, zero errors/skips
+  before the production edit. A preceding fixture compilation mistake is
+  preserved separately. Local construction rollback then passed those 15 cases;
+  two successful cache-selected/unselected ownership-transfer controls bring
+  the final class to **17 passing cases**. No per-request production edits.
+- Final focused starter/documentation run: **346 tests across 15 classes**,
+  zero failures/errors/skips, with explicit GC disabled. This includes the
+  **283-case** ownership/composition regression and **63 documentation guards**,
+  including the new 16-scenario inventory and pending-Priority-10 checks.
+- Mock/helper regression: **70 tests across three classes**, zero
+  failures/errors/skips, using the current reactor (not isolated publication).
+  Controlled reachability XML is separate from ordinary XML and CI uploads both.
+
+Final starter command:
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter \
+  -DargLine=-XX:+DisableExplicitGC \
+  -Dtest=ResourceOwnershipReviewTest,ResponseCacheRetentionOwnershipTest,CacheWorkOwnershipContractTest,CacheCallerAdmissionContractTest,CacheLoadAdmissionContractTest,CacheRefreshAdmissionContractTest,CacheWorkTelemetryContractTest,LocalResponseCacheObservabilityTest,BoundedLocalResponseCacheContractTest,InvocationCompositionReviewTest,CacheWorkCompositionContractTest,SemanticReadReplayTimeoutContractTest,SubscriptionReportingStateTest,AsyncHandoffOwnershipContractTest,DocumentationReleaseArtifactTest test
+```
+
+Helper command:
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-test -am \
+  -DargLine=-XX:+DisableExplicitGC \
+  -Dtest=MockReactiveHttpClientTest,MockResponseCacheSupportTest,MockCacheWorkParityTest \
+  -Dsurefire.failIfNoSpecifiedTests=false test
+```
+
+Oracle JDK 21.0.8, Maven 3.9.9, Java target 21, Boot 4.0.0 and repository
+Central-only settings. Preserve `target/release-evidence/v32/priority9/`
+before root clean: stage commands/logs/fresh XML, timestamps/exit statuses,
+source/patch, toolchain/settings, audit and SHA-256 inventory. Final documentation,
+source scope, XML totals and whitespace checks were rerun after the records.
+Earlier Priority 1-8 evidence retains its dated as-is scope.
+
+Priority 10 remains required: full affected-module/supported-Boot suites, strict
+root and independent starter API checks against fresh Central `4.4.0`, assembled
+consumers, JVM AOT and clean-source native creation/lifecycle evidence. No fresh
+native, matrix, API, assembled-consumer, memory or JMH run is claimed here.
+No hot-path change warrants a new benchmark. Release scope remains unselected.
 
 ## Priority 10 - Compatibility and Targeted Verification
 
