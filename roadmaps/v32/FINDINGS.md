@@ -1,6 +1,6 @@
 # V32 Architecture Finding Register
 
-> **Status:** open for review; four production gaps and one test-evidence gap, no accepted implementation
+> **Status:** F004/F005 accepted for implementation; F001-F003 deferred; no fixes delivered yet
 > **Baseline:** [verified scope and evidence](BASELINE-SCOPE.md)
 > **Decision owner:** maintainer, through [Priority 8.3](CHECKLIST.md)
 
@@ -37,8 +37,25 @@ keys, credentials or identities in source-controlled reproductions.
 
 ## Decision Gate
 
-No production change is authorized by the findings below. Their current-behavior
-tests are characterization, not desired behavior to preserve after an accepted fix.
+No production change is authorized by a finding alone. The dated Priority 8.3
+decision below authorizes only F004's bounded correction and F005's test work.
+Current-behavior tests are characterization, not behavior to preserve after a fix.
+
+### Priority 8 Consolidation
+
+Reviewed 2026-09-16 at reachable `15d0d16bc81f92ed920679f61754e8df0e32bfd2`.
+[ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) ranks the confirmed gaps
+F004, F003, F001, F002, then F005 by impact and records alternatives, per-item
+acceptance/verification budgets, compatibility/rollback and all reviewed-area
+no-change conclusions. Their causes remain separate; no shared resolver defect
+or connection to the reported pod-memory incident has been established.
+
+The maintainer explicitly approved F004 cleanup plus F005's test-lane foundation
+on 2026-09-16, with F001-F003 deferred using their documented workarounds and
+named reconsideration triggers. The decision record freezes the selected scope,
+acceptance, verification and rollback. Earlier review-stage disposition sections
+remain historical observations; the per-finding dispositions below are current.
+No correction has run. Release scope stays unselected.
 
 ## V32-F001: Starter Builder Is Misclassified Through ApplicationContext
 
@@ -52,9 +69,9 @@ tests are characterization, not desired behavior to preserve after an accepted f
 | Alternatives | Retain current behavior with an explicit inspected `starterWebClientBuilder: SAFE` entry; or narrowly make definition lookup understand the owning context while retaining replacement/customizer checks. Do not skip validation or trust arbitrary beans by name alone |
 | Tradeoffs | Extra application configuration and runtime/AOT/inspection drift versus a narrowly corrected lookup. Replacement-builder safety, hierarchy ownership and lazy non-instantiation must remain intact; no new public SPI or dependency is required by this evidence |
 | Priority and dependencies | Review blocker for the claimed default-builder exemption in this context path. Priority 4 compares selection entry points; Priority 7 checks assembled/AOT linkage; no broad redesign inferred |
-| Disposition | Unresolved, 2026-09-14. Review owner: maintainer/selection review. Reconsider at Priority 4 and scope gate 8.3; affected full-Boot combinations with a different Boot-provided builder are not inferred from this fixture |
+| Disposition | Deferred by maintainer, 2026-09-16. Owner: factory/cache-validation maintainer. Use explicit SAFE classification of the inspected starter builder plus application customizations. Reopen when this workaround blocks a consumer or builder lookup changes; different full-Boot builder combinations still need evidence |
 | Acceptance and rollback | Default-owned builder needs no extra classification in either path; actual Boot/per-client/replacement mutations still reject when unclassified; hierarchy/lazy tests and external consumer pass. Roll back any correction that accepts an unclassified application mutation |
-| Decision reference | Priority 8.3: not selected, no implementation approval |
+| Decision reference | [Priority 8.3 decision](ARCHITECTURE-DECISION.md): F001 deferred, not fixed or approved for implementation |
 
 ## V32-F002: Fresh Static Metadata Requires an Inaccessible Derived Value
 
@@ -68,9 +85,9 @@ tests are characterization, not desired behavior to preserve after an accepted f
 | Alternatives | Delegate unchanged built-in parsing when sufficient; tested public alternative sets an API-ref name and declares its method/path in ApiConfig. A narrow planner fallback from public metadata is a candidate for review, not selected work. Do not require package relocation, reflective access, or promotion of internal types just to make the consumer pass |
 | Tradeoffs | API-ref workaround duplicates parser/configuration information. A correction must preserve method/API-ref precedence, timeout defaults, generic return grammar and cached-plan semantics without expanding public internal cooperation accidentally |
 | Priority and dependencies | Reproduced blocker for fresh static parser implementations. Priorities 4 and 7 review runtime/mock/AOT/export consistency and compatibility; not a claim that delegating replacements all fail |
-| Disposition | Unresolved, 2026-09-14. Review owner: maintainer/planning review. Reconsider at Priority 4 and 8.3; no public fallback has been implemented |
+| Disposition | Deferred by maintainer, 2026-09-16. Owner: metadata/planning maintainer. Delegate built-in parsing or use tested public API-ref metadata/configuration. Reopen when neither serves a real parser; invalid/generic/timeout fallback cases still need evidence |
 | Acceptance and rollback | External fresh valid static metadata dispatches the declared target without access to an internal type; invalid metadata fails with deliberate validation, API-ref alternative remains valid, return/timeout/identity contracts and assembled/AOT checks pass. Roll back if derived precedence or per-method plan behavior changes unintentionally |
-| Decision reference | Priority 8.3: not selected, no implementation approval |
+| Decision reference | [Priority 8.3 decision](ARCHITECTURE-DECISION.md): F002 deferred, not fixed or approved for implementation |
 
 ## V32-F003: AOT Properties Selection Bypasses Non-Primary Precedence
 
@@ -84,9 +101,9 @@ tests are characterization, not desired behavior to preserve after an accepted f
 | Alternatives | Explicitly designate the intended programmatic properties bean primary, as the passing control and existing AOT test demonstrate; retain/document a stricter AOT constraint; or correct this bounded properties lookup to honor effective runtime selection while retaining environment binding and supported build-time replacement beans. No universal diagnostics/runtime resolver is required |
 | Tradeoffs | Misleading AOT rejection or validation of the wrong configuration versus selection-correct build-time resolution. Properties and metadata may legitimately be created for AOT, unlike diagnostic inspection. A correction must preserve primary/environment behavior, parent and FactoryBean constraints, avoid duplicate prototype creation, and not instantiate business clients merely to inspect properties |
 | Priority and dependencies | Reproduced supported-component selection blocker; Priority 7 reviews AOT/module and build-time constraints before the Priority 8.3 implementation decision |
-| Disposition | Unresolved, 2026-09-15. Review owner: maintainer/AOT selection review. Not an observed native-image failure, because only the JVM processor was run. Parent/prototype properties permutations remain unverified, not implicitly covered by this initialized-singleton case |
+| Disposition | Deferred by maintainer, 2026-09-16. Owner: AOT selection maintainer. Designate the intended properties bean primary. Reopen when that workaround is unavailable or the lookup changes; parent/prototype permutations remain unverified. JVM processor evidence is not an observed native-image failure |
 | Acceptance and rollback | The same preferred properties validate in runtime and AOT for all four cases; invalid preferred configuration still fails, inactive beans cannot mask it, existing primary/environment/foreign-factory tests remain green. Add proportionate current-consumer/native evidence for an accepted correction; roll back if selection instantiates business clients or discards programmatic configuration |
-| Decision reference | Priority 8.3: not selected, no implementation approval. Characterization assertions must change with an accepted fix |
+| Decision reference | [Priority 8.3 decision](ARCHITECTURE-DECISION.md): F003 deferred, not fixed or approved for implementation |
 
 ## Priority 5 Composition Disposition
 
@@ -110,9 +127,9 @@ second pipeline. Priority 6 owns remaining resource/teardown questions; Priority
 | Alternatives | Use the provider-aware overload with valid auth/base URL, or disable unneeded caching; reject known-invalid inputs before manager allocation; or add a local failure cleanup guard around handler construction. Early validation alone does not cover every later constructor/custom component failure. Test-only reflective lease cleanup is not a public workaround |
 | Tradeoffs | A local assembly guard avoids a new API or hot-path abstraction. It must close only the newly allocated manager, preserve the original exception and suppress cleanup failures, and leave supplied WebClient/auth/registry plus other live owners untouched |
 | Priority and dependencies | Reproduced resource leak on rejected construction, not proof of the earlier production pod-memory report. Priority 7 reviews public/helper creation paths; Priority 8.3 selects any correction. A Spring factory normally passes auth inputs; this exact failure does not establish that all ordinary factory startups leak |
-| Disposition | Unresolved, 2026-09-15. Review owner: maintainer/invocation assembly. Reconsider at Priority 7 and 8.3; no production fix approved |
+| Disposition | Accepted for bounded local cleanup, 2026-09-16; implementation pending in Priority 9. Owner: invocation-assembly maintainer. Blocking for the selected scope until verified or explicitly removed; not proof of the reported pod-memory cause |
 | Acceptance and rollback | Repeated rejected creation leaves the registry and same-tag live owner unchanged; no unreturned manager lease remains. Cover auth-input rejection and a later assembly exception, with and without telemetry, preserving no-Caffeine rollback and external component ownership. Run focused lifecycle/consumer tests and assess AOT/native impact for the actual patch; roll back on successful-owner disposal or altered validation |
-| Decision reference | Priority 8.3: not selected, no implementation approval. Current-behavior characterization assertions must change with an accepted fix |
+| Decision reference | [Priority 8.3 decision](ARCHITECTURE-DECISION.md): F004 scope, verification and rollback approved. Current-behavior assertions must change with the fix; no general assembly refactor authorized |
 
 ## Priority 6 Ownership Disposition
 
@@ -134,9 +151,9 @@ collection-dependent tests are an evidence-lane follow-up for Priority 7.
 | Alternatives | Document a restrictive test-JVM prerequisite; or retain deterministic terminal/slot-release assertions in normal tests and move actual reachability probes to a controlled opt-in lane using the existing AsyncHandoffReachabilityIT pattern. Longer sleeps do not create a collection guarantee |
 | Tradeoffs | Test-only scope; no runtime/API dependency or behavior change. Lane migration must not silently delete reachability coverage or make a controlled test appear to have run in the ordinary suite |
 | Priority and dependencies | Test reliability before claiming supported-JVM full-suite compatibility. Review 16 collection-dependent cases identified in E7-02; only the two caller cases were freshly compared under both settings |
-| Disposition | Unresolved, 2026-09-15; maintainer/test ownership, reconsider at Priority 8. No tests disabled or migrated in this review |
+| Disposition | Accepted for controlled reachability testing, 2026-09-16; implementation pending in Priority 9. Owner: test/ownership maintainer. Blocking for selected scope. Preserve all 16 inventoried scenarios and deterministic ordinary-suite witnesses; no tests migrated yet |
 | Acceptance and rollback | Ordinary affected tests pass with explicit GC disabled using deterministic ownership witnesses; opt-in reachability verifies collector/heap prerequisites and retains original object-owner scenarios. Preserve command/count separation; roll back a migration that weakens observable release assertions |
-| Decision reference | Priority 8.3: not selected; no production correction or broad test rewrite authorized |
+| Decision reference | [Priority 8.3 decision](ARCHITECTURE-DECISION.md): F005 bounded test-lane work approved. No production instrumentation or unrelated test rewrite authorized |
 
 ## Priority 7 Module and Evidence Disposition
 
@@ -150,10 +167,10 @@ no need for a module split or new SPI. No production change is authorized.
 ## Implementation Gate
 
 No production change is authorized by baseline completion or by creating a
-finding. Priority 8.3 must record the maintainer's selected IDs, alternatives,
-scope, compatibility/dependencies, verification and rollback in the eventual
-architecture decision record. An urgent confirmed defect needs an explicit
-expedited decision too. Until then implementation and release remain unselected.
+finding. The [architecture decision record](ARCHITECTURE-DECISION.md) records
+the maintainer's 2026-09-16 approval for F004/F005 only, including dependencies,
+compatibility, acceptance, verification and rollback. Adding a deferred finding
+or broader change needs a new explicit decision. Release scope remains unselected.
 
 No-change conclusions are valid. Deferred findings require an owner or concrete
 reconsideration trigger and named missing evidence; deferral is not completion

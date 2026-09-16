@@ -163,7 +163,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
         assertThat(checklist)
-                .contains("> **Implementation scope:** unselected; Priority 8 requires an explicit decision")
+                .contains("> **Implementation scope:** V32-F004 + V32-F005 approved; Priority 9 pending")
                 .contains("> **Release scope:** unselected; review-only completion is valid")
                 .containsPattern("(?m)^### \\[[ x]\\] 8\\.3 Record the maintainer scope decision$")
                 .containsPattern("(?m)^### \\[[ x]\\] 12\\.2 Select review-only or release scope$");
@@ -465,6 +465,56 @@ class DocumentationReleaseArtifactTest {
             assertThatThrownBy(() -> assertModuleReviewLinksExist(directory, broken))
                     .isInstanceOf(AssertionError.class).hasMessageContaining("MISSING-" + sibling);
         }
+    }
+
+    @Test
+    void v32ScopeDecisionMatchesApprovedBoundariesWithoutSelectingARelease() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v32");
+        String decision = Files.readString(directory.resolve("ARCHITECTURE-DECISION.md"));
+        String findings = Files.readString(directory.resolve("FINDINGS.md"));
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(decision.lines().filter(line -> line.startsWith("> **Status:**")).toList())
+                .containsExactly("> **Status:** maintainer approved F004 + F005; implementation pending");
+        assertThat(decision).contains("> **Implementation scope:** V32-F004 + V32-F005",
+                "> **Release scope:** unselected", "## Ranked Findings", "## Alternatives and Necessity",
+                "## Acceptance and Verification Budget", "## Reviewed Areas and No-Change Outcomes",
+                "## Deferred Questions and Stop Conditions", "## Maintainer Decision",
+                "not a production pod-memory diagnosis", "Priority 9");
+        assertThat(decision.replaceAll("\\s+", " ")).contains("not authorization to publish");
+        Matcher ranked = Pattern.compile("(?m)^\\| ([1-5]) \\| (V32-F00[1-5]) \\|").matcher(decision);
+        List<String> ids = new ArrayList<>();
+        while (ranked.find()) {
+            assertThat(Integer.parseInt(ranked.group(1))).isEqualTo(ids.size() + 1);
+            ids.add(ranked.group(2));
+            assertThat(findings).contains("## " + ranked.group(2) + ":");
+            assertThat(decision).contains("### " + ranked.group(2));
+        }
+        assertThat(ids).containsExactly("V32-F004", "V32-F003", "V32-F001", "V32-F002", "V32-F005");
+        Matcher dispositions = Pattern.compile("(?m)^\\| (V32-F00[1-5]) \\| (accepted|deferred) \\|")
+                .matcher(decision);
+        Map<String, String> selected = new LinkedHashMap<>();
+        while (dispositions.find()) {
+            assertThat(selected.put(dispositions.group(1), dispositions.group(2))).isNull();
+        }
+        assertThat(selected).containsExactlyInAnyOrderEntriesOf(Map.of(
+                "V32-F004", "accepted", "V32-F005", "accepted",
+                "V32-F001", "deferred", "V32-F002", "deferred", "V32-F003", "deferred"));
+        assertThat(checklist).contains("### [x] 8.3 Record the maintainer scope decision",
+                "> **Implementation scope:** V32-F004 + V32-F005 approved; Priority 9 pending",
+                "### [ ] 9.1 Prepare selected changes or record not applicability");
+        assertThat(decision).contains("**Approved by the maintainer on 2026-09-16.**",
+                "Both are blocking", "F005's deterministic test foundation",
+                "Review-only is not the selected branch");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md")))
+                .contains("F004/F005 approved, implementation pending");
+        assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md")))
+                .contains("F004/F005 are approved for implementation")
+                .doesNotContain("no implementation or next release scope is selected");
+        assertThat(Files.readString(projectRoot().resolve("docs/20-native-release-compatibility.md")))
+                .contains("F004/F005 implementation and defers F001-F003")
+                .doesNotContain("implementation and next release scope remain unselected");
+        assertThat(findings).contains("(ARCHITECTURE-DECISION.md)");
+        assertModuleReviewLinksExist(directory, decision);
     }
 
     private static void assertModuleReviewLinksExist(Path directory, String review) {
