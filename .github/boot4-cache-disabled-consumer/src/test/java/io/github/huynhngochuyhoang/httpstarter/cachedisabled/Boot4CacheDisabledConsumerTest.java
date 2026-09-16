@@ -2,7 +2,9 @@ package io.github.huynhngochuyhoang.httpstarter.cachedisabled;
 
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.enable.EnableReactiveHttpClients;
+import io.netty.handler.codec.http.HttpMethod;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.WebApplicationType;
@@ -15,6 +17,7 @@ import reactor.netty.DisposableServer;
 import reactor.netty.http.server.HttpServer;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,19 +25,45 @@ class Boot4CacheDisabledConsumerTest {
 
     @Test
     void cacheDisabledConsumerRunsWithoutCaffeine() {
-        assertThat(ClassUtils.isPresent(
-                "com.github.benmanes.caffeine.cache.Caffeine", getClass().getClassLoader())).isFalse();
+        for (String optionalType : new String[]{
+                "com.github.benmanes.caffeine.cache.Caffeine",
+                "io.github.resilience4j.retry.RetryRegistry",
+                "io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry",
+                "io.github.resilience4j.bulkhead.BulkheadRegistry",
+                "io.github.resilience4j.ratelimiter.RateLimiterRegistry",
+                "io.micrometer.core.instrument.MeterRegistry",
+                "io.opentelemetry.api.OpenTelemetry",
+                "io.github.huynhngochuyhoang.httpstarter.test.MockReactiveHttpClient"}) {
+            assertThat(ClassUtils.isPresent(optionalType, getClass().getClassLoader()))
+                    .as("optional integration absent: %s", optionalType).isFalse();
+        }
+        AtomicInteger requests = new AtomicInteger();
         DisposableServer server = HttpServer.create().port(0)
-                .route(routes -> routes.get("/value", (request, response) ->
-                        response.header("Content-Type", "text/plain").sendString(Mono.just("ok")).then()))
+                .handle((request, response) -> {
+                    requests.incrementAndGet();
+                    return response.status(HttpMethod.GET.equals(request.method())
+                                    && "/value".equals(request.uri()) ? 200 : 404)
+                            .header("Content-Type", "text/plain").sendString(Mono.just("ok")).then();
+                })
                 .bindNow(Duration.ofSeconds(5));
         try (ConfigurableApplicationContext context = new SpringApplicationBuilder(CacheDisabledApplication.class)
                 .web(WebApplicationType.NONE)
                 .properties(
                         "spring.main.banner-mode=off",
+                        "reactive.http.clients.cache-disabled.resilience.enabled=true",
                         "reactive.http.clients.cache-disabled.base-url=http://127.0.0.1:" + server.port())
                 .run()) {
-            assertThat(context.getBean(CacheDisabledClient.class).get().block()).isEqualTo("ok");
+            var resilience = context.getBean(ReactiveHttpClientProperties.class)
+                    .getClients().get("cache-disabled").getResilience();
+            assertThat(resilience.isEnabled()).isTrue();
+            assertThat(resilience.getRetry()).isNull();
+            assertThat(resilience.getCircuitBreaker()).isNull();
+            assertThat(resilience.getBulkhead()).isNull();
+            assertThat(resilience.getRateLimiter()).isNull();
+            CacheDisabledClient client = context.getBean(CacheDisabledClient.class);
+            assertThat(client.get().block(Duration.ofSeconds(5))).isEqualTo("ok");
+            assertThat(client.get().block(Duration.ofSeconds(5))).isEqualTo("ok");
+            assertThat(requests).hasValue(2);
         }
         finally {
             server.disposeNow(Duration.ofSeconds(5));

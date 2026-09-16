@@ -417,6 +417,71 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32ModuleReviewSeparatesOptionalCreationAndEvidenceBoundaries() throws Exception {
+        Path root = projectRoot();
+        String review = Files.readString(root.resolve("roadmaps/v32/MODULE-EVIDENCE-BOUNDARIES.md"));
+        assertThat(review).contains("> **Implementation and release scope:** unselected",
+                "## Cross-Module Contract", "## Optional Integration Matrix",
+                "## Runtime and AOT Creation", "## Evidence Gaps", "## Verification",
+                "V32-F003", "V32-F004", "Priority 8.3", "-XX:+DisableExplicitGC",
+                "not a new native build", "micrometer-observation");
+        assertModuleReviewLinksExist(root.resolve("roadmaps/v32"), review);
+        Matcher methods = Pattern.compile("`([A-Za-z0-9]+Test)#([A-Za-z0-9]+)`").matcher(review);
+        Set<String> references = new HashSet<>();
+        while (methods.find()) {
+            String className = methods.group(1);
+            List<Path> matches = new ArrayList<>();
+            for (String directory : List.of("reactive-http-client-starter/src/test",
+                    "reactive-http-client-test/src/test", "reactive-http-client-otel/src/test",
+                    ".github/boot4-consumer/src", ".github/boot4-cache-disabled-consumer/src",
+                    ".github/native-smoke/src")) {
+                try (var paths = Files.walk(root.resolve(directory))) {
+                    matches.addAll(paths.filter(path -> path.getFileName().toString()
+                            .equals(className + ".java")).toList());
+                }
+            }
+            assertThat(matches).as(methods.group()).hasSize(1);
+            assertThat(Files.readString(matches.getFirst())).contains(methods.group(2) + "(");
+            references.add(methods.group());
+        }
+        assertThat(references).contains(
+                "`Boot4CacheDisabledConsumerTest#cacheDisabledConsumerRunsWithoutCaffeine`",
+                "`LocalResponseCacheObservabilityTest#cacheObservabilityWithoutMeterRegistryStillRecordsCallerOutcomes`",
+                "`ReactiveHttpClientAotSmokeTest#applicationRuntimeHintsCanCoverContextOnlyCacheRecords`");
+        for (String document : List.of("ARCHITECTURE-MAP.md", "FINDINGS.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(root.resolve("roadmaps/v32/" + document)))
+                    .contains("MODULE-EVIDENCE-BOUNDARIES.md");
+        }
+    }
+
+    @Test
+    void v32ModuleReviewLinkGuardRejectsMissingSiblingTargets() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v32");
+        String review = Files.readString(directory.resolve("MODULE-EVIDENCE-BOUNDARIES.md"));
+        for (String sibling : List.of("ARCHITECTURE-MAP.md", "EFFECTIVE-POLICY-SELECTION.md",
+                "BASELINE-SCOPE.md", "CHECKLIST.md")) {
+            assertThat(review).contains("(" + sibling + ")");
+            String broken = review.replace("(" + sibling + ")", "(MISSING-" + sibling + ")");
+            assertThatThrownBy(() -> assertModuleReviewLinksExist(directory, broken))
+                    .isInstanceOf(AssertionError.class).hasMessageContaining("MISSING-" + sibling);
+        }
+    }
+
+    private static void assertModuleReviewLinksExist(Path directory, String review) {
+        Matcher links = MARKDOWN_LINK.matcher(review);
+        while (links.find()) {
+            String target = links.group(1);
+            if (isExternal(target)) {
+                continue;
+            }
+            String path = target.split("#", 2)[0];
+            if (!path.isEmpty()) {
+                assertThat(directory.resolve(path).normalize()).as(links.group()).exists();
+            }
+        }
+    }
+
+    @Test
     void readmeAndQuickStartVersionsUseLatestPublishedRelease() throws Exception {
         Path root = projectRoot();
         String pomXml = Files.readString(root.resolve("pom.xml"));
@@ -2294,8 +2359,16 @@ class DocumentationReleaseArtifactTest {
         assertThat(cacheDisabledFixtureTest)
                 .contains("cacheDisabledConsumerRunsWithoutCaffeine")
                 .contains("com.github.benmanes.caffeine.cache.Caffeine")
+                .contains("io.micrometer.core.instrument.MeterRegistry")
+                .contains("io.github.resilience4j.retry.RetryRegistry")
+                .contains("io.opentelemetry.api.OpenTelemetry")
+                .contains("reactive.http.clients.cache-disabled.resilience.enabled=true")
+                .contains("assertThat(resilience.isEnabled()).isTrue()")
+                .contains("HttpMethod.GET.equals(request.method())")
                 .contains("isFalse()")
-                .contains("context.getBean(CacheDisabledClient.class).get().block()");
+                .contains("context.getBean(CacheDisabledClient.class)")
+                .contains("client.get().block(Duration.ofSeconds(5))")
+                .contains("assertThat(requests).hasValue(2)");
         assertThat(releaseDocs)
                 .contains("### Boot 4 assembled consumer fixture")
                 .contains("scripts/verify-current-consumer.sh")

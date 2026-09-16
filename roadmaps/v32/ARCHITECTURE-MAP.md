@@ -328,6 +328,16 @@ runs narrow Q4, not prove a global lock-order theorem. Historical V29/V30 memory
 conclusions retain their original scope; legacy forced-GC lane migration and
 unexercised component failures remain Priority 7/8 review work.
 
+Priority 7 follow-up: [module/evidence boundaries](MODULE-EVIDENCE-BOUNDARIES.md)
+records mock reuse versus assembly substitutes, public internal bridges,
+physical optional-class absence and backend-independent terminal reporting.
+The runtime/AOT matrix retains F003 and explicit context-only record hints;
+foreign replacements remain outside starter-owned validation. Native fixture
+dispatch/quiet-window and timing limits, selected-traversal coverage and legacy
+GC-dependent tests have bounded owners/triggers. F005 concerns ordinary-test
+portability, not a production leak. No module split, new SPI or native rerun is
+selected by the review; Priority 8.3 still owns implementation scope.
+
 ### Verification Ledger
 
 The source baseline above is reachable in the reviewed history. Priority 2 changes
