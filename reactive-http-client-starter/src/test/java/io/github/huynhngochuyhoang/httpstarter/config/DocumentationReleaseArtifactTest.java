@@ -409,6 +409,12 @@ class DocumentationReleaseArtifactTest {
                 "`ResourceOwnershipReviewTest#lateFactoryFailureIsDisposedBySpringOrTheDirectCaller`",
                 "`ResourceOwnershipReviewTest#replacementConnectorStaysApplicationOwnedAfterFactoryDestroy`",
                 "`ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionReleasesOnlyItsNewManager`");
+        int rejectionStart = review.indexOf("- `ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionReleasesOnlyItsNewManager`:");
+        String rejectionOutcome = review.substring(rejectionStart, review.indexOf("\n\n", rejectionStart))
+                .replaceAll("\\s+", " ");
+        assertThat(rejectionOutcome).contains("four cases", "meter and owner sets unchanged",
+                        "gauge remains 16", "no owners or meters remain")
+                .doesNotContain("leaves a new lease", "gauge of 48");
         for (String document : List.of("ARCHITECTURE-MAP.md", "FINDINGS.md", "CHECKLIST.md")) {
             assertThat(Files.readString(root.resolve("roadmaps/v32/" + document))).contains("RESOURCE-OWNERSHIP.md");
         }
