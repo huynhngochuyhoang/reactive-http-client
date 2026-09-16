@@ -425,11 +425,7 @@ class DocumentationReleaseArtifactTest {
                 "## Runtime and AOT Creation", "## Evidence Gaps", "## Verification",
                 "V32-F003", "V32-F004", "Priority 8.3", "-XX:+DisableExplicitGC",
                 "not a new native build", "micrometer-observation");
-        Matcher links = Pattern.compile("\\]\\((\\.\\.?/[^)#]+)(?:#[^)]*)?\\)").matcher(review);
-        while (links.find()) {
-            assertThat(root.resolve("roadmaps/v32").resolve(links.group(1)).normalize())
-                    .as(links.group()).exists();
-        }
+        assertModuleReviewLinksExist(root.resolve("roadmaps/v32"), review);
         Matcher methods = Pattern.compile("`([A-Za-z0-9]+Test)#([A-Za-z0-9]+)`").matcher(review);
         Set<String> references = new HashSet<>();
         while (methods.find()) {
@@ -455,6 +451,33 @@ class DocumentationReleaseArtifactTest {
         for (String document : List.of("ARCHITECTURE-MAP.md", "FINDINGS.md", "CHECKLIST.md")) {
             assertThat(Files.readString(root.resolve("roadmaps/v32/" + document)))
                     .contains("MODULE-EVIDENCE-BOUNDARIES.md");
+        }
+    }
+
+    @Test
+    void v32ModuleReviewLinkGuardRejectsMissingSiblingTargets() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v32");
+        String review = Files.readString(directory.resolve("MODULE-EVIDENCE-BOUNDARIES.md"));
+        for (String sibling : List.of("ARCHITECTURE-MAP.md", "EFFECTIVE-POLICY-SELECTION.md",
+                "BASELINE-SCOPE.md", "CHECKLIST.md")) {
+            assertThat(review).contains("(" + sibling + ")");
+            String broken = review.replace("(" + sibling + ")", "(MISSING-" + sibling + ")");
+            assertThatThrownBy(() -> assertModuleReviewLinksExist(directory, broken))
+                    .isInstanceOf(AssertionError.class).hasMessageContaining("MISSING-" + sibling);
+        }
+    }
+
+    private static void assertModuleReviewLinksExist(Path directory, String review) {
+        Matcher links = MARKDOWN_LINK.matcher(review);
+        while (links.find()) {
+            String target = links.group(1);
+            if (isExternal(target)) {
+                continue;
+            }
+            String path = target.split("#", 2)[0];
+            if (!path.isEmpty()) {
+                assertThat(directory.resolve(path).normalize()).as(links.group()).exists();
+            }
         }
     }
 
