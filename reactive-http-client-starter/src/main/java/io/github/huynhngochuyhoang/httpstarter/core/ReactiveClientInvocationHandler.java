@@ -193,9 +193,20 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
                 applicationContext.getClassLoader(),
                 observabilityConfig,
                 meterRegistry);
-        return new ReactiveClientInvocationHandler(webClient, metadataCache, argumentResolver, errorDecoder,
-                clientConfig, clientName, clientInterface, applicationContext, resilienceOperatorApplier,
-                jsonCodec, observabilityConfig, responseCacheManager, cacheAuthProvider, baseUrl);
+        try {
+            return new ReactiveClientInvocationHandler(webClient, metadataCache, argumentResolver, errorDecoder,
+                    clientConfig, clientName, clientInterface, applicationContext, resilienceOperatorApplier,
+                    jsonCodec, observabilityConfig, responseCacheManager, cacheAuthProvider, baseUrl);
+        } catch (RuntimeException | Error failure) {
+            if (responseCacheManager != null) {
+                try {
+                    responseCacheManager.close();
+                } catch (RuntimeException | Error cleanupFailure) {
+                    failure.addSuppressed(cleanupFailure);
+                }
+            }
+            throw failure;
+        }
     }
 
     private static Object cacheMeterRegistry(

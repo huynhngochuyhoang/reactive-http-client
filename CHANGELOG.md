@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Close a newly allocated response-cache manager when public invocation-handler
+  construction fails, preserving the original failure and other live owners.
+  No request-path, API, activation or configuration changes.
+
+### Changed
+- Keep cache ownership cleanup assertions in the ordinary suite; run the 16
+  collection-dependent scenarios only in the explicit `v32-cache-reachability`
+  profile with checked collector, heap and explicit-GC prerequisites.
+
 ## [4.4.0] - 2026-09-13
 
 - **`4.4.0` published release.** Additive inbound-header

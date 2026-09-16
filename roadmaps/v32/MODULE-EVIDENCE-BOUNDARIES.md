@@ -14,6 +14,12 @@ patch, not a clean native or release measurement.
 
 ## Cross-Module Contract
 
+Priority 9 update (2026-09-16): [accepted improvements](ACCEPTED-IMPROVEMENTS.md)
+implements F004 locally in the starter create boundary and F005 in test/CI
+configuration. E7-01/E7-02 below retain their historical characterization;
+all 16 scenarios now have a controlled reachability lane plus ordinary cleanup
+witnesses. No dependency or module split; Priority 10 parity remains pending.
+
 | Boundary | Reused production behavior / deliberate substitute | Conclusion |
 |---|---|---|
 | [Starter POM](../../reactive-http-client-starter/pom.xml) | Owns grammar, effective policy, request identity, invocation, cache, transport, reporting and hints. Optional compile dependencies permit direct implementation types without requiring every integration in consumers | Classpath absence must be tested from assembled artifacts, not inferred from optional=true or an ApplicationContextRunner alone |

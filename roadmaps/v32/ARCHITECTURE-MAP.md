@@ -15,6 +15,12 @@ requires an explicit maintainer decision before production changes.
 
 ## Module and Dependency Map
 
+Current Priority 9 delta (2026-09-16): [accepted improvements](ACCEPTED-IMPROVEMENTS.md)
+adds local rollback after successful manager allocation but failed public handler
+construction. No module, request pipeline or ownership transfer on success changes.
+F005 separates ordinary cleanup checks from 16 controlled-JVM reachability cases.
+The dated as-is map below remains the review baseline; Priority 10 is still pending.
+
 | Module or lane | Dependency direction and linkage | Boundary |
 |---|---|---|
 | [Root reactor][root-pom] | Default modules: starter, test helper, OTel; benchmarks selected by profile | Owns version/BOM/API-baseline alignment, not runtime request state |

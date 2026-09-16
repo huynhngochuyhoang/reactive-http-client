@@ -1,6 +1,6 @@
 # V32 Architecture Scope Decision
 
-> **Status:** maintainer approved F004 + F005; implementation pending
+> **Status:** F004 + F005 implemented; Priority 10 verification pending
 > **Reviewed:** 2026-09-16
 > **Source baseline:** `15d0d16bc81f92ed920679f61754e8df0e32bfd2`
 > **Published / development:** `4.4.0` / `4.5.0-SNAPSHOT`
@@ -11,15 +11,17 @@ This consolidates [findings](FINDINGS.md) and the completed reviews for
 [Priority 8](CHECKLIST.md).
 The maintainer approved the bounded F004 + F005 scope below; this is not
 authorization to publish. Earlier review records describe their dated as-is
-checkpoints. This record owns the scope decision for Priority 9, not a claim
-that either selected correction has been implemented or verified.
+checkpoints. This record owns the scope decision for Priority 9. The dated
+[implementation result](ACCEPTED-IMPROVEMENTS.md) records the delivered corrections
+and focused tests separately; Priority 10's required broader lanes remain pending.
 
 ## Ranked Findings
 
 Impact order is not implementation dependency order. All five are reproducible
 within the stated fixture; none establishes prevalence in deployed applications.
 The register retains the source, reproducer, owner, lifecycle and original
-provenance for each ID. No finding is marked fixed by this consolidation.
+provenance for each ID. The original consolidation did not implement a fix;
+current implementation dispositions live in the register and Priority 9 result.
 
 | Rank | ID | Necessity and confidence | Approved disposition / owner and trigger |
 |---|---|---|---|
@@ -237,7 +239,7 @@ retain their owners, missing evidence and reconsideration triggers; they are
 not blockers for this bounded scope and are not marked resolved.
 
 Review-only is not the selected branch: its 8.3 conditional item is **not
-applicable** on this dated decision. Priority 9 remains required and pending;
+applicable** on this dated decision. Priority 9 is now implemented and recorded;
 Priority 10's applicable production/test verification and Priority 11 guidance
 are not waived. F005 alone would not require API/native/performance checks, but
 F004's production requirements still apply to the combined scope. Priority 12
@@ -257,3 +259,9 @@ sealed bundle describes the pre-approval recommendation. Approval-time source
 copies and fresh verification are separately retained under
 `target/release-evidence/v32/priority8-approval/`; the earlier provenance is not
 rewritten to claim that approval already existed.
+
+Priority 9 implementation has its own [result record](ACCEPTED-IMPROVEMENTS.md)
+and `target/release-evidence/v32/priority9/` bundle. The paragraphs above describe
+Priority 8's documentation-only evidence, not the later production patch.
+Focused tests validate both accepted changes; required Priority 10 lanes remain
+pending before either finding can be treated as fully release-verified.

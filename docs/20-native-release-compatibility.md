@@ -184,8 +184,10 @@ Reactor-only coordinates use `4.5.0-SNAPSHOT`. V1-V31 are completed release
 records. [V32](../roadmaps/v32/ROADMAP.md) has an
 [adopted execution checklist](../roadmaps/v32/CHECKLIST.md) for architecture
 review. Its [scope decision](../roadmaps/v32/ARCHITECTURE-DECISION.md) approves
-F004/F005 implementation and defers F001-F003; implementation evidence is pending
-and next release scope remains unselected.
+F004/F005 implementation and defers F001-F003. The
+[bounded implementation](../roadmaps/v32/ACCEPTED-IMPROVEMENTS.md) has focused
+regression evidence; Priority 10 compatibility/native verification and next
+release scope remain pending.
 The [V31 release review](../roadmaps/v31/RELEASE-DECISION.md#post-publication-closure)
 records verified signing, packaging, publication and Central consumption.
 The [architecture proposal](../roadmaps/proposals/POST_4_4_ARCHITECTURE_REVIEW.md)

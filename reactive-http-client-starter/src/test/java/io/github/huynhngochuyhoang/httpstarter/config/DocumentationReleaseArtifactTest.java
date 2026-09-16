@@ -163,7 +163,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
         assertThat(checklist)
-                .contains("> **Implementation scope:** V32-F004 + V32-F005 approved; Priority 9 pending")
+                .contains("> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification pending")
                 .contains("> **Release scope:** unselected; review-only completion is valid")
                 .containsPattern("(?m)^### \\[[ x]\\] 8\\.3 Record the maintainer scope decision$")
                 .containsPattern("(?m)^### \\[[ x]\\] 12\\.2 Select review-only or release scope$");
@@ -408,7 +408,7 @@ class DocumentationReleaseArtifactTest {
                 "`ResourceOwnershipReviewTest#earlyValidationDoesNotAcquireAConnectionProvider`",
                 "`ResourceOwnershipReviewTest#lateFactoryFailureIsDisposedBySpringOrTheDirectCaller`",
                 "`ResourceOwnershipReviewTest#replacementConnectorStaysApplicationOwnedAfterFactoryDestroy`",
-                "`ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionLeavesMeterLeasesWithoutAReturnedOwner`");
+                "`ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionReleasesOnlyItsNewManager`");
         for (String document : List.of("ARCHITECTURE-MAP.md", "FINDINGS.md", "CHECKLIST.md")) {
             assertThat(Files.readString(root.resolve("roadmaps/v32/" + document))).contains("RESOURCE-OWNERSHIP.md");
         }
@@ -468,13 +468,60 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v32AcceptedImprovementsPreserveAllReachabilityScenariosAndVerificationBoundaries() throws IOException {
+        Path root = projectRoot();
+        Path core = root.resolve("reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/core");
+        String lane = Files.readString(core.resolve("CacheOwnershipReachabilityIT.java"));
+        Map<String, List<String>> scenarios = Map.of(
+                "ResponseCacheRetentionOwnershipTest", List.of(
+                        "terminalOutcomesReleaseTransientOwnersWhileTheManagerRemainsOpen",
+                        "expiryCapacityAndRefreshTransitionsReleaseDisplacedOwners",
+                        "independentLoadRemainsCallerOwnedAfterManagerCloseAndReleasesAtCallerTerminal",
+                        "detachedWaiterReleasesItsArgumentsContextAndStateBeforeTheLeaderEnds",
+                        "detachedLeaderReleasesItsCallerStateWhileAWaiterKeepsTheLoadAlive",
+                        "hiddenRefreshTerminalPathsReleaseTheirCapturedState",
+                        "preparedBodyAuthContextFrozenArgumentsAndResponseMetadataEndAtPublication",
+                        "closeRemovesMeterRootsAndRejectsLatePublication",
+                        "retainedDiagnosticsMapDoesNotOwnFactoryManagerCacheOrValue"),
+                "CacheWorkOwnershipContractTest", List.of(
+                        "rejectedAndSkippedClosuresCollectWhileAdmittedOwnersRemainAlive",
+                        "detachedCallerCollectsWhileSourceRetainsItsOwnState",
+                        "evictionReleasesValuesBeforeCloseWithoutReleasingRunningLoad"),
+                "CacheCallerAdmissionContractTest", List.of(
+                        "terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen"));
+        for (var entry : scenarios.entrySet()) {
+            String ordinary = Files.readString(core.resolve(entry.getKey() + ".java"));
+            assertThat(ordinary).doesNotContain("System.gc()", "Thread.sleep(25)");
+            assertThat(ordinary).contains("boolean probeReachability", "if (probeReachability)");
+            for (String method : entry.getValue()) {
+                assertThat(ordinary).contains("void " + method + "(");
+                assertThat(lane).contains("void " + method + "(");
+                assertThat(lane.replaceAll("\\s+", "")).contains("new" + entry.getKey() + "()." + method + "(");
+            }
+        }
+        assertThat(lane).contains("UseSerialGC", "DisableExplicitGC", "128L * 1024 * 1024");
+        assertThat(Files.readString(root.resolve("reactive-http-client-starter/pom.xml")))
+                .contains("<id>v32-cache-reachability</id>", "**/CacheOwnershipReachabilityIT.java",
+                        "<reuseForks>false</reuseForks>", "<id>v31-handoff-reachability</id>");
+        assertThat(Files.readString(root.resolve(".github/workflows/ci.yml")))
+                .contains("-Pv32-cache-reachability", "**/target/cache-reachability-reports/*.xml");
+        String result = Files.readString(root.resolve("roadmaps/v32/ACCEPTED-IMPROVEMENTS.md"));
+        assertThat(result).contains("## F004", "## F005", "## Verification", "Priority 10",
+                "Release scope remains unselected", "No steady-state");
+        for (var methods : scenarios.values()) {
+            for (String method : methods) { assertThat(result).contains(method); }
+        }
+        assertModuleReviewLinksExist(root.resolve("roadmaps/v32"), result);
+    }
+
+    @Test
     void v32ScopeDecisionMatchesApprovedBoundariesWithoutSelectingARelease() throws IOException {
         Path directory = projectRoot().resolve("roadmaps/v32");
         String decision = Files.readString(directory.resolve("ARCHITECTURE-DECISION.md"));
         String findings = Files.readString(directory.resolve("FINDINGS.md"));
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         assertThat(decision.lines().filter(line -> line.startsWith("> **Status:**")).toList())
-                .containsExactly("> **Status:** maintainer approved F004 + F005; implementation pending");
+                .containsExactly("> **Status:** F004 + F005 implemented; Priority 10 verification pending");
         assertThat(decision).contains("> **Implementation scope:** V32-F004 + V32-F005",
                 "> **Release scope:** unselected", "## Ranked Findings", "## Alternatives and Necessity",
                 "## Acceptance and Verification Budget", "## Reviewed Areas and No-Change Outcomes",
@@ -500,15 +547,18 @@ class DocumentationReleaseArtifactTest {
                 "V32-F004", "accepted", "V32-F005", "accepted",
                 "V32-F001", "deferred", "V32-F002", "deferred", "V32-F003", "deferred"));
         assertThat(checklist).contains("### [x] 8.3 Record the maintainer scope decision",
-                "> **Implementation scope:** V32-F004 + V32-F005 approved; Priority 9 pending",
-                "### [ ] 9.1 Prepare selected changes or record not applicability");
+                "> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification pending",
+                "### [x] 9.1 Prepare selected changes or record not applicability",
+                "### [x] 9.2 Implement and verify one accepted boundary at a time",
+                "### [x] 9.3 Reconcile outcomes with the reviewed architecture",
+                "### [ ] 10.1 Select and run the applicable correctness lanes");
         assertThat(decision).contains("**Approved by the maintainer on 2026-09-16.**",
                 "Both are blocking", "F005's deterministic test foundation",
                 "Review-only is not the selected branch");
         assertThat(Files.readString(directory.resolve("ROADMAP.md")))
-                .contains("F004/F005 approved, implementation pending");
+                .contains("F004/F005 implemented, Priority 10 verification pending");
         assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md")))
-                .contains("F004/F005 are approved for implementation")
+                .contains("F004/F005 are implemented with focused verification")
                 .doesNotContain("no implementation or next release scope is selected");
         assertThat(Files.readString(projectRoot().resolve("docs/20-native-release-compatibility.md")))
                 .contains("F004/F005 implementation and defers F001-F003")

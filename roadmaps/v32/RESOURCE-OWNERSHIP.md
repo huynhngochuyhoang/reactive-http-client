@@ -12,6 +12,14 @@ It is not evidence that the reported production pod-memory increase has this cau
 
 ## Resource and Terminal Owners
 
+Priority 9 delta, 2026-09-16: [F004/F005 results](ACCEPTED-IMPROVEMENTS.md)
+supersede the failed-construction and ordinary-GC gaps below. Public handler
+creation now closes its newly allocated manager on failure. The renamed
+rejection regression referenced below now asserts no leaked owners instead of
+the original gap; its original result remains tied to this review's baseline.
+All 16 collection scenarios remain in a controlled lane. Broader Priority 10
+verification is pending; other ownership/lock conclusions are unchanged.
+
 | Resource / acquisition | Transfer and terminal owner | Retention boundary / limits |
 |---|---|---|
 | Eager InputStream, Reader or ReadableByteChannel supplied as a body | Handler `RequestBodyOwnership` wraps streams/channels without delegating close to each writer attempt; its atomic release guard closes on request-body or logical termination, including auth timeout and pre-write cancellation | An already-created resource that is never invoked remains application-owned. Repeated subscriptions/replays do not make a single-use resource reopenable; cleanup failures are logged, not proof of successful close |
@@ -72,7 +80,7 @@ The new [ResourceOwnershipReviewTest][review-test] has six cases:
   the starter tracking set stays empty. After factory/context close a separate
   WebClient still dispatches through that connector. The test's application owner
   finally disposes it. Both peer requests are counted.
-- `ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionLeavesMeterLeasesWithoutAReturnedOwner`:
+- `ResourceOwnershipReviewTest#rejectedPublicHandlerConstructionReleasesOnlyItsNewManager`:
   two cases, with and without an overlapping valid owner, reject authenticated
   caching through the provider-less public create overload three times. Each
   rejection leaves a new lease/cache supplier; the maximum-entry gauge increases

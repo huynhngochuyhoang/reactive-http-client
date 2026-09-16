@@ -779,17 +779,17 @@ class CacheCallerAdmissionContractTest {
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen(boolean success) throws Exception {
+        terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen(success, false);
+    }
+
+    void terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen(boolean success, boolean probeReachability) throws Exception {
         try (Fixture f = new Fixture(1)) {
             List<WeakReference<?>> references = terminalReferences(f, success);
             f.events.clear();
             f.lifecycle.clear();
             f.attempts.clear();
             f.logger.records.clear();
-            for (int attempt = 0; attempt < 40 && references.stream().anyMatch(ref -> ref.get() != null); attempt++) {
-                System.gc();
-                Thread.sleep(25);
-            }
-            assertThat(references).allSatisfy(reference -> assertThat(reference.get()).isNull());
+            if (probeReachability) { CacheOwnershipReachabilityIT.assertCollected(null, references); }
             assertThat(f.active()).isZero();
             f.auth = () -> Mono.just(AuthContext.empty());
             assertThat(f.call(false, "reuse").block(WAIT)).isEqualTo("response");
