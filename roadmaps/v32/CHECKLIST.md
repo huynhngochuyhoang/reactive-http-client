@@ -743,6 +743,21 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml -pl reactive-http-client-starter 
   -Dtest=CacheCallerAdmissionContractTest#terminalPreparationReleasesArgumentsContextAndAuthWhileManagerStaysOpen test
 ```
 
+**Priority 7 consumer correction (2026-09-16):** The original minimal consumer
+configured only its base URL, so it exercised resilience's disabled default, not
+enabled-only selection. The corrected fixture explicitly enables resilience,
+asserts the bound flag and four unselected operator names, and requires both GET
+and `/value` for a successful response while still counting every request.
+The documentation guard and optional-integration matrix now reflect those facts.
+Fresh verification passed **61 cases** (one assembled minimal consumer and 60
+documentation cases), zero failures/errors/skips, with explicit GC disabled.
+Source: clean starting commit `025d4c0d11fe12e9aaf3a5528113127f626b4b18` plus
+this four-file test/documentation patch. The commands above for installation,
+minimal consumption and documentation were rerun; XML, source snapshots,
+classpath, artifact hashes and `SHA256SUMS` are separately retained under
+`target/release-evidence/v32/priority7-consumer-correction/`. The original 319-case
+run is historical, not a rerun of this correction. No production change.
+
 ## Priority 8 - Findings, Necessity, and Scope Decision
 
 ### [ ] 8.1 Consolidate and prioritize findings
