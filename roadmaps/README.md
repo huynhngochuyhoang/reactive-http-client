@@ -10,7 +10,9 @@ is historical context rather than active work.
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V31 are completed release records. V31 was released as `4.4.0`.
 V32 is the active architecture-review execution roadmap. The reactor is
-`4.5.0-SNAPSHOT`; no implementation or next release scope is selected.
+`4.5.0-SNAPSHOT`; F004/F005 are approved for implementation, with no next release
+scope selected. The [scope decision](v32/ARCHITECTURE-DECISION.md) defers F001-F003
+with documented workarounds; no fixes are delivered by that approval.
 Public/API/consumer/benchmark baselines are verified `4.4.0`.
 [V31 publication and closure](v31/RELEASE-DECISION.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.

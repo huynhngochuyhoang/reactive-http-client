@@ -4,7 +4,7 @@
 > **Theme:** architecture review, practical extensibility, and justified improvements
 > **Published baseline:** `4.4.0`
 > **Development coordinate:** `4.5.0-SNAPSHOT`; no release scope selected
-> **Execution:** [adopted checklist](CHECKLIST.md); review active, implementation unselected
+> **Execution:** [adopted checklist](CHECKLIST.md); F004/F005 approved, implementation pending
 > **Draft date:** 2026-09-14
 > **Adopted:** 2026-09-14
 

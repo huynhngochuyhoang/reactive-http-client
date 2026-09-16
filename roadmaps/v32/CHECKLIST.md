@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.0`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** unselected; Priority 8 requires an explicit decision
+> **Implementation scope:** V32-F004 + V32-F005 approved; Priority 9 pending
 > **Release scope:** unselected; review-only completion is valid
 > **Adopted:** 2026-09-14
 
@@ -75,9 +75,9 @@ or swap dependencies merely to satisfy a review item.
 
 ## Review Records
 
-The baseline, architecture map, extension scenarios and finding register now exist;
-the decision record remains planned, not completed evidence. Keep detailed matrices in these
-records unless their size justifies a separate file.
+The baseline, review maps, scenarios, findings and approved decision now exist.
+The decision selects F004/F005 work, not delivered fixes or a release. Keep
+detailed matrices in these records unless their size justifies a separate file.
 
 | Record | Contents |
 |---|---|
@@ -88,8 +88,8 @@ records unless their size justifies a separate file.
 | [INVOCATION-COMPOSITION.md](INVOCATION-COMPOSITION.md) | Counted request/probe/replay paths, independent lifetimes and concrete change dependencies |
 | [RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) | Resource/terminal and nested-lock matrices, partial construction, external owners and retention limits |
 | [MODULE-EVIDENCE-BOUNDARIES.md](MODULE-EVIDENCE-BOUNDARIES.md) | Mock/optional integration and creation matrices, native triggers, fixture/provenance gaps and test-environment limits |
-| [FINDINGS.md](FINDINGS.md) | Four production gaps and one test-evidence gap, alternatives and unselected implementation decision |
-| `ARCHITECTURE-DECISION.md` | Maintainer scope decision, selected-item verification and final review/release disposition |
+| [FINDINGS.md](FINDINGS.md) | Four production gaps and one test-evidence gap; F004/F005 accepted, F001-F003 deferred with workarounds and triggers |
+| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; implementation pending, release unselected |
 
 ---
 
@@ -760,38 +760,111 @@ run is historical, not a rerun of this correction. No production change.
 
 ## Priority 8 - Findings, Necessity, and Scope Decision
 
-### [ ] 8.1 Consolidate and prioritize findings
+### [x] 8.1 Consolidate and prioritize findings
 
-- [ ] Assign stable IDs with user need, observed impact, source/reproducer,
+- [x] Assign stable IDs with user need, observed impact, source/reproducer,
       contract owner, affected lifecycle and confidence or missing evidence.
-- [ ] Link recurring symptoms only when evidence establishes a common cause;
+- [x] Link recurring symptoms only when evidence establishes a common cause;
       separate historical fixes, current defects and exploratory concerns.
-- [ ] Prioritize confirmed safety/correctness gaps, supported extension blockers
+- [x] Prioritize confirmed safety/correctness gaps, supported extension blockers
       and demonstrable maintenance cost; keep cosmetic changes out of scope.
-- [ ] Record verified behavior and intentional no-change outcomes for every
+- [x] Record verified behavior and intentional no-change outcomes for every
       reviewed area, not only a list of proposed work.
 
-### [ ] 8.2 Compare alternatives and verification cost
+### [x] 8.2 Compare alternatives and verification cost
 
-- [ ] Compare no change, documentation, local correction, existing helper/SPI and
+- [x] Compare no change, documentation, local correction, existing helper/SPI and
       a narrowly justified new boundary for each candidate improvement.
-- [ ] Record complexity added/removed, source/binary/behavior/configuration risk,
+- [x] Record complexity added/removed, source/binary/behavior/configuration risk,
       migration, concurrency/hot-path impact and rollback boundary.
-- [ ] Define deterministic acceptance and required consumer, optional-dependency,
+- [x] Define deterministic acceptance and required consumer, optional-dependency,
       matrix, AOT/native and performance evidence per candidate.
-- [ ] Move broader features or breaking redesigns to separate proposals; identify
+- [x] Move broader features or breaking redesigns to separate proposals; identify
       deferred/unresolved evidence needs and reconsideration triggers.
 
-### [ ] 8.3 Record the maintainer scope decision
+### [x] 8.3 Record the maintainer scope decision
 
-- [ ] Obtain and record a dated explicit maintainer decision: selected finding IDs
+- [x] Obtain and record a dated explicit maintainer decision: selected finding IDs
       and dependencies, or review-only completion with no production change.
-- [ ] Freeze each selected item's bounded scope, acceptance, verification budget,
+- [x] Freeze each selected item's bounded scope, acceptance, verification budget,
       compatibility classification and stop/review conditions before implementation.
-- [ ] Identify blocking findings and disposition non-selected work; do not treat
+- [x] Identify blocking findings and disposition non-selected work; do not treat
       checklist adoption as approval of findings or a release commitment.
-- [ ] For review-only, record which Priority 9/10/12 branches are not applicable
-      and why, while preserving required review, fixture and documentation checks.
+- [x] **Not applicable (2026-09-16):** review-only branch; the maintainer selected
+      F004/F005 implementation. Priority 9 and applicable Priority 10 checks remain
+      required; Priority 12 separately selects release or no-publication.
+
+Priority 8 completed on 2026-09-16 with **explicit maintainer approval for
+F004 + F005**. [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) consolidates
+five stable findings, ranks observed impact, compares alternatives and defines
+each candidate's bounded acceptance, verification budget, compatibility and
+rollback. It records no-change outcomes across all reviewed areas, excludes
+unjustified redesigns from this scope and requires separate proposals before
+any broader adoption. No new feature proposal is warranted by this evidence.
+
+- Approved scope: F004's local failed-construction cleanup plus
+  F005's deterministic/controlled-JVM test separation, with F001-F003 deferred
+  behind their tested workarounds and named reconsideration triggers. Impact
+  order differs from test dependency order. No finding is fixed, no common root
+  is invented, and F004 is not attributed to the historical pod-memory report.
+- The maintainer explicitly selected the recommended F004/F005 option and
+  deferred F001-F003 with their documented workarounds. F005's deterministic
+  test foundation precedes F004's local fix, followed by combined verification;
+  there is no production-code dependency. Both selected findings block scope
+  completion until verified or removed by a new decision. The record freezes
+  boundaries, verification budgets, compatibility and rollback; new APIs,
+  broader refactors or unavailable required lanes reopen the decision. Priority
+  9 remains pending. Release is unselected; no publication is authorized.
+- Pre-approval verification: **82 tests**, zero failures/errors/skips: 62 in
+  DocumentationReleaseArtifactTest, six in ResourceOwnershipReviewTest, four
+  in EffectiveSelectionAotReviewTest and ten in ComponentSelectionReviewTest.
+  These verify documentation and as-is gap/parity characterizations, not fixes.
+  The pre-approval documentation guard checks ranking, finding references, acceptance
+  sections, local links and the pending approval gate. Full Markdown/manifest
+  guards pass; the initial missing-record error and intermediate broken-anchor
+  failures remain in separate stages.
+
+```bash
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -pl reactive-http-client-starter -DargLine=-XX:+DisableExplicitGC \
+  -Dtest=DocumentationReleaseArtifactTest,ResourceOwnershipReviewTest,EffectiveSelectionAotReviewTest,ComponentSelectionReviewTest \
+  test
+```
+
+- Reviewed clean baseline: `15d0d16bc81f92ed920679f61754e8df0e32bfd2` plus the
+  recorded four-file decision/documentation-test patch. Maven 3.9.9, Oracle
+  JDK 21.0.8, Java target 21, Boot 4.0.0 and Central-only settings. Final checks
+  rerun after checklist edits. Source copies, XML, commands, actual totals,
+  toolchain/settings, reviewed source archive and hashes are under
+  `target/release-evidence/v32/priority8/`, sealed by `SHA256SUMS`.
+- Reused, not freshly run: Priority 7's 17 assembled extension cases and the two
+  failing GC-disabled/two passing GC-control cases. The prior inventory is
+  verified, sources bridged from reachable `6fb540fa9e7b73657a247caa6ea4c2a19a774d48`
+  to the reviewed baseline, and reports retain original commands/provenance.
+  Those reused counts are not included in the fresh 82. No fresh native, API,
+  matrix, benchmark, memory measurement or assembled consumer run is claimed.
+- No production, POM, dependency, coordinate, native fixture or V1-V31 change.
+  Required implementation verification is defined by 8.3 and the actual patch;
+  this documentation run cannot satisfy those future lanes. Historical review
+  records retain their original unselected-scope checkpoints.
+
+Approval verification on 2026-09-16: the same four-class command above passed
+**82 tests**, zero failures/errors/skips, after recording the maintainer's choice
+and aligning the active roadmap/index and current compatibility guide. The
+documentation guard now requires exactly F004/F005 accepted and F001-F003
+deferred, completed 8.3, pending Priority 9 and unselected release scope. The
+approval red test and an intermediate whitespace-sensitive assertion failure
+remain in separate stages, not hidden as passing runs.
+
+The approval run uses the same reachable baseline plus a seven-file cumulative
+documentation/test patch, continuing the existing uncommitted preparation work;
+it is not a clean release build. Final verification was repeated after this
+record. Commands, source copies, XML, toolchain/settings, prior-bundle hash and
+`SHA256SUMS` are separately under
+`target/release-evidence/v32/priority8-approval/`. The original sealed
+`priority8/` bundle remains unchanged and still describes the pending decision
+at that earlier checkpoint. No production fix or future implementation lane is
+claimed by this approval verification.
 
 ## Priority 9 - Bounded Accepted Improvements
 
