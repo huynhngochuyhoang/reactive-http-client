@@ -10,10 +10,12 @@ is historical context rather than active work.
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V31 are completed release records. V31 was released as `4.4.0`.
 V32 is the active architecture-review execution roadmap. The reactor is
-`4.5.0-SNAPSHOT`; F004/F005 are implemented with focused verification, with no next
+`4.5.0-SNAPSHOT`; F004/F005 are implemented with broader verification, with no next
 release scope selected. The [scope decision](v32/ARCHITECTURE-DECISION.md) defers
 F001-F003 with documented workarounds. [Implementation evidence](v32/ACCEPTED-IMPROVEMENTS.md)
-records the bounded changes; Priority 10 compatibility/native verification remains pending.
+records the bounded changes. [Priority 10 evidence](v32/COMPATIBILITY-VERIFICATION.md)
+passes JVM/API/consumer/matrix/AOT checks and clean-source native compilation
+and execution; earlier failed native attempts remain recorded.
 Public/API/consumer/benchmark baselines are verified `4.4.0`.
 [V31 publication and closure](v31/RELEASE-DECISION.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.

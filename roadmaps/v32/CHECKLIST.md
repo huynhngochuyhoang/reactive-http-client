@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.0`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification pending
+> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification complete
 > **Release scope:** unselected; review-only completion is valid
 > **Adopted:** 2026-09-14
 
@@ -89,7 +89,8 @@ detailed matrices in these records unless their size justifies a separate file.
 | [RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) | Resource/terminal and nested-lock matrices, partial construction, external owners and retention limits |
 | [MODULE-EVIDENCE-BOUNDARIES.md](MODULE-EVIDENCE-BOUNDARIES.md) | Mock/optional integration and creation matrices, native triggers, fixture/provenance gaps and test-environment limits |
 | [FINDINGS.md](FINDINGS.md) | Four production gaps and one test-evidence gap; F004/F005 accepted, F001-F003 deferred with workarounds and triggers |
-| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; Priority 10 pending, release unselected |
+| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; Priority 10 verified, release unselected |
+| [COMPATIBILITY-VERIFICATION.md](COMPATIBILITY-VERIFICATION.md) | Completed Priority 10 correctness/API/consumer/AOT/native evidence, including retained failed native attempts |
 | [ACCEPTED-IMPROVEMENTS.md](ACCEPTED-IMPROVEMENTS.md) | F004 construction rollback, F005 preserved scenario inventory and controlled lane, focused evidence and remaining verification |
 
 ---
@@ -956,38 +957,94 @@ No hot-path change warrants a new benchmark. Release scope remains unselected.
 
 ## Priority 10 - Compatibility and Targeted Verification
 
-### [ ] 10.1 Select and run the applicable correctness lanes
+### [x] 10.1 Select and run the applicable correctness lanes
 
-- [ ] Map accepted edits and review fixtures to required verification. Review-only
+- [x] Map accepted edits and review fixtures to required verification. Review-only
       still runs new/changed characterization tests and documentation/archive guards.
-- [ ] For accepted production edits, run focused contracts and full affected-module
+- [x] For accepted production edits, run focused contracts and full affected-module
       regressions, preserving actual failures, errors, skips and test totals.
-- [ ] Run applicable strict root and independent starter source/binary comparisons
+- [x] Run applicable strict root and independent starter source/binary comparisons
       against fresh Central `4.4.0`, plus assembled consumers without reactor leakage.
-- [ ] Verify behavioral/configuration compatibility separately; an unchanged
+- [x] Verify behavioral/configuration compatibility separately; an unchanged
       signature does not prove the extension, default or lifecycle contract unchanged.
 
-### [ ] 10.2 Verify shared-boundary, native and optional parity
+### [x] 10.2 Verify shared-boundary, native and optional parity
 
-- [ ] For affected shared boundaries, run supported Java/Boot dependency rows and
+- [x] For affected shared boundaries, run supported Java/Boot dependency rows and
       production/mock/consumer variants of the accepted extension cases.
-- [ ] Preserve minimal no-Caffeine consumers and applicable missing integrations;
+- [x] Preserve minimal no-Caffeine consumers and applicable missing integrations;
       verify replacement bean selection and factory shutdown where touched.
-- [ ] When reflection, bean creation or lifecycle changes, run AOT and native
+- [x] When reflection, bean creation or lifecycle changes, run AOT and native
       compile/execution from exact clean source and record binary/toolchain hashes.
-- [ ] Document each omitted/reused lane with its scope-based reason and provenance;
+- [x] Document each omitted/reused lane with its scope-based reason and provenance;
       a required but unavailable check stays pending, not implicitly passed.
 
-### [ ] 10.3 Assess hot-path cost and evidence integrity
+### [x] 10.3 Assess hot-path cost and evidence integrity
 
-- [ ] For hot-path/allocation changes, compare identical workloads with published
+- [x] **Not applicable (construction-only patch):** For hot-path/allocation
+      changes, compare identical workloads with published
       `4.4.0`; keep fixture setup, cold/warm state and metrics selection equivalent.
-- [ ] Separate benchmark discovery/smoke from controlled measurements and public
+- [x] **Not applicable (no new benchmark/claim):** Separate benchmark
+      discovery/smoke from controlled measurements and public
       claims; provide manual commands when the measurement lane is external.
-- [ ] Use deterministic gates for concurrency and controlled JVM lanes for any
+- [x] Use deterministic gates for concurrency and controlled JVM lanes for any
       reachability assertion; do not certify behavior from sleeps or forced GC.
-- [ ] Retain reports, exact sources, hashes and limitations; for review-only or
+- [x] Retain reports, exact sources, hashes and limitations; for review-only or
       unaffected paths, document not applicability instead of inventing new results.
+
+Priority 10 completed (2026-09-17): **10.1, 10.2 and 10.3 are complete**.
+[Verification record](COMPATIBILITY-VERIFICATION.md)
+maps scope to lanes, commands, compatibility distinctions and omissions.
+
+- Clean reachable source `c8f6a527450ea512ed6837bd8d09191921d4dd48`, built in an
+  isolated clone: Java 21.0.8, Maven 3.9.9, target Java 21, Central-only settings.
+  Each Boot 4.0.0/4.1.0 reactor passed **1,928 tests**: 1,788 starter, 78 helper,
+  62 OTel, zero failures/errors/skips. Each script row also passed three default
+  consumers, but the upper consumer retained Boot 4.0.0 with Spring 7.0.8;
+  this mixed result is not Boot 4.1 consumption. Both strict
+  root API comparisons and separate fresh-Central starter comparison passed.
+- Fresh isolated consumer lane: **74 mock + 28 full + three minimal cases**;
+  property-only upper consumer rerun: **28 mixed-version cases**. The evidence
+  audit identified the fixed consumer parent; an explicit Boot 4.1 parent
+  overlay passed **28 cases**, with its actual Boot 4.1 classpath verified
+  separately. Classpaths use installed JARs, not reactor
+  classes. Minimal Boot 4.0 consumption excludes Caffeine,
+  OTel and the helper, including enabled-only/no-operator resilience.
+- Explicit-GC-disabled contracts: **96 passing cases** (79 affected ordinary
+  scenarios plus 17 construction controls). Controlled lanes passed **16 cache
+  and five V31 handoff cases**. Three negative prerequisite runs each failed
+  one expected assertion. API/baseline negative-fixture scripts passed.
+- JVM fixture: **six cases passed**, and ordinary/AOT executables exited zero.
+  Native compilation reran six passing fixture cases but failed with
+  `OutOfMemoryError: Java heap space` under GraalVM 25.0.3, 4 GiB build heap and
+  two workers. A requested 6 GiB clean retry passed six JVM cases again but
+  failed with watchdog exit 30 (Maven exit 1) during universe building, with
+  severe host RAM/swap pressure observed. Both failures are retained. After the
+  host restart, a fresh clean clone of the same commit and isolated repository
+  passed six fixture cases and native compilation with 6 GiB/two workers.
+  Maven exited zero after 354 seconds; the new executable exited zero after
+  18.8 seconds within its 180-second bound. Native Image reported 5.40 GB peak
+  RSS. Binary SHA-256:
+  `49332e7ff709fc9295c675ca54d176e52b40bc5262573afab37b2b0dc1d85d4f`.
+- No steady-state code change warrants JMH or memory remeasurement. F001-F003
+  remain deferred and release scope unselected. Production, dependencies,
+  coordinates, native fixture and V1-V31 records are unchanged by this priority.
+- Stage logs/commands, clean source archive, fresh XML, artifacts, classpaths,
+  strict reports, Central provenance, toolchain hashes and failure evidence are
+  retained in `target/release-evidence/v32/priority10/`, with an audit and
+  `SHA256SUMS`. Completion documentation and its guard are a separate patch over
+  that clean source; earlier sealed evidence is unchanged.
+- The fresh native completion bundle, including binary/toolchain hashes,
+  companion libraries, source archive, installed reactor artifacts, commands,
+  XML, final documentation rerun and its own audit/manifest, is
+  `target/release-evidence/v32/priority10-native/`. The original manifest was
+  verified unchanged. The source archive matches byte-for-byte; broader lanes
+  above are reused from the same clean commit, not rerun after the restart.
+- Final documentation/archive/readiness verification passed **63 cases**, zero
+  failures/errors/skips. The earlier one-failure stale-status assertion run is
+  retained separately. The post-native completion documentation rerun also
+  passed **63 cases**. `git diff --check` passed. Priorities 11 and 12 and release
+  selection remain open; passing verification does not authorize publication.
 
 ## Priority 11 - Maintainer and Operations Guidance
 

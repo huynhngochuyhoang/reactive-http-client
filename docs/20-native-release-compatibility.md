@@ -186,8 +186,10 @@ records. [V32](../roadmaps/v32/ROADMAP.md) has an
 review. Its [scope decision](../roadmaps/v32/ARCHITECTURE-DECISION.md) approves
 F004/F005 implementation and defers F001-F003. The
 [bounded implementation](../roadmaps/v32/ACCEPTED-IMPROVEMENTS.md) has focused
-regression evidence; Priority 10 compatibility/native verification and next
-release scope remain pending.
+regression evidence. [Priority 10 verification](../roadmaps/v32/COMPATIBILITY-VERIFICATION.md)
+adds full supported-Boot, strict API, consumer, JVM/AOT and clean-source native
+compile/execution results. Earlier native failures remain recorded; Priority 10
+verification is complete, while next release scope remains unselected.
 The [V31 release review](../roadmaps/v31/RELEASE-DECISION.md#post-publication-closure)
 records verified signing, packaging, publication and Central consumption.
 The [architecture proposal](../roadmaps/proposals/POST_4_4_ARCHITECTURE_REVIEW.md)

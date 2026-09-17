@@ -1,6 +1,6 @@
 # V32 Architecture Scope Decision
 
-> **Status:** F004 + F005 implemented; Priority 10 verification pending
+> **Status:** F004 + F005 implemented; Priority 10 verification complete
 > **Reviewed:** 2026-09-16
 > **Source baseline:** `15d0d16bc81f92ed920679f61754e8df0e32bfd2`
 > **Published / development:** `4.4.0` / `4.5.0-SNAPSHOT`
@@ -13,7 +13,9 @@ The maintainer approved the bounded F004 + F005 scope below; this is not
 authorization to publish. Earlier review records describe their dated as-is
 checkpoints. This record owns the scope decision for Priority 9. The dated
 [implementation result](ACCEPTED-IMPROVEMENTS.md) records the delivered corrections
-and focused tests separately; Priority 10's required broader lanes remain pending.
+and focused tests separately. [Priority 10 verification](COMPATIBILITY-VERIFICATION.md)
+passes the broader JVM, API, matrix, consumer, AOT and native lanes. Earlier
+native build failures are retained alongside the successful post-restart run.
 
 ## Ranked Findings
 
@@ -83,7 +85,8 @@ against published `4.4.0`; behavior and configuration require separate tests.
   scenarios. Run strict root and independent starter API checks and supported
   Boot rows. Run JVM AOT and clean-source native lifecycle/creation evidence for
   this changed assembly boundary, with a witness for failed creation if feasible
-  without exposing internals. Missing native evidence remains pending.
+  without exposing internals. Priority 10 records the completed native gate and
+  the JVM-only scope of private failed-construction lease inspection.
 - Compatibility / rollback: no API signature, default or validation relaxation;
   only abandoned-resource cleanup changes. No application migration. Roll back
   this guard if it closes a successful or application-owned component, hides the
@@ -263,5 +266,8 @@ rewritten to claim that approval already existed.
 Priority 9 implementation has its own [result record](ACCEPTED-IMPROVEMENTS.md)
 and `target/release-evidence/v32/priority9/` bundle. The paragraphs above describe
 Priority 8's documentation-only evidence, not the later production patch.
-Focused tests validate both accepted changes; required Priority 10 lanes remain
-pending before either finding can be treated as fully release-verified.
+The [Priority 10 record](COMPATIBILITY-VERIFICATION.md) preserves fresh full
+matrix, API, consumer, controlled-JVM, AOT and clean-source native evidence,
+including earlier build failures and the successful post-restart compile/run.
+The accepted findings have completed Priority 10 verification. Priority 11
+guidance and Priority 12 release review remain open; release is unselected.
