@@ -591,6 +591,17 @@ class DocumentationReleaseArtifactTest {
                 "49332e7ff709fc9295c675ca54d176e52b40bc5262573afab37b2b0dc1d85d4f",
                 "boot41-consumer-overlay/pom.xml", "mixed-version results")
                 .doesNotContain("in progress; required lanes remain pending");
+        assertThat(verification).contains("### Boot 4.1 Consumer Overlay",
+                "shutil.copytree('.github/boot4-consumer', fixture",
+                "tree.find('m:parent/m:version', namespace).text = '4.1.0'",
+                "tree.find('m:properties/m:spring-boot.version', namespace).text = '4.1.0'",
+                "-Dmaven.repo.local=$RUN/repository", "-DskipTests -Dmaven.javadoc.skip=true install",
+                "\"${CONSUMER[@]}\" clean test", "jar.parent.name == '4.1.0'",
+                "'tests': 28, 'failures': 0, 'errors': 0, 'skipped': 0");
+        for (String flag : List.of("v26.observability", "v27.parity", "v28.parity", "v29.parity",
+                "v30.parity", "v31.parity", "v32.extensions")) {
+            assertThat(verification).contains("-Dconsumer." + flag + "=true");
+        }
         assertModuleReviewLinksExist(directory, verification);
         for (String document : List.of("CHECKLIST.md", "ARCHITECTURE-DECISION.md", "FINDINGS.md")) {
             assertThat(Files.readString(directory.resolve(document))).contains("COMPATIBILITY-VERIFICATION.md");

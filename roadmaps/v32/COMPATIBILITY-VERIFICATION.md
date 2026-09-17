@@ -137,13 +137,80 @@ scripts/verify-api-compatibility-fixtures.sh
 scripts/verify-published-baseline-fixtures.sh
 ```
 
-The corrected all-profile upper-row consumer uses the archived
-`boot41-consumer-overlay/pom.xml` (parent and version property both 4.1.0),
-and every V26-V32 consumer profile with the isolated installed reactor JARs.
-The recorded generator copies the fixture and updates those two XML elements;
-its exact command, effective POM, tree and classpath are retained. The minimal
-no-Caffeine consumer remains the separate Boot 4.0 fixture rather than being
-misrepresented as an upper-row run.
+### Boot 4.1 Consumer Overlay
+
+The following standalone recipe recreates `boot41-consumer-overlay/pom.xml`
+from tracked sources; no archived `target/release-evidence` files are needed.
+Run from the root of a clean checkout of `c8f6a527450ea512ed6837bd8d09191921d4dd48`,
+using Bash, Python 3, Maven and Java 21. It copies the fixture without build
+outputs, changes only the parent and version property to 4.1.0, installs the
+reactor into a fresh repository and enables every V26-V32 consumer flag. It does
+not modify the tracked Boot 4.0 fixture or certify the matrix script's mixed row.
+Keep the printed temporary directory for its overlay, logs, XML reports,
+effective POM, tree and assembled classpath.
+
+```bash
+set -euo pipefail
+test "$(git rev-parse HEAD)" = c8f6a527450ea512ed6837bd8d09191921d4dd48
+test -z "$(git status --porcelain)"
+export MAVEN_OPTS='-Xmx512m -XX:ActiveProcessorCount=2'
+RUN="$(mktemp -d /tmp/v32-boot41-consumer.XXXXXX)"
+printf 'Boot 4.1 reproduction: %s\n' "$RUN"
+python3 - "$RUN" <<'PY'
+from pathlib import Path
+import shutil
+import sys
+import xml.etree.ElementTree as ET
+
+fixture = Path(sys.argv[1]) / 'boot41-consumer-overlay'
+shutil.copytree('.github/boot4-consumer', fixture, ignore=shutil.ignore_patterns('target'))
+namespace = {'m': 'http://maven.apache.org/POM/4.0.0'}
+ET.register_namespace('', namespace['m'])
+tree = ET.parse(fixture / 'pom.xml')
+tree.find('m:parent/m:version', namespace).text = '4.1.0'
+tree.find('m:properties/m:spring-boot.version', namespace).text = '4.1.0'
+tree.write(fixture / 'pom.xml', encoding='utf-8', xml_declaration=True)
+PY
+MAVEN=(mvn -B -ntp -s "$PWD/.mvn/maven-central-settings.xml"
+  "-Dmaven.repo.local=$RUN/repository")
+"${MAVEN[@]}" -DskipTests -Dmaven.javadoc.skip=true install \
+  2>&1 | tee "$RUN/reactor-install.log"
+CONSUMER=("${MAVEN[@]}" -f "$RUN/boot41-consumer-overlay/pom.xml"
+  -Dreactive-http-client.version=4.5.0-SNAPSHOT
+  -Dconsumer.v26.observability=true -Dconsumer.v27.parity=true
+  -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true
+  -Dconsumer.v30.parity=true -Dconsumer.v31.parity=true
+  -Dconsumer.v32.extensions=true)
+"${CONSUMER[@]}" clean test 2>&1 | tee "$RUN/consumer.log"
+"${CONSUMER[@]}" help:effective-pom -Doutput="$RUN/effective-pom.xml"
+"${CONSUMER[@]}" dependency:tree -DoutputFile="$RUN/dependency-tree.txt"
+"${CONSUMER[@]}" dependency:build-classpath -Dmdep.outputFile="$RUN/classpath.txt"
+python3 - "$RUN" <<'PY'
+from pathlib import Path
+import os
+import sys
+import xml.etree.ElementTree as ET
+
+run = Path(sys.argv[1])
+jars = [Path(value) for value in (run / 'classpath.txt').read_text().strip().split(os.pathsep)]
+assert jars and all(jar.is_file() and jar.suffix == '.jar' for jar in jars)
+boot = [jar for jar in jars if '/org/springframework/boot/' in jar.as_posix()]
+assert boot and all(jar.parent.name == '4.1.0' for jar in boot), boot
+for module in ('reactive-http-client-starter', 'reactive-http-client-test', 'reactive-http-client-otel'):
+    expected = run / 'repository/io/github/huynhngochuyhoang' / module / '4.5.0-SNAPSHOT' / (module + '-4.5.0-SNAPSHOT.jar')
+    assert expected in jars, expected
+reports = list((run / 'boot41-consumer-overlay/target/surefire-reports').glob('TEST-*.xml'))
+counts = {key: sum(int(ET.parse(report).getroot().get(key, 0)) for report in reports)
+          for key in ('tests', 'failures', 'errors', 'skipped')}
+assert counts == {'tests': 28, 'failures': 0, 'errors': 0, 'skipped': 0}, counts
+print('Verified Boot 4.1.0, isolated reactor JARs and 28 passing consumer cases')
+PY
+```
+
+The minimal no-Caffeine consumer remains the separate Boot 4.0 fixture rather
+than being misrepresented as an upper-row run.
+
+### Native
 
 Native uses GraalVM/native-image 25.0.3, Java target 21 and Boot 4.0.0. Set
 `JAVA_HOME`/`PATH` to that installed GraalVM. The successful retry installs the
