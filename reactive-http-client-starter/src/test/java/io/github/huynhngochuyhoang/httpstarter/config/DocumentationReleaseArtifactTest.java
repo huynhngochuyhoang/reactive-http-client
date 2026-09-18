@@ -163,7 +163,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
         assertThat(checklist)
-                .contains("> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification pending")
+                .contains("> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification complete")
                 .contains("> **Release scope:** unselected; review-only completion is valid")
                 .containsPattern("(?m)^### \\[[ x]\\] 8\\.3 Record the maintainer scope decision$")
                 .containsPattern("(?m)^### \\[[ x]\\] 12\\.2 Select review-only or release scope$");
@@ -527,7 +527,7 @@ class DocumentationReleaseArtifactTest {
         String findings = Files.readString(directory.resolve("FINDINGS.md"));
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         assertThat(decision.lines().filter(line -> line.startsWith("> **Status:**")).toList())
-                .containsExactly("> **Status:** F004 + F005 implemented; Priority 10 verification pending");
+                .containsExactly("> **Status:** F004 + F005 implemented; Priority 10 verification complete");
         assertThat(decision).contains("> **Implementation scope:** V32-F004 + V32-F005",
                 "> **Release scope:** unselected", "## Ranked Findings", "## Alternatives and Necessity",
                 "## Acceptance and Verification Budget", "## Reviewed Areas and No-Change Outcomes",
@@ -553,24 +553,59 @@ class DocumentationReleaseArtifactTest {
                 "V32-F004", "accepted", "V32-F005", "accepted",
                 "V32-F001", "deferred", "V32-F002", "deferred", "V32-F003", "deferred"));
         assertThat(checklist).contains("### [x] 8.3 Record the maintainer scope decision",
-                "> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification pending",
+                "> **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification complete",
                 "### [x] 9.1 Prepare selected changes or record not applicability",
                 "### [x] 9.2 Implement and verify one accepted boundary at a time",
                 "### [x] 9.3 Reconcile outcomes with the reviewed architecture",
-                "### [ ] 10.1 Select and run the applicable correctness lanes");
+                "### [x] 10.1 Select and run the applicable correctness lanes",
+                "### [x] 10.2 Verify shared-boundary, native and optional parity",
+                "### [x] 10.3 Assess hot-path cost and evidence integrity",
+                "### [ ] 11.1 Publish the reviewed architecture and extension guidance");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 10 -"),
+                checklist.indexOf("## Priority 11 -"))).doesNotContain("[ ]");
+        assertThat(checklist).doesNotContain("native verification pending", "required gate open");
         assertThat(decision).contains("**Approved by the maintainer on 2026-09-16.**",
                 "Both are blocking", "F005's deterministic test foundation",
                 "Review-only is not the selected branch");
         assertThat(Files.readString(directory.resolve("ROADMAP.md")))
-                .contains("F004/F005 implemented, Priority 10 verification pending");
+                .contains("F004/F005 implemented, Priority 10 verification complete");
         assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md")))
-                .contains("F004/F005 are implemented with focused verification")
+                .contains("F004/F005 are implemented with broader verification")
                 .doesNotContain("no implementation or next release scope is selected");
         assertThat(Files.readString(projectRoot().resolve("docs/20-native-release-compatibility.md")))
                 .contains("F004/F005 implementation and defers F001-F003")
                 .doesNotContain("implementation and next release scope remain unselected");
         assertThat(findings).contains("(ARCHITECTURE-DECISION.md)");
         assertModuleReviewLinksExist(directory, decision);
+        String verification = Files.readString(directory.resolve("COMPATIBILITY-VERIFICATION.md"));
+        assertThat(verification.lines().filter(line -> line.startsWith("> **Status:**")).toList())
+                .containsExactly("> **Status:** complete, 2026-09-17; native compile and executable passed");
+        assertThat(verification).contains("> **Release scope:** unselected", "## Risk to Evidence",
+                "## Results", "## Reproduction", "## Cost and Limitations", "## Evidence Integrity",
+                "Boot 4.0.0", "Boot 4.1.0", "Independent starter API", "fresh Central",
+                "-XX:+DisableExplicitGC", "-Pv32-cache-reachability", "-Pv31-handoff-reachability",
+                "clean native:compile", "No steady-state", "F001-F003", "SHA256SUMS",
+                "Native compile failed", "OutOfMemoryError: Java heap space",
+                "Native binary SHA-256:", "watchdog", "priority10-native/",
+                "c8f6a527450ea512ed6837bd8d09191921d4dd48",
+                "49332e7ff709fc9295c675ca54d176e52b40bc5262573afab37b2b0dc1d85d4f",
+                "boot41-consumer-overlay/pom.xml", "mixed-version results")
+                .doesNotContain("in progress; required lanes remain pending");
+        assertThat(verification).contains("### Boot 4.1 Consumer Overlay",
+                "shutil.copytree('.github/boot4-consumer', fixture",
+                "tree.find('m:parent/m:version', namespace).text = '4.1.0'",
+                "tree.find('m:properties/m:spring-boot.version', namespace).text = '4.1.0'",
+                "-Dmaven.repo.local=$RUN/repository", "-DskipTests -Dmaven.javadoc.skip=true install",
+                "\"${CONSUMER[@]}\" clean test", "jar.parent.name == '4.1.0'",
+                "'tests': 28, 'failures': 0, 'errors': 0, 'skipped': 0");
+        for (String flag : List.of("v26.observability", "v27.parity", "v28.parity", "v29.parity",
+                "v30.parity", "v31.parity", "v32.extensions")) {
+            assertThat(verification).contains("-Dconsumer." + flag + "=true");
+        }
+        assertModuleReviewLinksExist(directory, verification);
+        for (String document : List.of("CHECKLIST.md", "ARCHITECTURE-DECISION.md", "FINDINGS.md")) {
+            assertThat(Files.readString(directory.resolve(document))).contains("COMPATIBILITY-VERIFICATION.md");
+        }
     }
 
     private static void assertModuleReviewLinksExist(Path directory, String review) {

@@ -1,6 +1,6 @@
 # V32 Architecture Finding Register
 
-> **Status:** F004/F005 implemented with focused verification; Priority 10 pending; F001-F003 deferred
+> **Status:** F004/F005 implemented; Priority 10 verification complete; F001-F003 deferred
 > **Baseline:** [verified scope and evidence](BASELINE-SCOPE.md)
 > **Decision owner:** maintainer, through [Priority 8.3](CHECKLIST.md)
 
@@ -56,8 +56,10 @@ named reconsideration triggers. The decision record freezes the selected scope,
 acceptance, verification and rollback. Earlier review-stage disposition sections
 remain historical observations; the per-finding dispositions below are current.
 [Priority 9 implementation](ACCEPTED-IMPROVEMENTS.md) records the local F004
-rollback and F005 lane split with focused regressions. Priority 10's broader
-verification remains pending. Release scope stays unselected.
+rollback and F005 lane split with focused regressions. [Priority 10 verification](COMPATIBILITY-VERIFICATION.md)
+adds full matrix, API, consumer, controlled-JVM, AOT and native evidence. Earlier
+native failures are retained beside the successful post-restart compile/run.
+Release scope stays unselected.
 
 ## V32-F001: Starter Builder Is Misclassified Through ApplicationContext
 
@@ -129,7 +131,7 @@ second pipeline. Priority 6 owns remaining resource/teardown questions; Priority
 | Alternatives | Use the provider-aware overload with valid auth/base URL, or disable unneeded caching; reject known-invalid inputs before manager allocation; or add a local failure cleanup guard around handler construction. Early validation alone does not cover every later constructor/custom component failure. Test-only reflective lease cleanup is not a public workaround |
 | Tradeoffs | A local assembly guard avoids a new API or hot-path abstraction. It must close only the newly allocated manager, preserve the original exception and suppress cleanup failures, and leave supplied WebClient/auth/registry plus other live owners untouched |
 | Priority and dependencies | Reproduced resource leak on rejected construction, not proof of the earlier production pod-memory report. Priority 7 reviews public/helper creation paths; Priority 8.3 selects any correction. A Spring factory normally passes auth inputs; this exact failure does not establish that all ordinary factory startups leak |
-| Disposition | Implemented with focused verification, 2026-09-16; see [Priority 9 results](ACCEPTED-IMPROVEMENTS.md). Priority 10 compatibility/consumer/native checks remain pending. Owner: invocation-assembly maintainer. Blocking for the selected scope until verified or explicitly removed; not proof of the reported pod-memory cause |
+| Disposition | Implemented 2026-09-16; [Priority 10 results](COMPATIBILITY-VERIFICATION.md) complete full JVM, compatibility, consumer, AOT and clean-source native checks on 2026-09-17. Earlier native failures remain recorded. Owner: invocation-assembly maintainer. Required verification is complete; release review remains open. Not proof of the reported pod-memory cause |
 | Acceptance and rollback | Repeated rejected creation leaves the registry and same-tag live owner unchanged; no unreturned manager lease remains. Cover auth-input rejection and a later assembly exception, with and without telemetry, preserving no-Caffeine rollback and external component ownership. Run focused lifecycle/consumer tests and assess AOT/native impact for the actual patch; roll back on successful-owner disposal or altered validation |
 | Decision reference | [Priority 8.3 decision](ARCHITECTURE-DECISION.md): F004 scope, verification and rollback approved. Current-behavior assertions must change with the fix; no general assembly refactor authorized |
 
@@ -153,7 +155,7 @@ collection-dependent tests are an evidence-lane follow-up for Priority 7.
 | Alternatives | Document a restrictive test-JVM prerequisite; or retain deterministic terminal/slot-release assertions in normal tests and move actual reachability probes to a controlled opt-in lane using the existing AsyncHandoffReachabilityIT pattern. Longer sleeps do not create a collection guarantee |
 | Tradeoffs | Test-only scope; no runtime/API dependency or behavior change. Lane migration must not silently delete reachability coverage or make a controlled test appear to have run in the ordinary suite |
 | Priority and dependencies | Test reliability before claiming supported-JVM full-suite compatibility. Review 16 collection-dependent cases identified in E7-02; only the two caller cases were freshly compared under both settings |
-| Disposition | Implemented with focused verification, 2026-09-16; all 16 scenarios remain in the controlled lane with deterministic ordinary witnesses. Owner: test/ownership maintainer. Full affected suites and supported Boot rows remain Priority 10 requirements; see [Priority 9 results](ACCEPTED-IMPROVEMENTS.md) |
+| Disposition | Implemented 2026-09-16; all 16 controlled scenarios and deterministic ordinary witnesses passed again, along with both full supported Boot rows and three negative JVM-prerequisite controls on 2026-09-17. See [Priority 10 results](COMPATIBILITY-VERIFICATION.md), including completed native verification for the combined F004 scope. Owner: test/ownership maintainer. Release review remains open |
 | Acceptance and rollback | Ordinary affected tests pass with explicit GC disabled using deterministic ownership witnesses; opt-in reachability verifies collector/heap prerequisites and retains original object-owner scenarios. Preserve command/count separation; roll back a migration that weakens observable release assertions |
 | Decision reference | [Priority 8.3 decision](ARCHITECTURE-DECISION.md): F005 bounded test-lane work approved. No production instrumentation or unrelated test rewrite authorized |
 
