@@ -560,7 +560,8 @@ class DocumentationReleaseArtifactTest {
                 "### [x] 10.1 Select and run the applicable correctness lanes",
                 "### [x] 10.2 Verify shared-boundary, native and optional parity",
                 "### [x] 10.3 Assess hot-path cost and evidence integrity",
-                "### [ ] 11.1 Publish the reviewed architecture and extension guidance");
+                "### [x] 11.1 Publish the reviewed architecture and extension guidance",
+                "### [ ] 12.1 Assemble the architecture decision evidence");
         assertThat(checklist.substring(checklist.indexOf("## Priority 10 -"),
                 checklist.indexOf("## Priority 11 -"))).doesNotContain("[ ]");
         assertThat(checklist).doesNotContain("native verification pending", "required gate open");
@@ -605,6 +606,75 @@ class DocumentationReleaseArtifactTest {
         assertModuleReviewLinksExist(directory, verification);
         for (String document : List.of("CHECKLIST.md", "ARCHITECTURE-DECISION.md", "FINDINGS.md")) {
             assertThat(Files.readString(directory.resolve(document))).contains("COMPATIBILITY-VERIFICATION.md");
+        }
+    }
+
+    @Test
+    void v32MaintainerGuidancePreservesReviewedScopeAndObservableOperations() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v32");
+        String guide = Files.readString(directory.resolve("MAINTAINER-GUIDANCE.md"));
+        assertThat(guide.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                .containsExactly("> **Release scope:** unselected");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(markdownSection(checklist, "## Priority 11 - Maintainer and Operations Guidance",
+                "## Priority 12 - Review Closure and Conditional Release Go/No-Go")).doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 12.1 Assemble the architecture decision evidence",
+                "### [ ] 12.2 Select review-only or release scope");
+        assertThat(guide.replaceAll("\\s+", " ")).contains("> **Published / development:** `4.4.0` / `4.5.0-SNAPSHOT`",
+                "> **Implementation scope:** V32-F004 + V32-F005 only",
+                "## Review Navigation", "## Choosing an Extension", "## Deferred and Intentional Limits",
+                "## Construction and Shutdown", "## Operations Evidence", "## Contributor Verification",
+                "V32-F001", "V32-F002", "V32-F003", "Unpublished F004 correction",
+                "MockResponseCacheSupport", "-Pv32-cache-reachability", "SerialGC", "128 MiB",
+                "**before close**", "unavailable, not zero", "credentials/identities",
+                "arbitrary exception messages", "Priority 12");
+        for (String record : List.of("BASELINE-SCOPE.md", "ARCHITECTURE-MAP.md", "EXTENSION-SCENARIOS.md",
+                "EFFECTIVE-POLICY-SELECTION.md", "INVOCATION-COMPOSITION.md", "RESOURCE-OWNERSHIP.md",
+                "MODULE-EVIDENCE-BOUNDARIES.md", "FINDINGS.md", "ARCHITECTURE-DECISION.md",
+                "ACCEPTED-IMPROVEMENTS.md", "COMPATIBILITY-VERIFICATION.md", "CHECKLIST.md")) {
+            assertThat(guide).contains("(" + record + ")");
+        }
+        for (String document : List.of("README.md", "roadmaps/README.md", "roadmaps/v32/CHECKLIST.md",
+                "docs/15-customizer.md", "docs/20-native-release-compatibility.md",
+                "docs/30-operations-troubleshooting.md", "docs/32-response-caching.md")) {
+            assertThat(Files.readString(root.resolve(document))).as(document).contains("MAINTAINER-GUIDANCE.md");
+        }
+        String customizer = Files.readString(root.resolve("docs/15-customizer.md"));
+        assertThat(customizer).contains("For a client without response caching",
+                        "32-response-caching.md#customization-safety", "### Cache-aware execution",
+                        "does not close that pool", "load-only", "append-only")
+                .doesNotContain("No extra configuration is required");
+        assertThat(customizer.replaceAll("\\s+", " "))
+                .contains("`SensitiveHeaders.DEFAULTS` names. `X-Signature` is not in that set",
+                        "it does not configure outbound redaction", "use `metadata-only` to omit headers",
+                        "explicitly select a custom `HttpExchangeLogger`",
+                        "`@LogHttpExchange` annotation's `logger` attribute")
+                .doesNotContain("Configure redaction for custom signature headers");
+        String caching = Files.readString(root.resolve("docs/32-response-caching.md"));
+        assertThat(caching).contains("V32-F001", "the terminal exchange function is insufficient",
+                "Do not trust a same-named replacement automatically");
+        String compatibility = Files.readString(root.resolve("docs/20-native-release-compatibility.md"));
+        assertThat(compatibility).contains("reactor, not published `4.4.0`", "(F002)", "(F003)");
+        String operations = markdownSection(Files.readString(root.resolve("docs/30-operations-troubleshooting.md")),
+                "## Construction and extension ownership", "## Inbound header and context triage");
+        assertThat(operations).contains("**unpublished**", "`4.5.0-SNAPSHOT`", "**before close**",
+                "absence is unavailable, not zero", "Overlapping same-tag owners",
+                "independent non-single-flight load", "exception class (not message)",
+                "not private registry-lease fields", "not an invented shutdown meter");
+        assertModuleReviewLinksExist(directory, guide);
+    }
+
+    @Test
+    void v32MaintainerNavigationRejectsBrokenSiblingAndCanonicalGuideLinks() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v32");
+        String guide = Files.readString(directory.resolve("MAINTAINER-GUIDANCE.md"));
+        for (String target : List.of("ARCHITECTURE-MAP.md", "ARCHITECTURE-DECISION.md",
+                "CHECKLIST.md", "../../docs/15-customizer.md", "../../docs/26-support-bundles.md")) {
+            String broken = guide.replace("(" + target + ")", "(MISSING-" + target + ")");
+            assertThat(broken).isNotEqualTo(guide);
+            assertThatThrownBy(() -> assertModuleReviewLinksExist(directory, broken))
+                    .isInstanceOf(AssertionError.class).hasMessageContaining("MISSING-");
         }
     }
 
