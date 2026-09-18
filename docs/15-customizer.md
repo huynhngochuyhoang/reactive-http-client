@@ -102,9 +102,16 @@ Cache-selected clients also require the
 [customization-safety inventory](32-response-caching.md#customization-safety),
 including applicable Boot/per-client customizers and replacement builders.
 When exchange logging uses the `headers` or `bodies` preset, the default logger
-reports this final outbound header after redaction rules are applied. Configure
-redaction for custom signature headers; a custom header name is not automatically
-recognized as a credential.
+logs the final outbound headers and redacts only the fixed
+`SensitiveHeaders.DEFAULTS` names. `X-Signature` is not in that set and will be
+logged. The configurable inbound-header deny-list affects captured inbound
+headers only; it does not configure outbound redaction.
+
+For this HMAC example, use `metadata-only` to omit headers (or disable exchange
+logging), or explicitly select a custom `HttpExchangeLogger` through the
+`@LogHttpExchange` annotation's `logger` attribute. That logger must redact
+`X-Signature` as well as the default sensitive headers before writing them.
+See [Custom logger](13-exchange-logging.md#custom-logger).
 
 ### Cache-aware execution
 

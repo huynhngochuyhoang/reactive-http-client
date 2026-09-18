@@ -645,6 +645,12 @@ class DocumentationReleaseArtifactTest {
                         "32-response-caching.md#customization-safety", "### Cache-aware execution",
                         "does not close that pool", "load-only", "append-only")
                 .doesNotContain("No extra configuration is required");
+        assertThat(customizer.replaceAll("\\s+", " "))
+                .contains("`SensitiveHeaders.DEFAULTS` names. `X-Signature` is not in that set",
+                        "it does not configure outbound redaction", "use `metadata-only` to omit headers",
+                        "explicitly select a custom `HttpExchangeLogger`",
+                        "`@LogHttpExchange` annotation's `logger` attribute")
+                .doesNotContain("Configure redaction for custom signature headers");
         String caching = Files.readString(root.resolve("docs/32-response-caching.md"));
         assertThat(caching).contains("V32-F001", "the terminal exchange function is insufficient",
                 "Do not trust a same-named replacement automatically");
