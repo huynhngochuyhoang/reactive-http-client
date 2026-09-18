@@ -242,6 +242,10 @@ Use plain Spring `@HttpExchange` or direct `WebClient` when:
 
 ## Build
 
+Maintainers: start with the [V32 reviewed architecture and extension guidance](roadmaps/v32/MAINTAINER-GUIDANCE.md)
+for contract ownership, supported extension boundaries, deferred findings and
+ordinary versus controlled test lanes. This does not select the next release.
+
 ```bash
 mvn test
 ```

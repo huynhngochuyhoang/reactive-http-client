@@ -861,10 +861,12 @@ reactive:
             catalogAuditCustomizer: SAFE
 ```
 
-`SAFE` is an explicit assertion that the complete builder mutation cannot add
-a per-caller authorization/tenant gate, change an omitted response variant, or
-alter decoded value semantics. `INCOMPATIBLE` and missing classifications reject
-selected caching. Do not label a dynamic `defaultRequest`, authorization or
+`SAFE` is an explicit assertion that the complete builder mutation does not
+bypass a required per-caller gate, introduce an unpartitioned response variant,
+or invalidate the declared decoded-value/identity contract. Required gates must
+execute in the pre-lookup probe, including on hits; a gate implemented only by
+the terminal exchange function is insufficient. `INCOMPATIBLE` and missing
+classifications reject selected caching. Do not label a dynamic `defaultRequest`, authorization or
 tenant filter, exchange-function replacement, codec/connector mutation, or
 other request/response transformation `SAFE` without accounting for its full
 effect.
@@ -874,6 +876,14 @@ on bean creation order. An already-created per-client customizer is filtered by
 `supports(clientName)`; an uninitialized lazy or factory-backed customizer is
 treated conservatively as applicable and must be classified. Startup, AOT, and
 diagnostics perform this inventory without creating the lazy bean.
+
+Known reviewed limitation in `4.4.0` and the unchanged `4.5.0-SNAPSHOT` selection
+path: context-based validation can fail to recognize the starter-managed builder
+exemption (V32-F001). Explicitly classify that builder by its actual bean name
+only after inspecting it, in addition to all applicable application mutations.
+Do not trust a same-named replacement automatically. This workaround is not a
+fix; the [maintainer guidance](../roadmaps/v32/MAINTAINER-GUIDANCE.md#deferred-and-intentional-limits)
+records the deferred decision and reconsideration trigger.
 
 The cache runtime must execute mandatory authorization, tenant, and policy
 checks at a cache-aware pre-lookup boundary for both hits and misses. Until a

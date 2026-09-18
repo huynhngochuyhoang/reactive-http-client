@@ -50,7 +50,44 @@ historical evidence.
 | Unexpected stale value, miss storm, refresh failure, or cache capacity pressure | Effective cache phase/TTL/capacity, bounded hit/miss/load/refresh/eviction rates, process instance | [Response cache behavior (4.0.0+)](#response-cache-behavior-400) |
 | Pod memory grows after enabling response caching | Published/development version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (`4.2.0`+)](#cache-memory-triage-420) |
 | Local cache-work rejection or skipped refresh (V30 / `4.3.0`+) | Selected work bounds, policy current/maximum gauges, fixed rejection/skip reasons, pre-close counter samples | [Cache-work saturation](#cache-work-saturation-v30-430) |
+| Repeated rejected construction or resources remaining across context replacement | Version, construction phase/outcome counts, bounded context ordinals, pre-close meter samples and application-owned lifecycle completion | [Construction and extension ownership](#construction-and-extension-ownership) |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
+
+## Construction and extension ownership
+
+Published `4.4.0` and the development reactor share the reviewed extension
+constraints; the [V32 maintainer guide](../roadmaps/v32/MAINTAINER-GUIDANCE.md)
+links their sources, supported alternatives and deferred findings. Record the
+actual version and creation path before diagnosing a startup or teardown failure.
+
+V32-F004 is an **unpublished** correction in `4.5.0-SNAPSHOT`: a rejected public
+handler create now releases its newly allocated cache manager and metric lease.
+It does not establish that ordinary successful clients caused the earlier pod
+memory report. For `4.4.0`, stop repeated invalid creation attempts and correct
+the inputs; do not recommend reflective cache cleanup or claim the fix is shipped.
+Spring-managed factory destruction and application-owned connector disposal are
+separate responsibilities. A manually constructed factory needs explicit destroy
+on failure too; application connectors, SDKs and executors keep their owners.
+
+Compare bounded pre/post-attempt meter registration counts in a controlled
+reproducer, not private registry-lease fields in a production support bundle.
+Record construction phase, exception class (not message), attempt/return counts,
+version, timestamps and ephemeral context ordinals. Sample cache/work counters
+on both sides of a quiet window **before close**. After the last owner closes,
+its meters are removed: absence is unavailable, not zero, and cannot provide a
+post-close terminal delta. Overlapping same-tag owners can keep aggregate meters
+alive, so also record which contexts remain open. Use separately timestamped
+application lifecycle completion for teardown, not an invented shutdown meter.
+
+An independent non-single-flight load may remain caller-owned after manager
+close until its own terminal signal; late cache publication is rejected. Cancel
+or join work owned by the application separately. Pool/direct memory, post-GC
+heap, decoded cache bytes and RSS measure different things. Follow
+[cache-memory triage](#cache-memory-triage-420) and
+[support-bundle sanitization](26-support-bundles.md) before attributing a leak.
+Do not export raw retained objects, heap dumps, request material, credential or
+identity data, cache keys/digests or arbitrary exception text. This review adds
+no new diagnostic metric or deployment-memory/mesh finding.
 
 ## Inbound header and context triage
 

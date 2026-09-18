@@ -1048,34 +1048,90 @@ maps scope to lanes, commands, compatibility distinctions and omissions.
 
 ## Priority 11 - Maintainer and Operations Guidance
 
-### [ ] 11.1 Publish the reviewed architecture and extension guidance
+### [x] 11.1 Publish the reviewed architecture and extension guidance
 
-- [ ] Link the reviewed map, scenarios, findings and decision record from one
+- [x] Link the reviewed map, scenarios, findings and decision record from one
       maintainer entry point without creating redundant sources of truth.
-- [ ] Document the supported SPI for each demonstrated need, its phase/order,
+- [x] Document the supported SPI for each demonstrated need, its phase/order,
       invocation cardinality, ownership and limits, including connector replacement.
-- [ ] Preserve public-internal distinctions, no-change rationales and deferred
+- [x] Preserve public-internal distinctions, no-change rationales and deferred
       reconsideration triggers; do not document discarded spikes as supported APIs.
 
-### [ ] 11.2 Consolidate canonical public and operations guidance
+### [x] 11.2 Consolidate canonical public and operations guidance
 
-- [ ] Correct only contradictions demonstrated by the review; align examples with
+- [x] Correct only contradictions demonstrated by the review; align examples with
       actual required dependencies, policy selection and customization constraints.
-- [ ] Distinguish published `4.4.0` behavior from any accepted candidate additions;
+- [x] Distinguish published `4.4.0` behavior from any accepted candidate additions;
       do not select a release or claim an implementation through documentation alone.
-- [ ] Tie troubleshooting to exported signals or explicitly collected bounded
+- [x] Tie troubleshooting to exported signals or explicitly collected bounded
       evidence available at the stated observation time, including shutdown.
-- [ ] Keep support artifacts structural and sanitized; exclude request material,
+- [x] Keep support artifacts structural and sanitized; exclude request material,
       credential/identity data, arbitrary error text and unverified diagnostic claims.
 
-### [ ] 11.3 Verify guidance and recorded scope
+### [x] 11.3 Verify guidance and recorded scope
 
-- [ ] Run link, archive, generated-readiness and affected example/fixture guards;
+- [x] Run link, archive, generated-readiness and affected example/fixture guards;
       record actual totals and any negative-case coverage added by the review.
-- [ ] Reconcile every reviewed area with a conclusion and every accepted change
+- [x] Reconcile every reviewed area with a conclusion and every accepted change
       with tests and guidance; unresolved questions retain named evidence needs.
-- [ ] Ensure review-only guidance does not require unavailable metrics, forced
+- [x] Ensure review-only guidance does not require unavailable metrics, forced
       publication, or a fabricated performance/memory/mesh result.
+
+Priority 11 completed (2026-09-18). [MAINTAINER-GUIDANCE.md](MAINTAINER-GUIDANCE.md)
+is the single maintainer entry point linked from the root README and roadmap
+index. It links all review records rather than duplicating their evidence,
+maps demonstrated needs to supported extensions with phase/cardinality/ownership,
+and preserves public-internal distinctions, no-change conclusions and F001-F003
+workarounds, owners and reconsideration triggers.
+
+- Canonical customizer/cache guidance now distinguishes non-cached registration
+  from cache-safety inventory, replayable pre-lookup gates from load-only exchange
+  functions, replacement-builder Boot customization and application connector
+  lifecycle. The existing cache guide remains the dependency/policy/variant
+  authority; no new example invents a default or relaxes eligibility.
+- Compatibility and operations guidance separates published `4.4.0` from the
+  unpublished F004 cleanup and F005 contributor-lane change. Startup metadata
+  and AOT selection limits remain deferred, not documented as repaired. Operations
+  uses bounded construction/lifecycle evidence, pre-close samples and same-tag
+  ownership caveats; absent post-close meters are not terminal deltas. Existing
+  sanitized bundle schemas are reused without adding request or identity material.
+- Fresh focused verification: **114 cases across six classes**, zero failures,
+  errors or skips: documentation **65**, construction/ownership **17**, invocation
+  composition **7**, component selection **10**, AOT selection **4**, customizers
+  **11**. Documentation includes links/anchors, archive/readiness generation,
+  examples and structural/private-data fixture guards. Two new tests protect the
+  scope/navigation/operations wording, including five deliberately broken sibling
+  and canonical-guide link mutations. The initial run had one overly literal
+  line-wrapping assertion failure; its log/XML remain separate from passing runs.
+- Clean starting revision `d39e4a94cb65d97c9448fd9ecd7ee21b198ef4d8` plus this
+  documentation/test patch; Oracle JDK 21.0.8, Maven 3.9.9, Java target 21 and
+  Boot 4.0.0. Central-only settings use the already populated isolated repository
+  below, not fresh published downloads. Ordinary tests run with explicit GC
+  disabled; no collection-dependent test is skipped or claimed freshly measured.
+- Commands/logs, fresh XML, source copies/patch, generated readiness and source/
+  report hashes are retained under `target/release-evidence/v32/priority11/`
+  with `SHA256SUMS`. Preserve before root clean. `git diff --check` passed.
+  No production/API/POM/coordinate or V1-V31 historical change. Prior clean-source
+  API/matrix/consumer/native evidence remains in
+  [Priority 10](COMPATIBILITY-VERIFICATION.md), not relabeled as a new run.
+  Documentation-only edits need no new native, full-reactor or benchmark lane;
+  no numerical memory/performance or mesh claim is made. Priority 12 and release
+  selection remain open.
+
+Final focused verification (from the repository root):
+
+```bash
+JAVA_HOME=/usr/lib/jvm/jdk-21.0.8-oracle-x64 \
+PATH=/usr/lib/jvm/jdk-21.0.8-oracle-x64/bin:$PATH \
+MAVEN_OPTS='-Xmx512m -XX:ActiveProcessorCount=2' \
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local=/tmp/v32-boot41-consumer.Z9m7kq/repository \
+  -pl reactive-http-client-starter -DargLine=-XX:+DisableExplicitGC \
+  -Dtest=DocumentationReleaseArtifactTest,ResourceOwnershipReviewTest,InvocationCompositionReviewTest,ComponentSelectionReviewTest,EffectiveSelectionAotReviewTest,ReactiveHttpClientCustomizerTest test
+```
+
+Use another local Maven repository if that machine-local directory is absent;
+the path records this run's dependency provenance, not a required tracked input.
 
 ## Priority 12 - Review Closure and Conditional Release Go/No-Go
 

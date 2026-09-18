@@ -13,6 +13,11 @@ Avoid calling `builder.clientConnector(...)` from a customizer unless you intend
 replace the starter-managed Reactor Netty connector. Replacing it bypasses the
 starter's configured connection pool, timeouts, compression, proxy, TLS/mTLS, and
 HTTP/2 settings for that client.
+The application owns the replacement connector's pool, executors and disposal;
+closing the starter factory does not close that pool. Configure transport retry
+and other network behavior on the replacement explicitly. The starter's
+disabled automatic transport retry applies to its own connector, not arbitrary
+application connectors.
 
 ---
 
@@ -29,11 +34,15 @@ Spring `WebClientCustomizer` beans run first when the starter creates its
 prototype `WebClient.Builder`. Optional companion modules, including
 `reactive-http-client-otel`, use that hook to add global filters such as OTel
 outbound propagation.
+If the application replaces the builder bean, it must apply any desired ordered
+Boot customizers itself; an arbitrary replacement does not inherit that work.
 
 Per-client `ReactiveHttpClientCustomizer` beans run **after** starter per-client
 filters such as correlation-ID propagation and outbound auth are registered. After
 customizers have been applied, the starter appends a final diagnostics filter that
 captures the outbound method, URL, and headers for exchange logging and observers.
+This order describes append-only customizers. A customizer that replaces or
+reorders filters must preserve the required auth, framing and observation behavior.
 
 At DEBUG level, the starter logs the applied `WebClientCustomizer` classes and the
 per-client `ReactiveHttpClientCustomizer` classes in execution order.
@@ -88,7 +97,31 @@ public class RequestSigningCustomizer implements ReactiveHttpClientCustomizer {
 }
 ```
 
-No extra configuration is required — registering the bean is sufficient. When exchange logging uses the `headers` or `bodies` preset, the default logger reports this final outbound header after redaction rules are applied.
+For a client without response caching, registering the bean is sufficient.
+Cache-selected clients also require the
+[customization-safety inventory](32-response-caching.md#customization-safety),
+including applicable Boot/per-client customizers and replacement builders.
+When exchange logging uses the `headers` or `bodies` preset, the default logger
+reports this final outbound header after redaction rules are applied. Configure
+redaction for custom signature headers; a custom header name is not automatically
+recognized as a credential.
+
+### Cache-aware execution
+
+On published `4.4.0`, a selected cache call builds a non-dispatching probe through
+the same defaults and filters before lookup, even on a warm hit. A miss then
+builds the load request, so a filter/defaultRequest callback is not guaranteed to
+run only once per logical call. Resilience retries and 401 auth replay can run
+further filter passes; native redirects do not re-enter the WebClient filters.
+Keep these callbacks safe to repeat and include response-affecting inputs in the
+selected key variants. Mandatory per-caller gates belong before lookup, not only
+in a replacement exchange function, which is load-only.
+
+Do not copy a blanket `SAFE` classification. Inspect the entire mutation and
+verify hit, miss and replay behavior, or leave caching unselected. The
+[reviewed extension scenarios](../roadmaps/v32/MAINTAINER-GUIDANCE.md#choosing-an-extension)
+record working public alternatives and the deferred starter-builder
+classification gap (F001); they do not add a new SPI or waive validation.
 
 ---
 

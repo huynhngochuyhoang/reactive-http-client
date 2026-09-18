@@ -195,6 +195,21 @@ records verified signing, packaging, publication and Central consumption.
 The [architecture proposal](../roadmaps/proposals/POST_4_4_ARCHITECTURE_REVIEW.md)
 remains the historical design input; adoption does not approve production changes.
 
+The [maintainer guidance](../roadmaps/v32/MAINTAINER-GUIDANCE.md) consolidates
+extension phase/cardinality, ownership and deferred workarounds. F004's local
+failed-handler-construction cleanup is implemented only in the unpublished
+reactor, not published `4.4.0`; F005 changes contributor test lanes only. Neither
+adds a public API, configuration property or metric.
+
+Two reviewed replacement-bean limits remain in `4.4.0` and the current snapshot:
+fresh static `MethodMetadata` built only through public setters can fail before
+returning a publisher (F002); delegate built-in parsing or use the tested public
+API-ref alternative. AOT properties selection can differ from runtime for
+initialized non-primary candidates (F003); designate the intended programmatic
+properties bean primary. These are deferred findings, not universal replacement
+or native guarantees. See the linked decision record for evidence gaps and
+reconsideration triggers; no reflective internal API workaround is supported.
+
 ### V31 additive surface freeze
 
 `RequestContext.inboundHeaderValues(ContextView, String)` returns an immutable

@@ -16,6 +16,8 @@ F001-F003 with documented workarounds. [Implementation evidence](v32/ACCEPTED-IM
 records the bounded changes. [Priority 10 evidence](v32/COMPATIBILITY-VERIFICATION.md)
 passes JVM/API/consumer/matrix/AOT checks and clean-source native compilation
 and execution; earlier failed native attempts remain recorded.
+The [maintainer entry point](v32/MAINTAINER-GUIDANCE.md) links the reviewed
+architecture, extension guidance, operating limits and current dispositions.
 Public/API/consumer/benchmark baselines are verified `4.4.0`.
 [V31 publication and closure](v31/RELEASE-DECISION.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.
