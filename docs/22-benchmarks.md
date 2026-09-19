@@ -1,7 +1,7 @@
 # Benchmarks
 
 The commands in [Commands](#commands) are authoritative for the current
-`4.5.0-SNAPSHOT` reactor and published `4.4.0` baseline. Versioned
+`4.4.1` reactor and published `4.4.0` baseline. Versioned
 scope sections preserve V12-V20 evidence and are historical unless explicitly
 identified as current.
 

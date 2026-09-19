@@ -3,10 +3,15 @@
 > **Status:** active
 > **Theme:** architecture review, practical extensibility, and justified improvements
 > **Published baseline:** `4.4.0`
-> **Development coordinate:** `4.5.0-SNAPSHOT`; no release scope selected
+> **Candidate coordinate:** `4.4.1`; patch selected, pending publication
 > **Execution:** [adopted checklist](CHECKLIST.md); F004/F005 implemented, Priority 10 verification complete
 > **Draft date:** 2026-09-14
 > **Adopted:** 2026-09-14
+
+On 2026-09-19 the maintainer selected patch `4.4.1` for the bounded F004/F005
+result. The [closure evidence](CLOSURE-EVIDENCE.md) preserves the reviewed snapshot
+provenance. Signing, publication verification and final closure remain pending;
+the original review proposal below does not supersede this dated decision.
 
 This roadmap develops the
 [post-4.4.0 architecture review proposal](../proposals/POST_4_4_ARCHITECTURE_REVIEW.md)

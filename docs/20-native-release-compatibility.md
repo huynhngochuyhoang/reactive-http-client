@@ -1,7 +1,7 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `4.5.0-SNAPSHOT`
-development line. Sections labeled V18, V19, V20, V27, or V29 preserve release-era
+Sections without a version label describe the current unpublished `4.4.1`
+patch candidate. Sections labeled V18, V19, V20, V27, or V29 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
 
@@ -180,7 +180,7 @@ commands, local signing failure and subsequent successful publication.
 
 After fresh Maven Central artifact and assembled-consumer verification, public
 consumer, strict API and benchmark baselines are published `4.4.0`.
-Reactor-only coordinates use `4.5.0-SNAPSHOT`. V1-V31 are completed release
+Reactor-only coordinates use the unpublished `4.4.1` patch candidate. V1-V31 are completed release
 records. [V32](../roadmaps/v32/ROADMAP.md) has an
 [adopted execution checklist](../roadmaps/v32/CHECKLIST.md) for architecture
 review. Its [scope decision](../roadmaps/v32/ARCHITECTURE-DECISION.md) approves
@@ -189,7 +189,8 @@ F004/F005 implementation and defers F001-F003. The
 regression evidence. [Priority 10 verification](../roadmaps/v32/COMPATIBILITY-VERIFICATION.md)
 adds full supported-Boot, strict API, consumer, JVM/AOT and clean-source native
 compile/execution results. Earlier native failures remain recorded; Priority 10
-verification is complete, while next release scope remains unselected.
+verification is complete. The [2026-09-19 patch decision](../roadmaps/v32/CLOSURE-EVIDENCE.md)
+selects `4.4.1`; signing, publication verification and final closure remain pending.
 The [V31 release review](../roadmaps/v31/RELEASE-DECISION.md#post-publication-closure)
 records verified signing, packaging, publication and Central consumption.
 The [architecture proposal](../roadmaps/proposals/POST_4_4_ARCHITECTURE_REVIEW.md)
@@ -436,7 +437,7 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `4.5.0-SNAPSHOT` development reactor compares
+from the current reactor version. The `4.4.1` candidate reactor compares
 strictly against published `4.4.0`:
 
 ```bash
@@ -927,7 +928,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=4.5.0-SNAPSHOT native:compile
+  -Dreactive-http-client.version=4.4.1 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -990,11 +991,9 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V31 is published and archived at `4.4.0`. The current reactor is
-`4.5.0-SNAPSHOT`, with active roadmap `v32`, unselected release scope and
-`plannedFinalVersion=null`. Architecture-review adoption does not select a final
-release. Generated readiness leaves future publication deferred until a release
-cut; a review-only closure may make release-only checks not applicable with a
-recorded decision. The
+`4.4.1`, with active roadmap `v32`, selected patch release scope and
+`plannedFinalVersion=4.4.1`. Generated readiness reports pending publication, not
+a signing pass or published artifact. The
 [V31 release decision](../roadmaps/v31/RELEASE-DECISION.md#post-publication-closure)
 records completed external verification separately from the conservative
 generated manual-command list. Future pending checks do not reopen V31.
@@ -1099,7 +1098,7 @@ test/runtime dependencies; its classpath must contain no Caffeine artifact. It r
 reactor `target/classes` leakage in either application and records separate mock,
 weighted/current-consumer, and cache-disabled test reports, both consumer classpaths,
 dependency trees and effective POMs, project artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-4.5.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+`target/release-evidence/current-consumer/current-4.4.1/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
 verifier status, including when any test stage fails.
 It also records the last completed stage and exit status when a later

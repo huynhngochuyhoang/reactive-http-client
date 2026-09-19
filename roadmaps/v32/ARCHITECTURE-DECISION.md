@@ -3,9 +3,9 @@
 > **Status:** F004 + F005 implemented; Priority 10 verification complete
 > **Reviewed:** 2026-09-16
 > **Source baseline:** `15d0d16bc81f92ed920679f61754e8df0e32bfd2`
-> **Published / development:** `4.4.0` / `4.5.0-SNAPSHOT`
+> **Published / candidate:** `4.4.0` / `4.4.1`
 > **Implementation scope:** V32-F004 + V32-F005
-> **Release scope:** unselected
+> **Release scope:** patch `4.4.1` selected; signing/publication and closure pending
 
 This consolidates [findings](FINDINGS.md) and the completed reviews for
 [Priority 8](CHECKLIST.md).
@@ -270,4 +270,16 @@ The [Priority 10 record](COMPATIBILITY-VERIFICATION.md) preserves fresh full
 matrix, API, consumer, controlled-JVM, AOT and clean-source native evidence,
 including earlier build failures and the successful post-restart compile/run.
 The accepted findings have completed Priority 10 verification. Priority 11
-guidance and Priority 12 release review remain open; release is unselected.
+guidance is complete. The [closure evidence inventory](CLOSURE-EVIDENCE.md)
+reconciles the reachable reviewed source, unchanged runtime inputs, verified
+bundle hashes and fresh checks. At Priority 10 completion release was unselected;
+the subsequent decision below does not waive publication-only gates.
+
+### Priority 12 Release Decision
+
+The preceding Priority 8 decision and evidence retain their historical scope.
+On 2026-09-19 the maintainer approved: "Prepare patch 4.4.1 (recommended); keep
+publication and final closure pending signing/publication verification."
+The [closure inventory](CLOSURE-EVIDENCE.md) records the dated decision, evidence
+reuse and pending release gates. This selects a patch, not an additive minor,
+breaking change, signing pass or published version. F001-F003 remain deferred.

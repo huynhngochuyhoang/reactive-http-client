@@ -1,9 +1,9 @@
 # V32 Maintainer and Operations Guidance
 
 > **Reviewed:** 2026-09-18
-> **Published / development:** `4.4.0` / `4.5.0-SNAPSHOT`
+> **Published / candidate:** `4.4.0` / `4.4.1`
 > **Implementation scope:** V32-F004 + V32-F005 only
-> **Release scope:** unselected
+> **Release scope:** patch `4.4.1` selected; signing/publication and closure pending
 
 Start here when changing or extending the reviewed starter. This is a navigation
 and usage guide, not another policy authority or a release decision. Earlier
@@ -11,6 +11,8 @@ review records retain their dated as-is observations; use the implementation and
 verification records below for subsequent corrections. Published `4.4.0` does
 not contain the F004 failed-construction fix or F005 contributor-lane changes.
 Neither requires an application API/configuration migration.
+The [2026-09-19 decision](CLOSURE-EVIDENCE.md) selects the unpublished patch;
+it does not change the version boundary or waive final publication checks.
 
 ## Review Navigation
 

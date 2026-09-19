@@ -2,9 +2,9 @@
 
 > **Status:** active
 > **Published baseline:** `4.4.0`
-> **Development coordinate:** `4.5.0-SNAPSHOT`
+> **Candidate coordinate:** `4.4.1`; unpublished
 > **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification complete
-> **Release scope:** unselected; review-only completion is valid
+> **Release scope:** patch `4.4.1` selected; signing/publication and closure pending
 > **Adopted:** 2026-09-14
 
 Execution companion to [`ROADMAP.md`](ROADMAP.md), developed from the
@@ -52,8 +52,8 @@ urgency does not silently authorize unrelated architectural changes.
 | Priority 11 | Publish evidence-backed guidance, including intentional limitations and no-change decisions |
 | Priority 12 | Close review-only without requiring a release, or complete the separately selected release path |
 
-The published/API/consumer/benchmark baseline stays `4.4.0`. Keep the development
-coordinate `4.5.0-SNAPSHOT` until a recorded release-cut decision. An active
+The published/API/consumer/benchmark baseline stays `4.4.0`. The 2026-09-19
+decision selects candidate `4.4.1`, replacing `4.5.0-SNAPSHOT`. An active
 architecture review does not select implementation scope or a planned final
 version. Do not relax validation, add public SPIs, split modules, change defaults
 or swap dependencies merely to satisfy a review item.
@@ -76,8 +76,9 @@ or swap dependencies merely to satisfy a review item.
 ## Review Records
 
 The baseline, review maps, scenarios, findings and approved decision now exist.
-The decision selects F004/F005 work, not delivered fixes or a release. Keep
-detailed matrices in these records unless their size justifies a separate file.
+F004/F005 are implemented and verified; the separate Priority 12 decision selects
+patch `4.4.1` with publication pending. Keep detailed matrices in these records
+unless their size justifies a separate file.
 
 | Record | Contents |
 |---|---|
@@ -89,9 +90,10 @@ detailed matrices in these records unless their size justifies a separate file.
 | [RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) | Resource/terminal and nested-lock matrices, partial construction, external owners and retention limits |
 | [MODULE-EVIDENCE-BOUNDARIES.md](MODULE-EVIDENCE-BOUNDARIES.md) | Mock/optional integration and creation matrices, native triggers, fixture/provenance gaps and test-environment limits |
 | [FINDINGS.md](FINDINGS.md) | Four production gaps and one test-evidence gap; F004/F005 accepted, F001-F003 deferred with workarounds and triggers |
-| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; Priority 10 verified, release unselected |
+| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; Priority 10 verified, patch `4.4.1` selected pending publication |
 | [COMPATIBILITY-VERIFICATION.md](COMPATIBILITY-VERIFICATION.md) | Completed Priority 10 correctness/API/consumer/AOT/native evidence, including retained failed native attempts |
 | [ACCEPTED-IMPROVEMENTS.md](ACCEPTED-IMPROVEMENTS.md) | F004 construction rollback, F005 preserved scenario inventory and controlled lane, focused evidence and remaining verification |
+| [CLOSURE-EVIDENCE.md](CLOSURE-EVIDENCE.md) | Reachable-source and sealed-bundle inventory, unsigned patch-candidate verification and pending signing/publication gates |
 
 ---
 
@@ -1135,27 +1137,51 @@ the path records this run's dependency provenance, not a required tracked input.
 
 ## Priority 12 - Review Closure and Conditional Release Go/No-Go
 
-### [ ] 12.1 Assemble the architecture decision evidence
+### [x] 12.1 Assemble the architecture decision evidence
 
-- [ ] Assemble reachable reviewed source, maps, scenarios, ranked findings,
+- [x] Assemble reachable reviewed source, maps, scenarios, ranked findings,
       dispositions, selected-item results and unresolved risks in the decision record.
-- [ ] Check all accepted blocking items are resolved or explicitly removed from
+- [x] Check all accepted blocking items are resolved or explicitly removed from
       scope with a maintainer decision; deferred is not implemented.
-- [ ] Retain source/report/toolchain hashes, actual counts, clean/dirty state and
+- [x] Retain source/report/toolchain hashes, actual counts, clean/dirty state and
       original failures in an inventory that can be verified from reviewed history.
-- [ ] Re-run affected checks after final edits; preserve reused historical/native/
+- [x] Re-run affected checks after final edits; preserve reused historical/native/
       performance provenance without relabeling it as a final-source run.
 
-### [ ] 12.2 Select review-only or release scope
+[CLOSURE-EVIDENCE.md](CLOSURE-EVIDENCE.md) records the source/evidence inventory
+and the selected patch release. On 2026-09-19, the unsigned `4.4.1` reactor passed
+**1,932 cases** (starter 1,792, mock helper 78, OTel 62), with zero failures,
+errors or skips. Binary/source/Javadoc generation packaging passed. Fresh-repository
+assembled consumption passed **105 cases** (mock 74, Boot 4 consumer 28, minimal
+consumer 3), including classpath isolation and optional-integration guards.
+Candidate source is a recorded dirty patch over clean `de3c1c9`; the earlier
+native/API/matrix evidence retains its original clean source and hashes.
+The final affected-check rerun passed **123 cases** across seven classes
+(documentation 67, ownership 17, composition 7, component selection 10, AOT
+selection 4, customizers 11, logger 7), with explicit GC disabled and zero
+failures/errors/skips. Reports, commands, candidate artifacts, readiness,
+reviewed-source archive, patch and hashes are retained in
+`target/release-evidence/v32/priority12/`. No signing or deployment was attempted.
+12.3-12.4 remain pending signing/publication, not waived by assembling evidence.
 
-- [ ] Record a dated review-only/documentation-only, patch, additive minor or no-go
+### [x] 12.2 Select review-only or release scope
+
+- [x] Record a dated review-only/documentation-only, patch, additive minor or no-go
       decision based on actual work; the snapshot coordinate selects no release.
-- [ ] For review-only/no publication, state why a release is unnecessary, retain
+- [x] **Not applicable: patch release selected.** For review-only/no publication, state why a release is unnecessary, retain
       the `4.4.0` baseline, and mark publication-only gates not applicable explicitly.
-- [ ] If a release is justified, choose and align final coordinates, supported
+- [x] If a release is justified, choose and align final coordinates, supported
       surface, canonical guidance, changelog and readiness before release evidence.
-- [ ] Require a separate major-version/migration decision for breaking work. Do
+- [x] **No breaking work selected.** Require a separate major-version/migration decision for breaking work. Do
       not silently ship it as an architecture cleanup or automatically select `4.5.0`.
+
+The maintainer explicitly approved patch `4.4.1` on 2026-09-19, with signing,
+publication verification and final closure pending. The
+[dated decision](CLOSURE-EVIDENCE.md#remaining-decision-and-publication-gates)
+limits scope to F004/F005. Reactor modules, consumer/native fixtures, current
+commands, matrix guard, changelog and generated readiness use the candidate;
+published/API/consumer/benchmark baselines remain `4.4.0`. Historical snapshot
+commands and native hashes remain attached to their original source.
 
 ### [ ] 12.3 Complete the selected publication or no-publication path
 
