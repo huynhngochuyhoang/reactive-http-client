@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.4.1] - Unreleased
+## [4.4.1] - 2026-09-19
 
-- **`4.4.1` patch candidate (pending publication).** Bounded V32
+- **`4.4.1` published patch release.** Bounded V32
   failed-construction cleanup and contributor test-lane correction. No public
   API, dependency, policy/default or request-path change; no performance or
-  deployment-memory claim. Signing, publication and final closure remain pending.
-  See the [V32 closure evidence and decision](roadmaps/v32/CLOSURE-EVIDENCE.md).
+  deployment-memory claim. Signed publication, fresh Central artifacts and
+  assembled consumption are verified; V32 is closed.
+  See the [V32 closure evidence and decision](roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure).
 
 ### Fixed
 - Close a newly allocated response-cache manager when public invocation-handler

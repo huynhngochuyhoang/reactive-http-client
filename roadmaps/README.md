@@ -8,32 +8,27 @@ branch after a go decision, or an item explicitly labeled deferred/superseded,
 is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
-`CHECKLIST.md`. V1-V31 are completed release records. V31 was released as `4.4.0`.
-V32 is the active architecture-review execution roadmap. The reactor is
-the unpublished `4.4.1` patch candidate; F004/F005 are implemented with broader verification.
-The [release decision](v32/CLOSURE-EVIDENCE.md) selects the patch while keeping
-signing, publication and final closure pending. The [scope decision](v32/ARCHITECTURE-DECISION.md) defers
-F001-F003 with documented workarounds. [Implementation evidence](v32/ACCEPTED-IMPROVEMENTS.md)
-records the bounded changes. [Priority 10 evidence](v32/COMPATIBILITY-VERIFICATION.md)
-passes JVM/API/consumer/matrix/AOT checks and clean-source native compilation
-and execution; earlier failed native attempts remain recorded.
-The [maintainer entry point](v32/MAINTAINER-GUIDANCE.md) links the reviewed
-architecture, extension guidance, operating limits and current dispositions.
-Public/API/consumer/benchmark baselines are verified `4.4.0`.
-[V31 publication and closure](v31/RELEASE-DECISION.md#post-publication-closure)
+`CHECKLIST.md`. V1-V32 are completed release records. V32 was released as `4.4.1`.
+No V33 execution roadmap is active. The reactor is `4.5.0-SNAPSHOT`, with no
+implementation or next release scope selected. Public/API/consumer/benchmark
+baselines are verified `4.4.1`.
+
+[V32 publication and closure](v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.
+F004/F005 are implemented; F001-F003 remain deferred with documented workarounds.
+[Priority 10 evidence](v32/COMPATIBILITY-VERIFICATION.md) retains original
+JVM/API/consumer/matrix/AOT/native results and failures. The
+[maintainer entry point](v32/MAINTAINER-GUIDANCE.md) links the reviewed architecture,
+extension guidance and operating limits. No new memory or performance claim is made.
 
 Deferred design work that is not part of an active execution roadmap is kept
 under [`proposals/`](proposals/). These proposals do not add release gates until
 they are deliberately adopted by a future roadmap.
 
-[V32](v32/ROADMAP.md) and its [execution checklist](v32/CHECKLIST.md) develop the
-[post-4.4.0 architecture review proposal](proposals/POST_4_4_ARCHITECTURE_REVIEW.md),
-covering missing contracts, practical extension constraints, and evidence-backed
-improvements. Adoption starts the review, not production changes or release
-selection; Priority 8 requires an explicit maintainer scope decision. Review-only
-completion is valid. The original proposal remains historical design input, and
-V32 adds no `4.4.0` release gate.
+[V32](v32/ROADMAP.md) and its [completed checklist](v32/CHECKLIST.md) adopted the
+[post-4.4.0 architecture review proposal](proposals/POST_4_4_ARCHITECTURE_REVIEW.md).
+The proposal remains historical design input; deferred findings do not
+automatically create another execution roadmap or reopen V32.
 
 | Version | Roadmap | Checklist | Archive status |
 |---|---|---|---|
@@ -68,4 +63,4 @@ V32 adds no `4.4.0` release gate.
 | V29 | [Roadmap](v29/ROADMAP.md) | [Checklist](v29/CHECKLIST.md) | Completed and released as `4.2.0` |
 | V30 | [Roadmap](v30/ROADMAP.md) | [Checklist](v30/CHECKLIST.md) | Completed and released as `4.3.0` |
 | V31 | [Roadmap](v31/ROADMAP.md) | [Checklist](v31/CHECKLIST.md) | Completed and released as `4.4.0` |
-| V32 | [Roadmap](v32/ROADMAP.md) | [Checklist](v32/CHECKLIST.md) | Active |
+| V32 | [Roadmap](v32/ROADMAP.md) | [Checklist](v32/CHECKLIST.md) | Completed and released as `4.4.1` |

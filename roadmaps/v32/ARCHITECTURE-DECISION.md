@@ -3,9 +3,9 @@
 > **Status:** F004 + F005 implemented; Priority 10 verification complete
 > **Reviewed:** 2026-09-16
 > **Source baseline:** `15d0d16bc81f92ed920679f61754e8df0e32bfd2`
-> **Published / candidate:** `4.4.0` / `4.4.1`
+> **Published / development:** `4.4.1` / `4.5.0-SNAPSHOT`
 > **Implementation scope:** V32-F004 + V32-F005
-> **Release scope:** patch `4.4.1` selected; signing/publication and closure pending
+> **Release scope:** patch `4.4.1` published; V32 closed
 
 This consolidates [findings](FINDINGS.md) and the completed reviews for
 [Priority 8](CHECKLIST.md).
@@ -283,3 +283,11 @@ publication and final closure pending signing/publication verification."
 The [closure inventory](CLOSURE-EVIDENCE.md) records the dated decision, evidence
 reuse and pending release gates. This selects a patch, not an additive minor,
 breaking change, signing pass or published version. F001-F003 remain deferred.
+
+### Post-Publication Disposition
+
+The [2026-09-19 closure](CLOSURE-EVIDENCE.md#post-publication-closure) verifies
+signed publication of `4.4.1` and fresh Central consumption. The accepted
+F004/F005 scope is complete; F001-F003 remain deferred with the owners,
+workarounds and triggers recorded above. No additional finding or release is
+selected. V1-V31 and the dated pre-release observations remain unchanged.

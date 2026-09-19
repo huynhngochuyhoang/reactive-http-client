@@ -7,7 +7,7 @@ logs, or application metrics.
 
 ## Current release scope
 
-Current consumer instructions apply to published starter `4.4.0` on Spring Boot
+Current consumer instructions apply to published starter `4.4.1` on Spring Boot
 4. The repository may contain a newer snapshot while the next release is being
 prepared. Use the published coordinates from the [Quick Start](01-quick-start.md)
 for applications and reserve snapshot commands for the explicitly labeled
@@ -55,12 +55,12 @@ historical evidence.
 
 ## Construction and extension ownership
 
-Published `4.4.0` and the development reactor share the reviewed extension
+Published `4.4.1` and the development reactor share the reviewed extension
 constraints; the [V32 maintainer guide](../roadmaps/v32/MAINTAINER-GUIDANCE.md)
 links their sources, supported alternatives and deferred findings. Record the
 actual version and creation path before diagnosing a startup or teardown failure.
 
-V32-F004 is an **unpublished** correction in `4.4.1`: a rejected public
+V32-F004 is a **published** correction in `4.4.1`: a rejected public
 handler create now releases its newly allocated cache manager and metric lease.
 It does not establish that ordinary successful clients caused the earlier pod
 memory report. For `4.4.0`, stop repeated invalid creation attempts and correct

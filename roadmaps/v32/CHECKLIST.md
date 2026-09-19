@@ -1,10 +1,10 @@
 # Reactive HTTP Client - Roadmap V32 Execution Checklist
 
-> **Status:** active
-> **Published baseline:** `4.4.0`
-> **Candidate coordinate:** `4.4.1`; unpublished
+> **Status:** completed and released as `4.4.1`
+> **Published baseline:** `4.4.1` (review started from `4.4.0`)
+> **Development coordinate:** `4.5.0-SNAPSHOT`; no next release selected
 > **Implementation scope:** V32-F004 + V32-F005 implemented; Priority 10 verification complete
-> **Release scope:** patch `4.4.1` selected; signing/publication and closure pending
+> **Release scope:** patch `4.4.1` published; V32 closed
 > **Adopted:** 2026-09-14
 
 Execution companion to [`ROADMAP.md`](ROADMAP.md), developed from the
@@ -52,8 +52,9 @@ urgency does not silently authorize unrelated architectural changes.
 | Priority 11 | Publish evidence-backed guidance, including intentional limitations and no-change decisions |
 | Priority 12 | Close review-only without requiring a release, or complete the separately selected release path |
 
-The published/API/consumer/benchmark baseline stays `4.4.0`. The 2026-09-19
-decision selects candidate `4.4.1`, replacing `4.5.0-SNAPSHOT`. An active
+The review retained the `4.4.0` published/API/consumer/benchmark baseline until
+2026-09-19 publication checks passed. Closure advances those baselines to `4.4.1`
+and restores `4.5.0-SNAPSHOT` for unselected future development. An active
 architecture review does not select implementation scope or a planned final
 version. Do not relax validation, add public SPIs, split modules, change defaults
 or swap dependencies merely to satisfy a review item.
@@ -77,7 +78,7 @@ or swap dependencies merely to satisfy a review item.
 
 The baseline, review maps, scenarios, findings and approved decision now exist.
 F004/F005 are implemented and verified; the separate Priority 12 decision selects
-patch `4.4.1` with publication pending. Keep detailed matrices in these records
+published patch `4.4.1` and closes V32. Keep detailed matrices in these records
 unless their size justifies a separate file.
 
 | Record | Contents |
@@ -90,10 +91,10 @@ unless their size justifies a separate file.
 | [RESOURCE-OWNERSHIP.md](RESOURCE-OWNERSHIP.md) | Resource/terminal and nested-lock matrices, partial construction, external owners and retention limits |
 | [MODULE-EVIDENCE-BOUNDARIES.md](MODULE-EVIDENCE-BOUNDARIES.md) | Mock/optional integration and creation matrices, native triggers, fixture/provenance gaps and test-environment limits |
 | [FINDINGS.md](FINDINGS.md) | Four production gaps and one test-evidence gap; F004/F005 accepted, F001-F003 deferred with workarounds and triggers |
-| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; Priority 10 verified, patch `4.4.1` selected pending publication |
+| [ARCHITECTURE-DECISION.md](ARCHITECTURE-DECISION.md) | Approved F004/F005 scope, alternatives, bounded acceptance/verification and rollback; Priority 10 verified, patch `4.4.1` published and V32 closed |
 | [COMPATIBILITY-VERIFICATION.md](COMPATIBILITY-VERIFICATION.md) | Completed Priority 10 correctness/API/consumer/AOT/native evidence, including retained failed native attempts |
 | [ACCEPTED-IMPROVEMENTS.md](ACCEPTED-IMPROVEMENTS.md) | F004 construction rollback, F005 preserved scenario inventory and controlled lane, focused evidence and remaining verification |
-| [CLOSURE-EVIDENCE.md](CLOSURE-EVIDENCE.md) | Reachable-source and sealed-bundle inventory, unsigned patch-candidate verification and pending signing/publication gates |
+| [CLOSURE-EVIDENCE.md](CLOSURE-EVIDENCE.md) | Reachable-source and sealed-bundle inventory, original candidate verification and verified publication/closure |
 
 ---
 
@@ -1162,7 +1163,9 @@ selection 4, customizers 11, logger 7), with explicit GC disabled and zero
 failures/errors/skips. Reports, commands, candidate artifacts, readiness,
 reviewed-source archive, patch and hashes are retained in
 `target/release-evidence/v32/priority12/`. No signing or deployment was attempted.
-12.3-12.4 remain pending signing/publication, not waived by assembling evidence.
+At that preparation checkpoint, 12.3-12.4 remained pending. The subsequent
+[post-publication closure](CLOSURE-EVIDENCE.md#post-publication-closure) below
+supersedes only the pending state, not the original evidence provenance.
 
 ### [x] 12.2 Select review-only or release scope
 
@@ -1175,48 +1178,71 @@ reviewed-source archive, patch and hashes are retained in
 - [x] **No breaking work selected.** Require a separate major-version/migration decision for breaking work. Do
       not silently ship it as an architecture cleanup or automatically select `4.5.0`.
 
-The maintainer explicitly approved patch `4.4.1` on 2026-09-19, with signing,
-publication verification and final closure pending. The
+**Preparation checkpoint:** the maintainer explicitly approved patch `4.4.1`
+on 2026-09-19, with signing, publication verification and final closure pending. The
 [dated decision](CLOSURE-EVIDENCE.md#remaining-decision-and-publication-gates)
-limits scope to F004/F005. Reactor modules, consumer/native fixtures, current
-commands, matrix guard, changelog and generated readiness use the candidate;
-published/API/consumer/benchmark baselines remain `4.4.0`. Historical snapshot
+limits scope to F004/F005. At selection, reactor modules, consumer/native fixtures,
+commands, matrix guard, changelog and generated readiness used the candidate;
+published/API/consumer/benchmark baselines remained `4.4.0`. Historical snapshot
 commands and native hashes remain attached to their original source.
 
-### [ ] 12.3 Complete the selected publication or no-publication path
+### [x] 12.3 Complete the selected publication or no-publication path
 
-- [ ] On release go, verify the reviewed clean final commit/tag, signed artifacts,
+- [x] On release go, verify the reviewed clean final commit/tag, signed artifacts,
       staged assembled consumption and generation packaging before deployment.
-- [ ] Preserve signing/publication evidence; a scope GO or unsigned local build
+- [x] Preserve signing/publication evidence; a scope GO or unsigned local build
       is not a signing pass. Keep credentials and passphrases out of artifacts.
-- [ ] After publication, verify all release attachments and an assembled consumer
+- [x] After publication, verify all release attachments and an assembled consumer
       from fresh Central-only repositories before advancing public/API/consumer/
       benchmark baselines or the next development coordinate.
-- [ ] On no-publication, record publication checks as not applicable with the
-      12.2 decision; do not fabricate a published version to close the review.
+- [x] **No-publication branch not applicable:** patch `4.4.1` was published;
+      the release path below is verified, not waived.
 
-### [ ] 12.4 Archive V32 with a truthful disposition
+### [x] 12.4 Archive V32 with a truthful disposition
 
-- [ ] Close the accepted review scope with evidence for each area and explicit
+- [x] Close the accepted review scope with evidence for each area and explicit
       dispositions for unresolved/deferred work and conditional checks.
-- [ ] Align roadmap, checklist, index, archive guards and generated readiness with
+- [x] Align roadmap, checklist, index, archive guards and generated readiness with
       the chosen review/release result; future manual release tasks do not reopen it.
-- [ ] Keep V1-V31 evidence unchanged and any future proposal unselected until
+- [x] Keep V1-V31 evidence unchanged and any future proposal unselected until
       separately adopted; record next-work suggestions without adding closure gates.
-- [ ] Confirm no unimplemented public contract, unrun required check or unsupported
+- [x] Confirm no unimplemented public contract, unrun required check or unsupported
       memory/performance/mesh claim is represented as shipped or verified.
+
+**Completion, 2026-09-19:** published tag `v4.4.1` resolves to
+`0e3667c1407b5a481ce1f020a3bf4747fdad5b48`, whose tree matches the reviewed clean
+local commit `95774391cbb3545eb5b11fd3d116ebb2f3ca8e3e`. Release workflow
+`35434570822` passed reactor verification, signed build, staged signature/consumer
+checks, generation packaging and deployment. Fresh Central-only repositories
+verified all **13 release artifacts**, their signatures/checksums and **four**
+baseline consumer cases; the full-profile published-consumer run passed **28**
+cases with zero failures/errors/skips. No local signing or redeployment occurred.
+
+[CLOSURE-EVIDENCE.md#post-publication-closure](CLOSURE-EVIDENCE.md#post-publication-closure)
+records public run/tag provenance, signed-artifact checks, raw report locations and
+archive validation. V32 closes with F004/F005 implemented and F001-F003 deferred,
+not fixed. Public/API/consumer/benchmark baselines are `4.4.1`; the reactor is
+`4.5.0-SNAPSHOT`, with no active roadmap or selected next release. Future generated
+manual tasks do not reopen V32. V1-V31 and original native/memory/performance
+evidence remain unchanged.
+
+Archive verification passed 1,932 reactor cases, strict root and independent
+starter binary/source API lanes against `4.4.1`, generation packaging and the
+67-case documentation guards. Original failed archive assertions and the corrected
+results are retained in `target/release-evidence/v32/priority12-publication/`.
+No production Java, dependency versions or historical roadmap evidence changed.
 
 ## Completion Criteria
 
-- [ ] All reviewed modules and paths have source-linked architecture/owner maps,
+- [x] All reviewed modules and paths have source-linked architecture/owner maps,
       evidence and a disposition, including legitimate lifecycle differences.
-- [ ] External-consumer scenarios distinguish supported usage, intentional limits
+- [x] External-consumer scenarios distinguish supported usage, intentional limits
       and proven gaps without relaxing safety restrictions to make tests pass.
-- [ ] Findings have concrete user impact, alternatives and evidence; accepted
+- [x] Findings have concrete user impact, alternatives and evidence; accepted
       production work has an explicit maintainer decision and passing verification.
-- [ ] Review-only remains a valid completed outcome; conditional work carries
+- [x] Review-only remains a valid completed outcome; conditional work carries
       explicit not-applicable reasons rather than invented implementation evidence.
-- [ ] Public/operations guidance matches delivered behavior and available signals;
+- [x] Public/operations guidance matches delivered behavior and available signals;
       privacy, optional integrations and compatibility remain intact.
-- [ ] The dated review/release disposition and matching archive path are complete,
+- [x] The dated review/release disposition and matching archive path are complete,
       with publication claimed only after the corresponding verification.

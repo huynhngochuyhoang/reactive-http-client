@@ -213,9 +213,9 @@ implicitly accepted consequence of the major version.
 ## Release state
 
 - Released major: `4.0.0` from tag `v4.0.0`.
-- Latest published and API baseline: `4.4.0`.
-- Public README and quick-start coordinates: `4.4.0`.
-- Current candidate: `4.4.1`; patch selected, pending publication.
+- Latest published and API baseline: `4.4.1`.
+- Public README and quick-start coordinates: `4.4.1`.
+- Current development: `4.5.0-SNAPSHOT`; no next release scope selected.
 
 ## Post-`4.1.0` cache compatibility
 
