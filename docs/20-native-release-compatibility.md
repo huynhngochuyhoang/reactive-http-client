@@ -180,8 +180,9 @@ commands, local signing failure and subsequent successful publication.
 
 Fresh Maven Central artifact and assembled-consumer verification establish
 published `4.4.1` as the public, strict API and benchmark baseline. Reactor-only
-coordinates are `4.5.0-SNAPSHOT`; no active roadmap or next release scope is
-selected. V1-V32 are completed release records.
+coordinates are `4.5.0-SNAPSHOT`. [V33](../roadmaps/v33/CHECKLIST.md) is active
+for baseline and characterization work; implementation and next release scope
+remain unselected. V1-V32 are completed release records.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records the release tag, successful signing/staging/packaging/deployment workflow,
 13 verified signed Central artifacts and published-consumer results.
@@ -988,8 +989,9 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V32 is published and archived at `4.4.1`. The current reactor is
-`4.5.0-SNAPSHOT`, with no active roadmap, unselected release scope and
-`plannedFinalVersion=null`. The
+`4.5.0-SNAPSHOT`, with `activeRoadmap=v33`, unselected release scope and
+`plannedFinalVersion=null`. V33 stays active through a release cut until its
+checklist is closed; a version suffix does not decide roadmap lifecycle. The
 [V32 closure record](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records verified signing and publication separately from the conservative
 generated manual-command list. Future pending checks do not reopen V32.

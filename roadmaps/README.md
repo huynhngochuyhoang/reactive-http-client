@@ -9,9 +9,14 @@ is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V32 are completed release records. V32 was released as `4.4.1`.
-No V33 execution roadmap is active. The reactor is `4.5.0-SNAPSHOT`, with no
+V33 is the active execution roadmap. The reactor is `4.5.0-SNAPSHOT`, with no
 implementation or next release scope selected. Public/API/consumer/benchmark
 baselines are verified `4.4.1`.
+
+[V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
+supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.
+Adoption starts baseline and characterization work, not production fixes or a
+release. Priority 2.3 requires an explicit maintainer scope decision.
 
 [V32 publication and closure](v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.
@@ -64,3 +69,4 @@ automatically create another execution roadmap or reopen V32.
 | V30 | [Roadmap](v30/ROADMAP.md) | [Checklist](v30/CHECKLIST.md) | Completed and released as `4.3.0` |
 | V31 | [Roadmap](v31/ROADMAP.md) | [Checklist](v31/CHECKLIST.md) | Completed and released as `4.4.0` |
 | V32 | [Roadmap](v32/ROADMAP.md) | [Checklist](v32/CHECKLIST.md) | Completed and released as `4.4.1` |
+| V33 | [Roadmap](v33/ROADMAP.md) | [Checklist](v33/CHECKLIST.md) | Active |
