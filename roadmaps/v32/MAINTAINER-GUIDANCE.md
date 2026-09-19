@@ -1,9 +1,9 @@
 # V32 Maintainer and Operations Guidance
 
 > **Reviewed:** 2026-09-18
-> **Published / candidate:** `4.4.0` / `4.4.1`
+> **Published / development:** `4.4.1` / `4.5.0-SNAPSHOT`
 > **Implementation scope:** V32-F004 + V32-F005 only
-> **Release scope:** patch `4.4.1` selected; signing/publication and closure pending
+> **Release scope:** patch `4.4.1` published; V32 closed
 
 Start here when changing or extending the reviewed starter. This is a navigation
 and usage guide, not another policy authority or a release decision. Earlier
@@ -11,8 +11,8 @@ review records retain their dated as-is observations; use the implementation and
 verification records below for subsequent corrections. Published `4.4.0` does
 not contain the F004 failed-construction fix or F005 contributor-lane changes.
 Neither requires an application API/configuration migration.
-The [2026-09-19 decision](CLOSURE-EVIDENCE.md) selects the unpublished patch;
-it does not change the version boundary or waive final publication checks.
+The [2026-09-19 closure](CLOSURE-EVIDENCE.md#post-publication-closure) verifies
+publication of the patch. Deferred findings remain outside its scope.
 
 ## Review Navigation
 
@@ -93,7 +93,7 @@ Discarded alternatives in the decision record are not supported APIs.
 
 ## Construction and Shutdown
 
-**Unpublished F004 correction:** public handler create closes its newly allocated
+**Published F004 correction (4.4.1):** public handler create closes its newly allocated
 manager if later handler construction throws, preserves the original exception,
 and suppresses cleanup failure on it. Success transfers ownership unchanged;
 borrowed WebClient/auth/registry and other same-tag owners remain usable. This is
@@ -103,7 +103,7 @@ Use normal Spring factory lifecycle where possible. A caller manually creating a
 factory must destroy it on failure as well as normal teardown. Successful
 low-level handler creation is not an AutoCloseable client API; prefer the
 Spring-managed factory or the closeable mock helper for cache lifecycle ownership.
-The unpublished guard only handles failure before a handler is returned.
+The 4.4.1 guard only handles failure before a handler is returned.
 In published `4.4.0`, avoid retry
 loops around rejected cache-selected public handler creation; reproduce and fix
 the invalid construction inputs rather than trying reflective cache cleanup.

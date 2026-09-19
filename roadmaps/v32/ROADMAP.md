@@ -1,17 +1,18 @@
 # Reactive HTTP Client - Roadmap V32
 
-> **Status:** active
+> **Status:** completed and released as `4.4.1`
 > **Theme:** architecture review, practical extensibility, and justified improvements
 > **Published baseline:** `4.4.0`
-> **Candidate coordinate:** `4.4.1`; patch selected, pending publication
-> **Execution:** [adopted checklist](CHECKLIST.md); F004/F005 implemented, Priority 10 verification complete
+> **Released:** `4.4.1` on 2026-09-19
+> **Execution:** [completed checklist](CHECKLIST.md); F004/F005 delivered, F001-F003 deferred
 > **Draft date:** 2026-09-14
 > **Adopted:** 2026-09-14
 
 On 2026-09-19 the maintainer selected patch `4.4.1` for the bounded F004/F005
 result. The [closure evidence](CLOSURE-EVIDENCE.md) preserves the reviewed snapshot
-provenance. Signing, publication verification and final closure remain pending;
-the original review proposal below does not supersede this dated decision.
+provenance. [Post-publication closure](CLOSURE-EVIDENCE.md#post-publication-closure)
+verifies the signed release and Central consumption. V32 is closed; the original
+review proposal and its acceptance boxes below remain historical, not open work.
 
 This roadmap develops the
 [post-4.4.0 architecture review proposal](../proposals/POST_4_4_ARCHITECTURE_REVIEW.md)
