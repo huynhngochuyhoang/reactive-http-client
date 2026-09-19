@@ -877,7 +877,7 @@ on bean creation order. An already-created per-client customizer is filtered by
 treated conservatively as applicable and must be classified. Startup, AOT, and
 diagnostics perform this inventory without creating the lazy bean.
 
-Known reviewed limitation in `4.4.0` and the unchanged `4.5.0-SNAPSHOT` selection
+Known reviewed limitation in `4.4.0` and the unchanged `4.4.1` selection
 path: context-based validation can fail to recognize the starter-managed builder
 exemption (V32-F001). Explicitly classify that builder by its actual bean name
 only after inspecting it, in addition to all applicable application mutations.

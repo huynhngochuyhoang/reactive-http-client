@@ -60,7 +60,7 @@ constraints; the [V32 maintainer guide](../roadmaps/v32/MAINTAINER-GUIDANCE.md)
 links their sources, supported alternatives and deferred findings. Record the
 actual version and creation path before diagnosing a startup or teardown failure.
 
-V32-F004 is an **unpublished** correction in `4.5.0-SNAPSHOT`: a rejected public
+V32-F004 is an **unpublished** correction in `4.4.1`: a rejected public
 handler create now releases its newly allocated cache manager and metric lease.
 It does not establish that ordinary successful clients caused the earlier pod
 memory report. For `4.4.0`, stop repeated invalid creation attempts and correct

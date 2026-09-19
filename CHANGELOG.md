@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.1] - Unreleased
+
+- **`4.4.1` patch candidate (pending publication).** Bounded V32
+  failed-construction cleanup and contributor test-lane correction. No public
+  API, dependency, policy/default or request-path change; no performance or
+  deployment-memory claim. Signing, publication and final closure remain pending.
+  See the [V32 closure evidence and decision](roadmaps/v32/CLOSURE-EVIDENCE.md).
+
 ### Fixed
 - Close a newly allocated response-cache manager when public invocation-handler
   construction fails, preserving the original failure and other live owners.
@@ -1898,7 +1906,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.4.0...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.4.1...HEAD
+[4.4.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.4.0...v4.4.1
 [4.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...v4.3.0
 [4.2.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.1.0...v4.2.0
