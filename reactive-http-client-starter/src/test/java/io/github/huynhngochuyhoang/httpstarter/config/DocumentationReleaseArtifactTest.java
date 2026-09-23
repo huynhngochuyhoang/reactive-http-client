@@ -175,13 +175,76 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
         assertThat(checklist)
-                .contains("> **Implementation scope:** unselected; Priority 2.3 approval required",
+                .contains("> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; corrections pending",
                         "> **Release scope:** unselected", "V32-F001", "V32-F002", "V32-F003",
                         "target/release-evidence/v33/priority<N>/")
                 .containsPattern("(?m)^### \\[[ x]\\] 2\\.3 Record the maintainer scope decision$")
                 .containsPattern("(?m)^### \\[[ x]\\] 10\\.4 Verify publication or no-release closure$");
         assertThat(roadmap).doesNotContain("not adopted for execution",
                 "An execution checklist is intentionally not created");
+    }
+
+    @Test
+    void v33FixDecisionRecordsApprovalWithoutClaimingDeliveredCorrections() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v33");
+        String scope = "> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; corrections pending";
+        for (String name : List.of("ROADMAP.md", "CHECKLIST.md", "FIX-DECISION.md")) {
+            String document = Files.readString(directory.resolve(name));
+            assertThat(document.lines().filter(line -> line.startsWith("> **Implementation scope:**")).toList())
+                    .as("%s approved scope", name).containsExactly(scope);
+            assertThat(document.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                    .as("%s release selection", name).containsExactly("> **Release scope:** unselected");
+        }
+
+        String decision = Files.readString(directory.resolve("FIX-DECISION.md"));
+        assertThat(decision).contains("**Approved, 2026-09-23.**", "F001 + F002 + F003 (recommended)",
+                "## Fresh Reproductions", "## Alternatives and Necessity",
+                "## Acceptance and Verification Budget", "## Maintainer Decision",
+                "not passing fix evidence", "not a release", "not applicable",
+                "Stop/rollback", "Creation permissions");
+        String priority = Files.readString(directory.resolve("CHECKLIST.md"))
+                .split("## Priority 2 - ", 2)[1].split("## Priority 3 - ", 2)[0];
+        assertThat(priority).contains("(FIX-DECISION.md)").doesNotContain("[ ]");
+        assertThat(Files.readString(root.resolve("roadmaps/README.md")))
+                .contains("(v33/FIX-DECISION.md)", "no next release scope selected");
+        assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
+                .contains("(../roadmaps/v33/FIX-DECISION.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) {
+                assertThat(directory.resolve(target).normalize())
+                        .as("V33 decision link to %s", target).exists();
+            }
+        }
+    }
+
+    @Test
+    void v33BaselinePreservesPublishedEvidenceAndTheImplementationGate() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v33");
+        String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+
+        assertThat(baseline).contains("> **Published baseline:** `4.4.1`",
+                "> **Development coordinate:** `4.5.0-SNAPSHOT`",
+                "> **Implementation and release scope:** unselected",
+                "## Revalidated Evidence", "## Characterization Scope", "## Fresh Verification",
+                "not fresh Central downloads", "Priority 2.3", "no-public-performance-claim",
+                "Java 21", "Boot 4.0.0", "Boot 4.1.0");
+        for (String finding : List.of("V32-F001", "V32-F002", "V32-F003", "V32-F004", "V32-F005")) {
+            assertThat(baseline).as("original finding ID").contains(finding);
+        }
+        assertThat(checklist.split("## Priority 1 - ", 2)[1].split("## Priority 2 - ", 2)[0])
+                .contains("(BASELINE-SCOPE.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) {
+                assertThat(directory.resolve(target).normalize())
+                        .as("V33 baseline link to %s", target).exists();
+            }
+        }
     }
 
     @Test
@@ -606,7 +669,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(Files.readString(directory.resolve("ROADMAP.md")))
                 .contains("F004/F005 delivered, F001-F003 deferred");
         assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md")))
-                .contains("F004/F005 are implemented; F001-F003 remain deferred",
+                .contains("F004/F005 are implemented. V32 deferred F001-F003",
                         "V33 is the active execution roadmap");
         assertThat(Files.readString(projectRoot().resolve("docs/20-native-release-compatibility.md")))
                 .contains("F004/F005 implemented and F001-F003 deferred")

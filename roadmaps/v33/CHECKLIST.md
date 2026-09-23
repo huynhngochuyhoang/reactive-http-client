@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.1`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** unselected; Priority 2.3 approval required
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; corrections pending
 > **Release scope:** unselected
 > **Adopted:** 2026-09-19
 
@@ -11,6 +11,10 @@ Execution companion to [`ROADMAP.md`](ROADMAP.md). Adoption starts baseline and
 characterization work; it does not complete Priority 1, select F001-F003 for
 implementation, authorize publication, or reopen V32. V1-V32 remain completed
 release records. V32-F004/F005 are delivered safeguards, not new feature work.
+
+Priority 2.3 approval is recorded in [FIX-DECISION.md](FIX-DECISION.md).
+All three corrections are selected for Priorities 3-5; none is implemented by
+the reproduction/decision work. Release scope remains unselected.
 
 Execute priorities in order. Record any dependency-based reordering explicitly.
 Production edits require the maintainer decision in **Priority 2.3** first.
@@ -75,71 +79,122 @@ matrices. Links to V32 remain historical inputs.
 
 ## Priority 1 - Post-`4.4.1` Baseline and V33 Scope Integrity
 
-### [ ] 1.1 Align adoption and version state
+### [x] 1.1 Align adoption and version state
 
-- [ ] Verify reactor/module/current-consumer/native/benchmark coordinates remain
+- [x] Verify reactor/module/current-consumer/native/benchmark coordinates remain
       `4.5.0-SNAPSHOT` and public/API/consumer/benchmark baselines remain `4.4.1`.
-- [ ] Verify roadmap, checklist, index and archive guard report active V33 while
+- [x] Verify roadmap, checklist, index and archive guard report active V33 while
       V1-V32 remain completed; no release or implementation scope is selected.
-- [ ] Verify generated readiness uses checklist lifecycle, stays active through
+- [x] Verify generated readiness uses checklist lifecycle, stays active through
       a final-version cut, and keeps the current planned final version unset.
-- [ ] Preserve historical V1-V32 and proposal content; no adoption-only dependency,
+- [x] Preserve historical V1-V32 and proposal content; no adoption-only dependency,
       production API, configuration or schema change.
 
-### [ ] 1.2 Establish baseline provenance
+### [x] 1.2 Establish baseline provenance
 
-- [ ] Record reachable source/release tag, toolchain, settings and clean/dirty state.
+- [x] Record reachable source/release tag, toolchain, settings and clean/dirty state.
       Identify which V32 publication and compatibility results remain reusable.
-- [ ] Verify the published parent/module artifacts and assembled `4.4.1` consumer
+- [x] Verify the published parent/module artifacts and assembled `4.4.1` consumer
       through isolated Central provenance, or explicitly revalidate and label exact
       reused evidence. Do not substitute a reactor install for published consumption.
-- [ ] Retain artifact hashes, versions, effective POMs, dependency trees, classpaths
+- [x] Retain artifact hashes, versions, effective POMs, dependency trees, classpaths
       and actual test totals; distinguish fresh results from prior observations.
-- [ ] Confirm the Java 21 and existing Boot 4.0.0/4.1.0 lanes without upgrading them.
+- [x] Confirm the Java 21 and existing Boot 4.0.0/4.1.0 lanes without upgrading them.
 
-### [ ] 1.3 Freeze characterization scope
+### [x] 1.3 Freeze characterization scope
 
-- [ ] Inventory F001-F003, their original reproductions, workarounds and missing
+- [x] Inventory F001-F003, their original reproductions, workarounds and missing
       evidence from V32; retain original finding IDs.
-- [ ] Identify F004 cleanup and F005 controlled-test safeguards that must remain
+- [x] Identify F004 cleanup and F005 controlled-test safeguards that must remain
       intact, without treating their fixes as new V33 work.
-- [ ] Record exclusions and baseline conclusions, then run documentation,
+- [x] Record exclusions and baseline conclusions, then run documentation,
       archive/readiness and applicable version guards with actual results.
+
+Baseline and scope record: [BASELINE-SCOPE.md](BASELINE-SCOPE.md).
+Evidence: `target/release-evidence/v33/priority1/`. Published/matrix results
+are revalidated V32 evidence, not new Central downloads or runtime executions.
+Implementation and release scope remain unselected; Priority 2.3 is still required.
+
+**Completed 2026-09-23.** Reviewed clean source
+`66e8b7689e16f9393c158879fac9317de47895e7`; fresh documentation results use
+that source plus this recorded baseline/test patch. Oracle JDK 21.0.8, Maven
+3.9.9 and Central-only settings; coordinates remain unchanged.
+
+| Verification | Actual result |
+|---|---|
+| Documentation/archive/readiness guards | 69 tests, zero failures/errors/skips; initial missing-record red test retained separately |
+| Maven reactor `validate` | Passed |
+| Published-baseline provenance fixtures | Passed, including rejected local/mismatched/missing artifacts and root/module self-comparison |
+| API compatibility fixtures | Passed additive/defaulted annotation controls and expected source/binary-breaking rejections; not a new strict project comparison |
+| Reused publication evidence | 477-file bundle verified; 13 artifact hashes/versions/Central markers and release-tag sources rechecked; original four baseline and 28 full-profile consumer cases recounted |
+| Reused supported lanes | 692-file compatibility bundle and 25-file genuine Boot 4.1 consumer bundle verified; original 1,928 module tests per Boot row and 28 overlay cases recounted |
+| Syntax, unchanged scope and whitespace | Passed; V1-V32/proposals/production/POMs untouched |
+
+The baseline record links exact commands, integrity anchors, source applicability
+and limitations. No fresh Central download, assembled-consumer execution, full
+reactor test suite, matrix, native build, benchmark or release decision is claimed.
 
 ## Priority 2 - Reproduction and Explicit Fix Selection
 
-### [ ] 2.1 Reproduce the three candidate gaps
+### [x] 2.1 Reproduce the three candidate gaps
 
-- [ ] Reproduce F001 through bean-factory and ApplicationContext entry points using
+- [x] Reproduce F001 through bean-factory and ApplicationContext entry points using
       the same starter builder and properly classified application customizations.
-- [ ] Reproduce F002 with fresh static public metadata from an external parser;
+- [x] Reproduce F002 with fresh static public metadata from an external parser;
       keep delegated parsing and API-ref construction as passing controls.
-- [ ] Reproduce F003 with paired runtime/AOT primary, non-fallback, priority and
+- [x] Reproduce F003 with paired runtime/AOT primary, non-fallback, priority and
       default-candidate properties selection, including the existing primary control.
-- [ ] Record construction, selection and dispatch witnesses separately. Preserve
+- [x] Record construction, selection and dispatch witnesses separately. Preserve
       baseline outcomes and fixture failures before changing defect expectations.
 
-### [ ] 2.2 Bound alternatives and acceptance
+### [x] 2.2 Bound alternatives and acceptance
 
-- [ ] For each ID, document affected consumer need, workaround cost, no-change
+- [x] For each ID, document affected consumer need, workaround cost, no-change
       alternative and smallest correction within the existing owner.
-- [ ] Specify API/configuration/behavioral compatibility, negative tests, creation
+- [x] Specify API/configuration/behavioral compatibility, negative tests, creation
       permissions, dependencies, verification budget and rollback conditions.
-- [ ] Name unsupported or untested shapes rather than inferring universal Spring,
+- [x] Name unsupported or untested shapes rather than inferring universal Spring,
       native, parser or builder compatibility from representative fixtures.
-- [ ] Reject new public abstractions or broader refactors not required by the
+- [x] Reject new public abstractions or broader refactors not required by the
       reproduced gap; record any need for a separate proposal.
 
-### [ ] 2.3 Record the maintainer scope decision
+### [x] 2.3 Record the maintainer scope decision
 
-- [ ] Obtain explicit approval of selected finding IDs, or a review-only decision.
+- [x] Obtain explicit approval of selected finding IDs, or a review-only decision.
       Proposed F001 + F002 + F003 is not approval merely because it is listed.
-- [ ] Record date, rationale, bounded changes, acceptance/verification requirements
+- [x] Record date, rationale, bounded changes, acceptance/verification requirements
       and stop conditions. Identify the independent implementation order.
-- [ ] Mark unselected candidate priorities not applicable with their deferral,
+- [x] Mark unselected candidate priorities not applicable with their deferral,
       workaround, owner and reconsideration trigger; do not claim a fix.
-- [ ] Update V33 implementation status consistently without selecting a release.
+      **Not applicable, 2026-09-23:** all three IDs were explicitly selected;
+      Priorities 3-5 remain open, not deferred or complete.
+- [x] Update V33 implementation status consistently without selecting a release.
       Stop production work until this decision exists.
+
+Decision and acceptance: [FIX-DECISION.md](FIX-DECISION.md).
+On 2026-09-23 the maintainer selected **F001 + F002 + F003**. The fixes are
+independent; execute F001, F002, then F003 in checklist order. No new SPI,
+general resolver, public internal type, version bump or release was approved.
+Evidence: `target/release-evidence/v33/priority2/`; reviewed clean source
+`9fd20c3a069ebcc101f8b314d33bb69f0afcf969`.
+
+**Completed 2026-09-23.** Oracle JDK 21.0.8, Maven 3.9.9, Boot 4.0.0 and
+Central-only settings. Freshly rebuilt reactor artifacts were installed into a
+reused dependency repository; this is not published-artifact consumption.
+
+| Verification | Actual result |
+|---|---|
+| External extension reproduction and controls | 17 tests, zero failures/errors/skips; F001/F002 remain asserted defects, delegated/API-ref and gate controls pass |
+| Paired runtime/AOT properties reproduction | Four tests, zero failures/errors/skips; primary passes both, three non-primary cases retain the recorded drift |
+| Consumer provenance | Actual Surefire and exported classpaths use rebuilt starter/helper/OTel JARs with matching hashes, not reactor classes; effective POM, tree and Boot version retained |
+| Documentation/archive/readiness guards | 70 tests, zero failures/errors/skips after updating two stale scope assertions; initial failing log/XML preserved |
+| Scope and whitespace | Passed; production, runtime fixtures, coordinates, dependencies and V1-V32/proposals unchanged |
+
+The 21 reproduction cases ran against the clean reviewed source before tracked
+edits. Documentation verification uses the recorded scope/guard patch. The
+decision freezes alternatives, negative controls, creation permissions, later
+verification budget and rollback conditions. No API/native/matrix/performance
+result for a future correction is claimed.
 
 ## Priority 3 - Starter Builder Ownership and Cache-Safety Validation
 
