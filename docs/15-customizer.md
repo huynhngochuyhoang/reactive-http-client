@@ -129,6 +129,9 @@ verify hit, miss and replay behavior, or leave caching unselected. The
 [reviewed extension scenarios](../roadmaps/v32/MAINTAINER-GUIDANCE.md#choosing-an-extension)
 record working public alternatives and the deferred starter-builder
 classification gap (F001); they do not add a new SPI or waive validation.
+That gap remains in published `4.4.1`; [V33 Priority 3](../roadmaps/v33/BUILDER-OWNERSHIP.md)
+corrects the ownership lookup in `4.5.0-SNAPSHOT` without exempting application
+customizers from classification.
 
 ---
 

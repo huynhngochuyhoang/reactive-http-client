@@ -72,9 +72,17 @@ final class CacheCustomizationValidator {
     }
 
     private static boolean isStarterManagedBuilder(ListableBeanFactory beanFactory, String beanName) {
-        if (!STARTER_BUILDER_BEAN.equals(beanName)
-                || !(beanFactory instanceof ConfigurableListableBeanFactory configurable)
-                || !configurable.containsBeanDefinition(beanName)) {
+        if (!STARTER_BUILDER_BEAN.equals(beanName)) {
+            return false;
+        }
+        // Inspect the definition where the builder is owned, not a shadowed ancestor.
+        if (beanFactory instanceof HierarchicalBeanFactory hierarchical
+                && !hierarchical.containsLocalBean(beanName)
+                && hierarchical.getParentBeanFactory() instanceof ListableBeanFactory parent) {
+            return isStarterManagedBuilder(parent, beanName);
+        }
+        ConfigurableListableBeanFactory configurable = localBeanFactory(beanFactory);
+        if (configurable == null || !configurable.containsBeanDefinition(beanName)) {
             return false;
         }
         BeanDefinition builderDefinition = configurable.getMergedBeanDefinition(beanName);
