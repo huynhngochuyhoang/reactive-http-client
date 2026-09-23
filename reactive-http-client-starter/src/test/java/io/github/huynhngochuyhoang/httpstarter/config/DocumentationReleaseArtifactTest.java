@@ -185,6 +185,33 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v33BaselinePreservesPublishedEvidenceAndTheImplementationGate() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v33");
+        String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+
+        assertThat(baseline).contains("> **Published baseline:** `4.4.1`",
+                "> **Development coordinate:** `4.5.0-SNAPSHOT`",
+                "> **Implementation and release scope:** unselected",
+                "## Revalidated Evidence", "## Characterization Scope", "## Fresh Verification",
+                "not fresh Central downloads", "Priority 2.3", "no-public-performance-claim",
+                "Java 21", "Boot 4.0.0", "Boot 4.1.0");
+        for (String finding : List.of("V32-F001", "V32-F002", "V32-F003", "V32-F004", "V32-F005")) {
+            assertThat(baseline).as("original finding ID").contains(finding);
+        }
+        assertThat(checklist.split("## Priority 1 - ", 2)[1].split("## Priority 2 - ", 2)[0])
+                .contains("(BASELINE-SCOPE.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) {
+                assertThat(directory.resolve(target).normalize())
+                        .as("V33 baseline link to %s", target).exists();
+            }
+        }
+    }
+
+    @Test
     void v32ExecutionChecklistClosesAllPrioritiesWithVerifiedPublication() throws IOException {
         Path root = projectRoot();
         String roadmap = Files.readString(root.resolve("roadmaps/v32/ROADMAP.md"));

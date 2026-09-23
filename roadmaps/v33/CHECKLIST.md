@@ -75,36 +75,60 @@ matrices. Links to V32 remain historical inputs.
 
 ## Priority 1 - Post-`4.4.1` Baseline and V33 Scope Integrity
 
-### [ ] 1.1 Align adoption and version state
+### [x] 1.1 Align adoption and version state
 
-- [ ] Verify reactor/module/current-consumer/native/benchmark coordinates remain
+- [x] Verify reactor/module/current-consumer/native/benchmark coordinates remain
       `4.5.0-SNAPSHOT` and public/API/consumer/benchmark baselines remain `4.4.1`.
-- [ ] Verify roadmap, checklist, index and archive guard report active V33 while
+- [x] Verify roadmap, checklist, index and archive guard report active V33 while
       V1-V32 remain completed; no release or implementation scope is selected.
-- [ ] Verify generated readiness uses checklist lifecycle, stays active through
+- [x] Verify generated readiness uses checklist lifecycle, stays active through
       a final-version cut, and keeps the current planned final version unset.
-- [ ] Preserve historical V1-V32 and proposal content; no adoption-only dependency,
+- [x] Preserve historical V1-V32 and proposal content; no adoption-only dependency,
       production API, configuration or schema change.
 
-### [ ] 1.2 Establish baseline provenance
+### [x] 1.2 Establish baseline provenance
 
-- [ ] Record reachable source/release tag, toolchain, settings and clean/dirty state.
+- [x] Record reachable source/release tag, toolchain, settings and clean/dirty state.
       Identify which V32 publication and compatibility results remain reusable.
-- [ ] Verify the published parent/module artifacts and assembled `4.4.1` consumer
+- [x] Verify the published parent/module artifacts and assembled `4.4.1` consumer
       through isolated Central provenance, or explicitly revalidate and label exact
       reused evidence. Do not substitute a reactor install for published consumption.
-- [ ] Retain artifact hashes, versions, effective POMs, dependency trees, classpaths
+- [x] Retain artifact hashes, versions, effective POMs, dependency trees, classpaths
       and actual test totals; distinguish fresh results from prior observations.
-- [ ] Confirm the Java 21 and existing Boot 4.0.0/4.1.0 lanes without upgrading them.
+- [x] Confirm the Java 21 and existing Boot 4.0.0/4.1.0 lanes without upgrading them.
 
-### [ ] 1.3 Freeze characterization scope
+### [x] 1.3 Freeze characterization scope
 
-- [ ] Inventory F001-F003, their original reproductions, workarounds and missing
+- [x] Inventory F001-F003, their original reproductions, workarounds and missing
       evidence from V32; retain original finding IDs.
-- [ ] Identify F004 cleanup and F005 controlled-test safeguards that must remain
+- [x] Identify F004 cleanup and F005 controlled-test safeguards that must remain
       intact, without treating their fixes as new V33 work.
-- [ ] Record exclusions and baseline conclusions, then run documentation,
+- [x] Record exclusions and baseline conclusions, then run documentation,
       archive/readiness and applicable version guards with actual results.
+
+Baseline and scope record: [BASELINE-SCOPE.md](BASELINE-SCOPE.md).
+Evidence: `target/release-evidence/v33/priority1/`. Published/matrix results
+are revalidated V32 evidence, not new Central downloads or runtime executions.
+Implementation and release scope remain unselected; Priority 2.3 is still required.
+
+**Completed 2026-09-23.** Reviewed clean source
+`66e8b7689e16f9393c158879fac9317de47895e7`; fresh documentation results use
+that source plus this recorded baseline/test patch. Oracle JDK 21.0.8, Maven
+3.9.9 and Central-only settings; coordinates remain unchanged.
+
+| Verification | Actual result |
+|---|---|
+| Documentation/archive/readiness guards | 69 tests, zero failures/errors/skips; initial missing-record red test retained separately |
+| Maven reactor `validate` | Passed |
+| Published-baseline provenance fixtures | Passed, including rejected local/mismatched/missing artifacts and root/module self-comparison |
+| API compatibility fixtures | Passed additive/defaulted annotation controls and expected source/binary-breaking rejections; not a new strict project comparison |
+| Reused publication evidence | 477-file bundle verified; 13 artifact hashes/versions/Central markers and release-tag sources rechecked; original four baseline and 28 full-profile consumer cases recounted |
+| Reused supported lanes | 692-file compatibility bundle and 25-file genuine Boot 4.1 consumer bundle verified; original 1,928 module tests per Boot row and 28 overlay cases recounted |
+| Syntax, unchanged scope and whitespace | Passed; V1-V32/proposals/production/POMs untouched |
+
+The baseline record links exact commands, integrity anchors, source applicability
+and limitations. No fresh Central download, assembled-consumer execution, full
+reactor test suite, matrix, native build, benchmark or release decision is claimed.
 
 ## Priority 2 - Reproduction and Explicit Fix Selection
 
