@@ -251,16 +251,23 @@ class ExtensionScenariosTest {
     }
 
     @Test
-    void freshStaticMetadataCannotSupplyTheInternalEffectiveApiThroughPublicConstruction() {
-        // V32-F002 characterizes a gap, not the behavior to retain after an approved fix.
+    void freshStaticMetadataDispatchesThroughPublicConstruction() {
         try (Scenario s = new Scenario()) {
             s.metadataViaApiRef = false;
             s.runner().run(context -> {
+                assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getBeanFactory())).isNotNull();
                 Client client = context.getBean(Client.class);
-                assertThatThrownBy(client::mapped).isInstanceOf(NullPointerException.class);
-                assertThat(s.requests).isEmpty();
-                assertThat(s.events).isEmpty();
-                assertThat(s.terminals).isEmpty();
+                Mono<String> call = client.mapped();
+                int metadataLookups = s.mappedMetadataCalls.get();
+                assertThat(call(call, "one")).contains("/v1/mapped");
+                assertThat(call(call, "two")).contains("/v1/mapped");
+                assertThat(s.mappedMetadataCalls).hasValue(metadataLookups);
+                assertThat(s.requests).extracting(WireRequest::path)
+                        .containsExactly("/v1/mapped", "/v1/mapped");
+                assertThat(s.requests).extracting(WireRequest::method).containsExactly("GET", "GET");
+                assertThat(s.events).hasSize(2);
+                assertThat(s.terminals).hasSize(2);
             });
         }
     }
@@ -522,7 +529,7 @@ class ExtensionScenariosTest {
         }
     }
 
-    private record WireRequest(String path, String tenant, String identity, String body,
+    private record WireRequest(String path, String method, String tenant, String identity, String body,
                                String bootDefault, String builder, String authorization) { }
 
     private static final class Scenario implements AutoCloseable {
@@ -574,7 +581,7 @@ class ExtensionScenariosTest {
             server = HttpServer.create().host("127.0.0.1").port(0).handle((request, response) ->
                     request.receive().aggregate().asString().defaultIfEmpty("").flatMap(body -> {
                         var headers = request.requestHeaders();
-                        var wire = new WireRequest(java.net.URI.create(request.uri()).getRawPath(),
+                        var wire = new WireRequest(java.net.URI.create(request.uri()).getRawPath(), request.method().name(),
                                 headers.get("X-Tenant"), headers.get("X-Identity"),
                                 body, headers.get("X-Boot-Default"), headers.get("X-Builder"), headers.get("Authorization"));
                         requests.add(wire);

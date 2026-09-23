@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.1`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001 implemented, F002/F003 pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001/F002 implemented, F003 pending
 > **Release scope:** unselected
 > **Adopted:** 2026-09-19
 
@@ -252,34 +252,54 @@ pending in their own priorities.
 
 Conditional on **V32-F002** approval.
 
-### [ ] 4.1 Define and implement static derivation
+### [x] 4.1 Define and implement static derivation
 
-- [ ] Add an external fresh-public-metadata regression that fails before the fix
+- [x] Add an external fresh-public-metadata regression that fails before the fix
       and asserts actual method/target/result afterward.
-- [ ] Derive missing static effective API at the existing validated planning boundary
+- [x] Derive missing static effective API at the existing validated planning boundary
       without reflection, package relocation or making EffectiveApi public.
-- [ ] Define supplied-derived-value versus public-field behavior and preserve
+- [x] Define supplied-derived-value versus public-field behavior and preserve
       built-in/static/API-ref precedence without another mutable decision model.
 
-### [ ] 4.2 Preserve grammar and plan ownership
+### [x] 4.2 Preserve grammar and plan ownership
 
-- [ ] Reject incomplete/invalid method, path and return metadata deliberately with
+- [x] Reject incomplete/invalid method, path and return metadata deliberately with
       zero dispatch; state construction/planning versus logical-call failure timing.
-- [ ] Cover inherited methods, concrete generics, Mono/Flux grammar, URI templates,
+- [x] Cover inherited methods, concrete generics, Mono/Flux grammar, URI templates,
       cache identity and method/API-ref/client timeout precedence.
-- [ ] Retain delegated parser and API-ref alternatives, existing valid metadata and
+- [x] Retain delegated parser and API-ref alternatives, existing valid metadata and
       source/binary accessors. Document any earlier invalid-input failure.
-- [ ] Verify plan reuse and concrete-client isolation without per-subscription
+- [x] Verify plan reuse and concrete-client isolation without per-subscription
       parsing or retention of invocation arguments/context in metadata.
 
-### [ ] 4.3 Verify the public extension boundary
+### [x] 4.3 Verify the public extension boundary
 
-- [ ] Prove construction and invocation from a consumer outside starter packages
+- [x] Prove construction and invocation from a consumer outside starter packages
       using only supported public APIs.
-- [ ] Check relevant contract export, mock and AOT validation with explicit limits;
+- [x] Check relevant contract export, mock and AOT validation with explicit limits;
       do not impose factory-only guarantees on lower-level entry points.
-- [ ] Record focused results and cost-review triggers for Priority 8. Stop for
+- [x] Record focused results and cost-review triggers for Priority 8. Stop for
       a public-type promotion, breaking setter change or broader parser redesign.
+
+Completed on 2026-09-23. [STATIC-METADATA.md](STATIC-METADATA.md) records F002's
+missing-value derivation, retained supplied/API-ref precedence, earlier deliberate
+fresh-input validation, lower-level limits, commands and Priority 8 cost triggers.
+Source is the reviewed working-tree patch on reachable
+`f0c3e167fc73f1ba41a7da769cf275a93e1a99e2`, not a clean release commit.
+Evidence is under `target/release-evidence/v33/priority4/`.
+
+- Pre-fix external desired-behavior test: one NullPointerException at invocation.
+- Final focused starter run: 381 passed, including 25 new planning cases.
+- Assembled external consumer: 18 passed; mock helper controls: 76 passed.
+- Documentation/archive/readiness guards: 72 passed.
+- Passing runs have zero failures/errors/skips and disable explicit GC; initial
+  fixture compilation/assertion errors are retained, not counted as passing work.
+
+EffectiveApi stays internal; public signatures, dependencies and coordinates
+are unchanged. No per-subscription parsing or new metadata state is added.
+F003, shared full-suite/API/matrix/native/cost gates and release selection remain
+pending in their own priorities. Earlier Priority 2/3 evidence retains its dated
+pre-F002 status.
 
 ## Priority 5 - AOT and Runtime Properties Selection Parity
 
