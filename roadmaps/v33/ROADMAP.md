@@ -4,25 +4,26 @@
 > **Theme:** supported extension and AOT selection parity
 > **Published baseline:** `4.4.1`
 > **Development reactor:** `4.5.0-SNAPSHOT`
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; corrections pending
 > **Release scope:** unselected
 > **Draft date:** 2026-09-19
 > **Adopted:** 2026-09-19
-> **Execution:** [checklist](CHECKLIST.md); implementation requires Priority 2.3 approval
+> **Execution:** [checklist](CHECKLIST.md); [Priority 2.3 approval](FIX-DECISION.md#maintainer-decision) recorded
 
 This roadmap defines a bounded follow-up to the
 [completed V32 architecture review](../v32/ROADMAP.md) and its
 [published cleanup patch](../v32/CLOSURE-EVIDENCE.md#post-publication-closure).
-The adopted checklist starts baseline and characterization work; it does not
+Checklist adoption alone starts baseline and characterization work; it does not
 reopen V32, authorize production changes, or select `4.5.0` for release.
 V1-V32 remain completed records. Adoption does not complete Priority 1.
 
-The proposed candidates are the three confirmed extension gaps that V32 deferred:
+The selected corrections are the three confirmed extension gaps that V32 deferred:
 **V32-F001, V32-F002 and V32-F003**. Their
 [original scope decision](../v32/ARCHITECTURE-DECISION.md) and workarounds remain
-valid history. This roadmap proposes reconsidering them, not silently changing
-that decision. A maintainer must explicitly select the finding IDs and their
-verification budget before implementation. A smaller selection, or documented
-deferral of all three, remains a valid outcome.
+valid history. On 2026-09-23 the maintainer explicitly selected all three with
+the bounded acceptance and verification requirements in [FIX-DECISION.md](FIX-DECISION.md).
+Priority 2 completes reproduction and selection, not implementation or release
+approval. Corrections remain pending in Priorities 3-5.
 
 ## Intent
 
@@ -36,7 +37,7 @@ boundaries where they are selected, validated and used:
 3. Validate the same effective application properties during AOT processing that
    runtime bean selection would use, without creating business clients.
 
-These are proposed compatibility corrections, not a new extension framework.
+These are approved compatibility corrections, not a new extension framework.
 Success means a concrete consumer no longer needs the documented workaround,
 backed by negative and cross-path tests. Class size, code duplication or a desire
 to extract a general resolver is not sufficient justification.
@@ -120,7 +121,7 @@ selection, not automatic approval of all proposed production changes.
 - Keep unselected findings deferred with their workaround, owner and reconsideration
   trigger. Do not make closure depend on implementing an unselected candidate.
 
-The proposed set is F001 + F002 + F003. They are independent fixes; shared tests
+The approved set is F001 + F002 + F003. They are independent fixes; shared tests
 do not establish a common root cause or require a general selection abstraction.
 Priorities 3-5 apply only to selected IDs.
 

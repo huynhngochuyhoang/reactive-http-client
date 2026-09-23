@@ -9,18 +9,19 @@ is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V32 are completed release records. V32 was released as `4.4.1`.
-V33 is the active execution roadmap. The reactor is `4.5.0-SNAPSHOT`, with no
-implementation or next release scope selected. Public/API/consumer/benchmark
-baselines are verified `4.4.1`.
+V33 is the active execution roadmap. The reactor is `4.5.0-SNAPSHOT`, with
+F001/F002/F003 approved for correction and no next release scope selected.
+Public/API/consumer/benchmark baselines are verified `4.4.1`.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.
-Adoption starts baseline and characterization work, not production fixes or a
-release. Priority 2.3 requires an explicit maintainer scope decision.
+The [Priority 2.3 decision](v33/FIX-DECISION.md) approves all three bounded
+corrections; implementation remains pending in Priorities 3-5. No release is selected.
 
 [V32 publication and closure](v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.
-F004/F005 are implemented; F001-F003 remain deferred with documented workarounds.
+F004/F005 are implemented. V32 deferred F001-F003 with documented workarounds;
+V33 now selects them for correction without reopening the V32 release record.
 [Priority 10 evidence](v32/COMPATIBILITY-VERIFICATION.md) retains original
 JVM/API/consumer/matrix/AOT/native results and failures. The
 [maintainer entry point](v32/MAINTAINER-GUIDANCE.md) links the reviewed architecture,
