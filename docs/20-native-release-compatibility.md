@@ -182,14 +182,15 @@ Fresh Maven Central artifact and assembled-consumer verification establish
 published `4.4.1` as the public, strict API and benchmark baseline. Reactor-only
 coordinates are `4.5.0-SNAPSHOT`. [V33](../roadmaps/v33/CHECKLIST.md) is active
 with [F001/F002/F003 approved for correction](../roadmaps/v33/FIX-DECISION.md);
-implementation is pending and next release scope remains unselected.
+[F001 is implemented](../roadmaps/v33/BUILDER-OWNERSHIP.md), F002/F003 are pending,
+and next release scope remains unselected.
 V1-V32 are completed release records.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records the release tag, successful signing/staging/packaging/deployment workflow,
 13 verified signed Central artifacts and published-consumer results.
 The historical [architecture decision](../roadmaps/v32/ARCHITECTURE-DECISION.md)
 records F004/F005 implemented and F001-F003 deferred with their workarounds;
-the V33 decision selects those three for later implementation.
+the V33 decision selects those three, with F001 now corrected in development.
 [Priority 10](../roadmaps/v32/COMPATIBILITY-VERIFICATION.md) retains its original
 snapshot API, supported-Boot, JVM/AOT/native results and earlier failures.
 Publication does not relabel them as a new final-coordinate native build.

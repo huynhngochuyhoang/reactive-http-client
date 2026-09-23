@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.1`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; corrections pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001 implemented, F002/F003 pending
 > **Release scope:** unselected
 > **Adopted:** 2026-09-19
 
@@ -14,7 +14,8 @@ release records. V32-F004/F005 are delivered safeguards, not new feature work.
 
 Priority 2.3 approval is recorded in [FIX-DECISION.md](FIX-DECISION.md).
 All three corrections are selected for Priorities 3-5; none is implemented by
-the reproduction/decision work. Release scope remains unselected.
+the reproduction/decision work. Priority 3 records the F001 correction and its
+verification separately. Release scope remains unselected.
 
 Execute priorities in order. Record any dependency-based reordering explicitly.
 Production edits require the maintainer decision in **Priority 2.3** first.
@@ -200,34 +201,52 @@ result for a future correction is claimed.
 
 Conditional on **V32-F001** approval.
 
-### [ ] 3.1 Correct ownership lookup locally
+### [x] 3.1 Correct ownership lookup locally
 
-- [ ] Add desired-behavior regressions for context versus owning bean-factory lookup,
+- [x] Add desired-behavior regressions for context versus owning bean-factory lookup,
       retaining a reproducible pre-fix baseline.
-- [ ] Resolve the actual owning definition through existing factory/context helpers;
+- [x] Resolve the actual owning definition through existing factory/context helpers;
       do not exempt by bean name, factory-method name or SAFE label alone.
-- [ ] Preserve conservative rejection of unknown ownership and existing explicit
+- [x] Preserve conservative rejection of unknown ownership and existing explicit
       SAFE declarations; do not create lazy components just to inspect ownership.
 
-### [ ] 3.2 Preserve application customization safety
+### [x] 3.2 Preserve application customization safety
 
-- [ ] Cover inherited builders, child shadowing, application replacement builders
+- [x] Cover inherited builders, child shadowing, application replacement builders
       and same-named definitions with both positive and negative controls.
-- [ ] Keep applicable Boot/per-client customizers classified, including filters,
+- [x] Keep applicable Boot/per-client customizers classified, including filters,
       defaultRequest, exchange functions, connector and other builder mutations.
-- [ ] Count lazy/prototype/product creation where relevant to prove inspection
+- [x] Count lazy/prototype/product creation where relevant to prove inspection
       does not materialize application components.
-- [ ] Keep cache auth, request variants and per-caller gates enforced independently
+- [x] Keep cache auth, request variants and per-caller gates enforced independently
       of the starter-builder exemption.
 
-### [ ] 3.3 Verify affected entry points
+### [x] 3.3 Verify affected entry points
 
-- [ ] Prove the external E12 consumer no longer needs the redundant starter-builder
+- [x] Prove the external E12 consumer no longer needs the redundant starter-builder
       classification through runtime, AOT and inspection paths as applicable.
-- [ ] Prove unclassified application behavior still fails and prior valid SAFE
+- [x] Prove unclassified application behavior still fails and prior valid SAFE
       configurations remain accepted.
-- [ ] Record changed behavior, focused tests and rollback assessment. Stop for
+- [x] Record changed behavior, focused tests and rollback assessment. Stop for
       scope review if the fix requires weakening ownership proof or the inventory.
+
+Completed on 2026-09-23. [BUILDER-OWNERSHIP.md](BUILDER-OWNERSHIP.md) records the
+bounded F001 correction, reproducible red/green tests, hierarchy and creation
+controls, commands and rollback assessment. Source is the reviewed working-tree
+patch on reachable `0c2daf13ef2b8409ecfb58021b432d86a3288ce0`, not a clean release
+commit. Evidence is under `target/release-evidence/v33/priority3/`.
+
+- Pre-fix: 12 ownership cases, three expected failures; first corrected run: 12 passed.
+- Final focused starter run: 321 passed, including 13 final ownership cases.
+- Assembled external consumer: 18 passed; mock helper controls: 75 passed.
+- Documentation/archive/readiness guards: 71 passed; the initial stale-name
+  assertion failure is preserved with its log/XML.
+- All passing runs have zero failures/errors/skips and disable explicit GC.
+
+No application customization is automatically classified SAFE. The published
+4.4.1 workaround is retained; the development guide describes the correction.
+F002/F003, final cross-path/API/matrix/native gates and release selection remain
+pending in their own priorities.
 
 ## Priority 4 - Public Static Metadata and Effective Request Planning
 

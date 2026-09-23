@@ -12,12 +12,14 @@ import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthRequest;
 import io.github.huynhngochuyhoang.httpstarter.auth.InvalidatableAuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientAutoConfiguration;
+import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientBeanFactoryInitializationAotProcessor;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.core.DefaultErrorDecoder;
 import io.github.huynhngochuyhoang.httpstarter.core.Jackson3ReactiveHttpClientJsonCodec;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientCustomizer;
+import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientDiagnosticsProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientJsonCodec;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleContext;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientLifecycleHook;
@@ -78,20 +80,34 @@ import static org.assertj.core.api.Assertions.*;
 class ExtensionScenariosTest {
     private static final Duration WAIT = Duration.ofSeconds(5);
 
-    @Test
-    void starterManagedBuilderClassificationDiffersBetweenFactoryAndContextLookup() {
-        // V32-F001 characterizes a gap, not the behavior to retain after an approved fix.
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void starterManagedBuilderNeedsNoRedundantClassificationAcrossEntryPoints(boolean explicitSafe) {
         try (Scenario s = new Scenario()) {
-            s.config().getCache().getCustomizations().remove("starterWebClientBuilder");
+            if (explicitSafe) {
+                s.config().getCache().getCustomizations().put("starterWebClientBuilder",
+                        ReactiveHttpClientProperties.CacheCustomizationSafety.SAFE);
+            }
             s.runner().run(context -> {
                 assertThat(context.getBeanFactory().getBeanDefinition("starterWebClientBuilder").getFactoryMethodName())
                         .isEqualTo("starterWebClientBuilder");
                 assertThatCode(() -> context.getBean(MethodMetadataCache.class).validateDeclarativeCacheCustomizations(
                         context.getBeanFactory(), Client.class, "review", s.config())).doesNotThrowAnyException();
-                assertThatThrownBy(() -> context.getBean(Client.class))
-                        .hasStackTraceContaining("starterWebClientBuilder")
-                        .hasStackTraceContaining("has no cache-safety classification");
+                assertThatCode(() -> context.getBean(MethodMetadataCache.class).validateDeclarativeCacheCustomizations(
+                        context, Client.class, "review", s.config())).doesNotThrowAnyException();
+                assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getBeanFactory())).isNotNull();
+                assertThat(context.getBean(ReactiveHttpClientDiagnosticsProvider.class).clientSummaries()).hasSize(1);
+                assertThat(s.firstFactoryCreates).hasValue(0);
+                assertThat(s.trace).isEmpty();
                 assertThat(s.requests).isEmpty();
+
+                Client client = context.getBean(Client.class);
+                String result = call(client.read(), "one");
+                assertThat(call(client.read(), "one")).isEqualTo(result).contains("/v1/read");
+                assertThat(s.requests).hasSize(1);
+                assertThat(s.events).extracting(HttpClientObserverEvent::getCacheOutcome)
+                        .containsExactly(HttpClientCacheOutcome.MISS_LOADER, HttpClientCacheOutcome.FRESH_HIT);
             });
         }
     }
@@ -310,6 +326,11 @@ class ExtensionScenariosTest {
             var runner = s.runner();
             if (beanName.equals("replacementBuilder")) { runner = runner.withUserConfiguration(ReplacementBuilder.class); }
             runner.run(context -> {
+                assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
+                        .processAheadOfTime(context.getBeanFactory()))
+                        .hasStackTraceContaining(beanName).hasStackTraceContaining("cache-safety classification");
+                assertThatThrownBy(() -> context.getBean(ReactiveHttpClientDiagnosticsProvider.class).clientSummaries())
+                        .hasStackTraceContaining(beanName).hasStackTraceContaining("cache-safety classification");
                 assertThatThrownBy(() -> context.getBean(Client.class))
                         .hasStackTraceContaining(beanName).hasStackTraceContaining("cache-safety classification");
                 assertThat(s.requests).isEmpty();
@@ -580,8 +601,8 @@ class ExtensionScenariosTest {
             var cache = config.getCache();
             cache.getPolicies().put("read", policy(false));
             cache.getPolicies().put("search", policy(true));
-            // V32-F001: runtime context lookup also requires classification of this inspected starter bean.
-            for (String name : List.of("starterWebClientBuilder", "bootDefaults", "clientMutations", "replacementBuilder",
+            // Only application-owned mutations need explicit classification.
+            for (String name : List.of("bootDefaults", "clientMutations", "replacementBuilder",
                     "replacementExchange", "replacementConnector")) {
                 cache.getCustomizations().put(name, ReactiveHttpClientProperties.CacheCustomizationSafety.SAFE);
             }

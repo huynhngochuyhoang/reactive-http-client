@@ -877,13 +877,18 @@ on bean creation order. An already-created per-client customizer is filtered by
 treated conservatively as applicable and must be classified. Startup, AOT, and
 diagnostics perform this inventory without creating the lazy bean.
 
-Known reviewed limitation in `4.4.1` and the unchanged `4.5.0-SNAPSHOT` selection
-path: context-based validation can fail to recognize the starter-managed builder
+Known reviewed limitation in published `4.4.1`: context-based validation can fail to recognize the starter-managed builder
 exemption (V32-F001). Explicitly classify that builder by its actual bean name
 only after inspecting it, in addition to all applicable application mutations.
 Do not trust a same-named replacement automatically. This workaround is not a
 fix; the [maintainer guidance](../roadmaps/v32/MAINTAINER-GUIDANCE.md#deferred-and-intentional-limits)
 records the deferred decision and reconsideration trigger.
+
+In the `4.5.0-SNAPSHOT` development tree, [V33 Priority 3](../roadmaps/v33/BUILDER-OWNERSHIP.md)
+corrects V32-F001 by inspecting the builder's owning definition through the
+context or bean factory. The starter-owned builder no longer needs that redundant
+entry; existing explicit SAFE entries remain accepted. Inherited ownership does
+not exempt child replacements, unknown factories, or application customizers.
 
 The cache runtime must execute mandatory authorization, tenant, and policy
 checks at a cache-aware pre-lookup boundary for both hits and misses. Until a

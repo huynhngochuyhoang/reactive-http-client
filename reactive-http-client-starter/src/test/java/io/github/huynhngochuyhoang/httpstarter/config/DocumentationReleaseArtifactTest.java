@@ -175,7 +175,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
         assertThat(checklist)
-                .contains("> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; corrections pending",
+                .contains("> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001 implemented, F002/F003 pending",
                         "> **Release scope:** unselected", "V32-F001", "V32-F002", "V32-F003",
                         "target/release-evidence/v33/priority<N>/")
                 .containsPattern("(?m)^### \\[[ x]\\] 2\\.3 Record the maintainer scope decision$")
@@ -185,10 +185,39 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v33FixDecisionRecordsApprovalWithoutClaimingDeliveredCorrections() throws IOException {
+    void v33BuilderOwnershipEvidenceClosesOnlyTheApprovedCorrection() throws IOException {
         Path root = projectRoot();
         Path directory = root.resolve("roadmaps/v33");
-        String scope = "> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; corrections pending";
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 3 - ", 2)[1].split("## Priority 4 - ", 2)[0];
+        assertThat(priority).contains("(BUILDER-OWNERSHIP.md)").doesNotContain("[ ]");
+        for (int pending : List.of(4, 5)) {
+            assertThat(checklist.split("## Priority " + pending + " - ", 2)[1]
+                    .split("## Priority " + (pending + 1) + " - ", 2)[0])
+                    .contains("[ ]").doesNotContain("[x]");
+        }
+        String evidence = Files.readString(directory.resolve("BUILDER-OWNERSHIP.md"));
+        assertThat(evidence).contains("V32-F001 implemented; F002/F003 pending",
+                "No public API", "## Rollback and Remaining Gates", "pre-fix",
+                "explicit SAFE", "unknown provenance", "not a native",
+                "SHA256SUMS", "> **Release scope:** unselected");
+        assertThat(Files.readString(root.resolve("docs/32-response-caching.md")))
+                .contains("Known reviewed limitation in published `4.4.1`",
+                        "(../roadmaps/v33/BUILDER-OWNERSHIP.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(evidence);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) {
+                assertThat(directory.resolve(target).normalize()).as("V33 ownership link to %s", target).exists();
+            }
+        }
+    }
+
+    @Test
+    void v33FixDecisionSeparatesApprovalImplementationAndRelease() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v33");
+        String scope = "> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001 implemented, F002/F003 pending";
         for (String name : List.of("ROADMAP.md", "CHECKLIST.md", "FIX-DECISION.md")) {
             String document = Files.readString(directory.resolve(name));
             assertThat(document.lines().filter(line -> line.startsWith("> **Implementation scope:**")).toList())
@@ -401,7 +430,13 @@ class DocumentationReleaseArtifactTest {
         Matcher methods = Pattern.compile("`ExtensionScenariosTest#([A-Za-z0-9]+)`").matcher(scenarios);
         Set<String> referenced = new HashSet<>();
         while (methods.find()) {
-            assertThat(consumer).contains(methods.group(1) + "(");
+            // V32 preserves the defect witness; V33 converts it into a passing regression.
+            String currentMethod = switch (methods.group(1)) {
+                case "starterManagedBuilderClassificationDiffersBetweenFactoryAndContextLookup" ->
+                        "starterManagedBuilderNeedsNoRedundantClassificationAcrossEntryPoints";
+                default -> methods.group(1);
+            };
+            assertThat(consumer).contains(currentMethod + "(");
             referenced.add(methods.group(1));
         }
         assertThat(referenced).hasSizeGreaterThanOrEqualTo(14);
