@@ -26,9 +26,9 @@ for the binding step, not as a new registry or public selection API.
 | No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
 | Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean sharing the selected parent's name cannot supply its binding environment or metadata. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
-| Boot binding | AOT refresh does not install ordinary binding post-processors. The selected definition-backed ordinary bean uses the owning factory's Boot binding processor, including `@Bean` binding metadata, when that processor is registered but not installed. This includes singletons resolved by an earlier AOT processor. No processor is installed globally and no environment-derived replacement object is substituted. |
+| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor before initialization callbacks, including `@Bean` binding metadata. It is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. No environment-derived replacement object is substituted. |
 | Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
-| Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved to its configured target. Binding uses the target name/definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
+| Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. This covers `@Bean` and supplier-configured factories without a definition property. Binding uses the target name/definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
 | Foreign client factory | An annotated interface backed by a foreign factory is excluded before properties or metadata lookup; its factory and product remain uncreated. |
 
@@ -40,8 +40,9 @@ than being overwritten with environment defaults. Existing primary programmatic,
 environment-only, foreign-factory and reflection-hint controls remain in the
 [AOT smoke suite][smoke-tests].
 
-This binding step prepares the selected configuration for build-time validation;
-it is not a complete replay of runtime bean initialization. Application property
+New properties are bound before initialization during this processor's lookup.
+For objects created by an earlier AOT processor, fallback binding cannot undo
+callbacks already run on defaults; initialization is not replayed. Application property
 constructors/factory methods and custom binders/converters remain application
 code. They must not depend on business traffic or produce owned transport/cache
 resources during configuration creation. Definition-less prepared registrations
@@ -73,7 +74,7 @@ There is no new static cache or retained configuration model.
 
 Untested here: arbitrary custom BeanFactory implementations or resolver overrides,
 FactoryBeans that still report an unknowable product type after initialization,
-every custom binding converter/validator or early-initialization callback, concurrent
+every custom binding converter/validator, initialization before this processor, concurrent
 bean-definition mutation, and native execution. The opaque-parent fixture proves
 provider delegation, not access to hidden parent binding metadata. Do not infer
 support for live properties mutation or universal AOT/runtime lifecycle equivalence.
@@ -173,8 +174,9 @@ properties targets unbound during AOT processing. Four pre-fix cases reproduce
 cache-policy rejection or missing ordinary-client configuration, while separately
 refreshed runtime contexts bind the target correctly.
 
-The processor uses the selected scoped-proxy definition's `targetBeanName` and
-the owning bean factory, then applies the existing binding rules to that target.
+That revision used the selected scoped-proxy definition's `targetBeanName` and
+the owning bean factory, then applied the existing binding rules to that target.
+The creation-time review below supersedes the definition-only target lookup.
 Returning the resolved target for this validation pass avoids binding one
 prototype instance and validating a different one. This is a build-time
 configuration sample, not a change to runtime scoped-proxy dispatch. Ordinary
@@ -199,6 +201,43 @@ earlier sealed evidence. The regression-only command uses
 Source/commands/patch, red/green XML and hashes are preserved with `SHA256SUMS`.
 Consumer, strict API, supported-Boot matrix and native checks were not rerun for
 this correction; their remaining gates and historical claims are unchanged.
+
+## Creation-Time Binding Review Correction
+
+The follow-up on `a2f30f65` addresses programmatic scoped proxies and initialization
+ordering. Three pre-fix cases fail: ordinary properties reach `@PostConstruct`
+unbound, while `@Bean` and supplier-created scoped proxies fail because their
+definitions have no `targetBeanName`. Both factories configure the target through
+`setTargetBeanName`; the supplier declares its product type for AOT discovery.
+
+The processor now reads the initialized proxy's public `Advised` target source
+before consulting definition metadata. It temporarily installs a properties-only
+binding callback ahead of initialization processors in each applicable owning
+factory, before resolving metadata or properties. Newly created ordinary beans
+and scoped targets therefore bind during creation, not after `getBean` returns.
+An identity set prevents a second binding pass when selected properties are
+returned. Cleanup removes these callbacks even when binding or initialization
+fails. Ordinary FactoryBean products, definition-less prepared singletons and
+normal refresh with Boot binding already installed retain their prior behavior.
+
+Nine new cases compare ordinary, `@Bean`-proxy and supplier-proxy configuration
+with independent runtime contexts. Each successful case requires one construction,
+one binding pass and the same bound values in `@PostConstruct`, `InitializingBean`
+and a custom init method. Six failure cases cover conversion errors and rejected
+init methods, requiring the original post-processor list and zero business
+resources afterward. Existing early-instance, hierarchy, materialization-count,
+FactoryBean, diagnostics and ownership controls remain passing. Previously run
+initialization callbacks are not replayed or repaired by fallback binding.
+
+The nine-class focused command above passes **289 cases**, including **52**
+selection-contract cases; the documentation command passes **73 cases**, with
+zero failures/errors/skips and explicit GC disabled. These are **362 passing
+cases**, not a full-suite or native claim. Review evidence under
+`target/release-evidence/v33/priority5-creation-binding/` preserves the reachable
+source base, reviewed patch, commands, logs, XML and `SHA256SUMS`. Initial fixture
+compilation/injection/product-discovery errors are retained separately from the
+three final pre-fix errors. Earlier sealed bundles are unchanged. Consumer,
+strict API, supported-Boot matrix and native execution were not rerun here.
 
 ## Rollback and Remaining Gates
 

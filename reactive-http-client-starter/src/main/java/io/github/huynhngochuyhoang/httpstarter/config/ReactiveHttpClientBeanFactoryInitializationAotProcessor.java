@@ -4,7 +4,10 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
+import org.springframework.aop.framework.Advised;
+import org.springframework.aop.scope.ScopedObject;
 import org.springframework.aop.scope.ScopedProxyFactoryBean;
+import org.springframework.aop.target.SimpleBeanTargetSource;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.ReflectionHints;
 import org.springframework.aot.hint.RuntimeHints;
@@ -17,6 +20,7 @@ import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.NamedBeanHolder;
 import org.springframework.beans.factory.support.AbstractBeanFactory;
@@ -52,9 +56,28 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         if (clientInterfaces.isEmpty()) {
             return null;
         }
-        MethodMetadataCache metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)
-                .getIfAvailable(MethodMetadataCache::new);
-        ReactiveHttpClientProperties properties = properties(beanFactory);
+        MethodMetadataCache metadataCache;
+        ReactiveHttpClientProperties properties;
+        Map<AbstractBeanFactory, PropertiesBinding> bindings = new LinkedHashMap<>();
+        try {
+            for (BeanFactory current = beanFactory; current instanceof ConfigurableListableBeanFactory configurable;
+                 current = configurable.getParentBeanFactory()) {
+                if (current instanceof AbstractBeanFactory factory
+                        && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)
+                        && factory.getBeanPostProcessors().stream()
+                                .noneMatch(ConfigurationPropertiesBindingPostProcessor.class::isInstance)) {
+                    var binding = new PropertiesBinding(factory);
+                    bindings.put(factory, binding);
+                    // Binding must precede init-annotation processors already installed by AOT refresh.
+                    factory.getBeanPostProcessors().add(0, binding);
+                }
+            }
+            metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)
+                    .getIfAvailable(MethodMetadataCache::new);
+            properties = properties(beanFactory, bindings);
+        } finally {
+            bindings.forEach((factory, binding) -> factory.getBeanPostProcessors().remove(binding));
+        }
         Map<Class<?>, ReactiveHttpClientProperties.ClientConfig> clientConfigs = new HashMap<>();
         clientInterfaces.forEach(clientInterface -> {
             ReactiveHttpClient annotation = clientInterface.getAnnotation(ReactiveHttpClient.class);
@@ -96,7 +119,8 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         });
     }
 
-    private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory) {
+    private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory,
+                                                     Map<AbstractBeanFactory, PropertiesBinding> bindings) {
         NamedBeanHolder<ReactiveHttpClientProperties> selected;
         try {
             selected = beanFactory.resolveNamedBean(ReactiveHttpClientProperties.class);
@@ -117,7 +141,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                             .getIfAvailable(this::environmentProperties)
                     : environmentProperties();
         }
-        return bindSelectedPropertiesForAot(beanFactory, selected);
+        return bindSelectedPropertiesForAot(beanFactory, selected, bindings);
     }
 
     private ReactiveHttpClientProperties environmentProperties() {
@@ -129,7 +153,8 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     }
 
     private static ReactiveHttpClientProperties bindSelectedPropertiesForAot(
-            ConfigurableListableBeanFactory beanFactory, NamedBeanHolder<ReactiveHttpClientProperties> selected) {
+            ConfigurableListableBeanFactory beanFactory, NamedBeanHolder<ReactiveHttpClientProperties> selected,
+            Map<AbstractBeanFactory, PropertiesBinding> bindings) {
         while (true) {
             Class<?> localType = beanFactory.containsLocalBean(selected.getBeanName())
                     ? beanFactory.getType(selected.getBeanName(), false) : null;
@@ -147,28 +172,47 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             if (factoryType == null || !ScopedProxyFactoryBean.class.isAssignableFrom(factoryType)) {
                 return selected.getBeanInstance();
             }
-            Object targetName = beanFactory.getMergedBeanDefinition(selected.getBeanName())
-                    .getPropertyValues().get("targetBeanName");
+            Object targetName;
+            if (selected.getBeanInstance() instanceof Advised advised
+                    && advised.getTargetSource() instanceof SimpleBeanTargetSource targetSource) {
+                targetName = targetSource.getTargetBeanName();
+            } else {
+                targetName = beanFactory.getMergedBeanDefinition(selected.getBeanName())
+                        .getPropertyValues().get("targetBeanName");
+            }
             if (!(targetName instanceof String name) || !StringUtils.hasText(name)) {
                 throw new IllegalStateException("Scoped properties proxy has no targetBeanName: " + selected.getBeanName());
             }
             // Validate the same target that was bound, including prototype-scoped targets.
             return bindSelectedPropertiesForAot(beanFactory, new NamedBeanHolder<>(name,
-                    beanFactory.getBean(name, ReactiveHttpClientProperties.class)));
+                    beanFactory.getBean(name, ReactiveHttpClientProperties.class)), bindings);
         }
-        // AOT refresh omits ordinary BeanPostProcessors, even for a definition-created
-        // singleton resolved by an earlier processor. Bind the selected definition;
-        // definition-less registrations and normally bound beans need no manual pass.
-        if (beanFactory instanceof AbstractBeanFactory factory
-                && beanFactory.containsBeanDefinition(selected.getBeanName())
-                && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)
-                && factory.getBeanPostProcessors().stream()
-                        .noneMatch(ConfigurationPropertiesBindingPostProcessor.class::isInstance)) {
-            factory.getBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
-                            ConfigurationPropertiesBindingPostProcessor.class)
-                    .postProcessBeforeInitialization(selected.getBeanInstance(), selected.getBeanName());
+        // Existing instances missed the creation callback; newly created ones are already tracked.
+        PropertiesBinding binding = bindings.get(beanFactory);
+        if (binding != null && beanFactory.containsBeanDefinition(selected.getBeanName())) {
+            binding.postProcessBeforeInitialization(selected.getBeanInstance(), selected.getBeanName());
         }
         return selected.getBeanInstance();
+    }
+
+    private static final class PropertiesBinding implements BeanPostProcessor {
+        private final AbstractBeanFactory factory;
+        private final Set<Object> bound = Collections.newSetFromMap(new IdentityHashMap<>());
+
+        private PropertiesBinding(AbstractBeanFactory factory) {
+            this.factory = factory;
+        }
+
+        @Override
+        public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            if (bean instanceof ReactiveHttpClientProperties && !(bean instanceof ScopedObject) && !bound.contains(bean)) {
+                factory.getBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                                ConfigurationPropertiesBindingPostProcessor.class)
+                        .postProcessBeforeInitialization(bean, beanName);
+                bound.add(bean);
+            }
+            return bean;
+        }
     }
 
     private static boolean isCacheSelected(

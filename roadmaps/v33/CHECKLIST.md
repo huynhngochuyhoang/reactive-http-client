@@ -375,6 +375,18 @@ skips, explicit GC disabled. Four pre-fix errors and the initial fixture compile
 error are retained. The companion record states scope availability and remaining
 consumer/API/matrix/native limitations; no release gate is closed by this rerun.
 
+Creation-time binding review correction, 2026-09-24: initialized scoped-proxy
+target-source metadata supports `@Bean` and supplier-configured targets without
+a definition property. A temporary properties-only callback binds new beans
+before initialization and is removed on success or failure; fallback binding
+of earlier-created objects does not replay their initialization. Nine new cases
+cover one binding pass, three initialization callbacks, programmatic proxy forms
+and cleanup after binding/init errors. Follow-up evidence under
+`target/release-evidence/v33/priority5-creation-binding/` records three pre-fix
+errors, **289 focused cases** (52 selection cases) and **73 documentation cases**
+passing with explicit GC disabled, zero failures/errors/skips. The companion
+record retains earlier provenance and the pending consumer/API/matrix/native gates.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

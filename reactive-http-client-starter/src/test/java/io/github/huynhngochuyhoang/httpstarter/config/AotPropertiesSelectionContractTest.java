@@ -38,6 +38,148 @@ class AotPropertiesSelectionContractTest {
     enum Preference { PRIMARY, NON_FALLBACK, PRIORITY, DEFAULT }
     enum Shape { LAZY, PROTOTYPE, TYPED_FACTORY, RAW_FACTORY, DIRECT_FACTORY, PROTOTYPE_FACTORY }
     enum Hierarchy { PARENT_ONLY, CHILD_SHADOWS, LOCAL_OVER_PARENT_PRIMARY }
+    enum LifecycleShape { ORDINARY, BEAN_PROXY, SUPPLIER_PROXY }
+
+    @ParameterizedTest
+    @EnumSource(LifecycleShape.class)
+    void bindingPrecedesInitializationAndSupportsProgrammaticProxies(LifecycleShape shape) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            var witness = witness(aot.getDefaultListableBeanFactory(), Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var processors = java.util.List.copyOf(aot.getDefaultListableBeanFactory().getBeanPostProcessors());
+            assertThat(aotCalls).isEmpty();
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject()
+                    .getClients().get("selection");
+            assertThat(runtimeCalls).containsExactly("construct", "bind", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+            if (shape != LifecycleShape.ORDINARY) {
+                assertThat(aot.getBeanFactory().getMergedBeanDefinition("selectedProxy")
+                        .getPropertyValues().get("targetBeanName")).isNull();
+            }
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(aot.getDefaultListableBeanFactory())).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
+            assertThat(aot.getDefaultListableBeanFactory().getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(aot.getDefaultListableBeanFactory());
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "BEAN_PROXY,false", "SUPPLIER_PROXY,false",
+            "ORDINARY,true", "BEAN_PROXY,true", "SUPPLIER_PROXY,true"})
+    void temporaryBindingIsRemovedAfterBindingOrInitializationFailure(LifecycleShape shape, boolean failInitialization) {
+        var calls = new java.util.ArrayList<String>();
+        try (var context = lifecycleContext(shape, calls, failInitialization)) {
+            if (!failInitialization) {
+                context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("invalid", Map.of(
+                        "lifecycle.clients.selection.cache.policies.chosen.ttl-ms", "not-a-number")));
+            }
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+
+            assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(factory))
+                    .isInstanceOf(org.springframework.beans.factory.BeanCreationException.class)
+                    .hasStackTraceContaining(failInitialization ? "initialization rejected" : "not-a-number");
+
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            assertThat(witness.config).isNull();
+            witness.assertNoBusinessResources(factory);
+            if (failInitialization) {
+                assertThat(calls).containsExactly("construct", "bind", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+            } else {
+                assertThat(calls).containsExactly("construct");
+            }
+        }
+    }
+
+    private static AnnotationConfigApplicationContext lifecycleContext(LifecycleShape shape, java.util.List<String> calls) {
+        return lifecycleContext(shape, calls, false);
+    }
+
+    private static AnnotationConfigApplicationContext lifecycleContext(
+            LifecycleShape shape, java.util.List<String> calls, boolean failInitialization) {
+        var context = bindingContext(false);
+        context.register(LifecycleBinding.class);
+        context.getBeanFactory().registerSingleton("lifecycleCalls", new LifecycleCalls(calls, failInitialization));
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("lifecycle", Map.of(
+                "lifecycle.clients.selection.cache.policies.chosen.ttl-ms", "9000",
+                "lifecycle.clients.selection.cache.policies.chosen.maximum-size", "16",
+                "lifecycle.clients.selection.cache.policies.chosen.shared-response", "true",
+                "lifecycle.clients.selection.cache.customizations.Builder", "SAFE")));
+        if (shape == LifecycleShape.BEAN_PROXY) {
+            context.register(ProgrammaticProxyBinding.class);
+        } else if (shape == LifecycleShape.SUPPLIER_PROXY) {
+            var definition = new RootBeanDefinition(org.springframework.aop.scope.ScopedProxyFactoryBean.class,
+                    AotPropertiesSelectionContractTest::programmaticProxy);
+            definition.setPrimary(true);
+            definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, LifecycleProperties.class);
+            context.registerBeanDefinition("selectedProxy", definition);
+        }
+        context.addBeanFactoryPostProcessor(factory -> {
+            var target = (org.springframework.beans.factory.support.AbstractBeanDefinition) factory.getBeanDefinition("lifecycleTarget");
+            target.setPrimary(shape == LifecycleShape.ORDINARY);
+            target.setAutowireCandidate(shape == LifecycleShape.ORDINARY);
+            target.setDefaultCandidate(shape == LifecycleShape.ORDINARY);
+        });
+        return context;
+    }
+
+    private static org.springframework.aop.scope.ScopedProxyFactoryBean programmaticProxy() {
+        var factory = new org.springframework.aop.scope.ScopedProxyFactoryBean();
+        factory.setTargetBeanName("lifecycleTarget");
+        return factory;
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class ProgrammaticProxyBinding {
+        @Bean @Primary
+        org.springframework.aop.scope.ScopedProxyFactoryBean selectedProxy() { return programmaticProxy(); }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class LifecycleBinding {
+        @Bean(initMethod = "finish") @ConfigurationProperties("lifecycle") @Scope("prototype")
+        LifecycleProperties lifecycleTarget(LifecycleCalls lifecycleCalls) {
+            return new LifecycleProperties(lifecycleCalls.values(), lifecycleCalls.failInitialization());
+        }
+    }
+
+    record LifecycleCalls(java.util.List<String> values, boolean failInitialization) { }
+
+    static class LifecycleProperties extends ReactiveHttpClientProperties implements org.springframework.beans.factory.InitializingBean {
+        private final java.util.List<String> calls;
+        private final boolean failInitialization;
+        LifecycleProperties(java.util.List<String> calls, boolean failInitialization) {
+            this.calls = calls;
+            this.failInitialization = failInitialization;
+            calls.add("construct");
+        }
+        @Override public void setClients(Map<String, ClientConfig> clients) {
+            calls.add("bind");
+            super.setClients(clients);
+        }
+        @jakarta.annotation.PostConstruct
+        void prepared() { record("postConstruct"); }
+        @Override public void afterPropertiesSet() { record("afterPropertiesSet"); }
+        void finish() {
+            record("init");
+            if (failInitialization) throw new IllegalStateException("initialization rejected");
+        }
+        private void record(String callback) {
+            var client = getClients().get("selection");
+            if (client == null) throw new IllegalStateException("unbound initialization: " + callback);
+            calls.add(callback + ":" + client.getCache().getPolicies().get("chosen").getTtlMs());
+        }
+    }
 
     @ParameterizedTest
     @EnumSource(Preference.class)
