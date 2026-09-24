@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.1`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001/F002 implemented, F003 pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending
 > **Release scope:** unselected
 > **Adopted:** 2026-09-19
 
@@ -305,34 +305,51 @@ pre-F002 status.
 
 Conditional on **V32-F003** approval.
 
-### [ ] 5.1 Select the effective properties
+### [x] 5.1 Select the effective properties
 
-- [ ] Turn the paired runtime/AOT drift cases into desired-behavior regressions
+- [x] Turn the paired runtime/AOT drift cases into desired-behavior regressions
       while preserving their baseline provenance.
-- [ ] Prefer supported Spring candidate resolution at the properties boundary;
+- [x] Prefer supported Spring candidate resolution at the properties boundary;
       remove registration-order fallback rather than duplicating precedence rules.
-- [ ] Preserve environment binding lifecycle, primary programmatic properties and
+- [x] Preserve environment binding lifecycle, primary programmatic properties and
       foreign-factory behavior; do not select an unbound configuration object.
 
-### [ ] 5.2 Cover selection and failure semantics
+### [x] 5.2 Cover selection and failure semantics
 
-- [ ] Cover primary, non-fallback, priority, default candidate, absence and ambiguity
+- [x] Cover primary, non-fallback, priority, default candidate, absence and ambiguity
       against the runtime selection oracle.
-- [ ] Exercise parent/child shadowing, lazy/prototype and FactoryBean shapes touched
+- [x] Exercise parent/child shadowing, lazy/prototype and FactoryBean shapes touched
       by the actual lookup; label untested shapes explicitly.
-- [ ] Prove invalid selected configuration fails instead of choosing a valid inactive
+- [x] Prove invalid selected configuration fails instead of choosing a valid inactive
       bean or falling back to environment/default values.
-- [ ] Count prototype/product materializations to detect duplicate creation and
+- [x] Count prototype/product materializations to detect duplicate creation and
       discarded configuration instances.
 
-### [ ] 5.3 Preserve build-time ownership
+### [x] 5.3 Preserve build-time ownership
 
-- [ ] Assert properties/metadata creation permissions separately from zero business
+- [x] Assert properties/metadata creation permissions separately from zero business
       client, transport, cache-manager and signer creation during selection.
-- [ ] Retain non-instantiating diagnostics and supported unknown values; do not
+- [x] Retain non-instantiating diagnostics and supported unknown values; do not
       reuse the eager AOT path for inspection.
-- [ ] Run environment-only, replacement-properties and foreign-factory controls;
+- [x] Run environment-only, replacement-properties and foreign-factory controls;
       record focused results, remaining constraints and rollback assessment.
+
+Completed on 2026-09-24. [AOT-PROPERTIES-SELECTION.md](AOT-PROPERTIES-SELECTION.md)
+records Spring-owned selection, Boot binding, creation counts, failure semantics,
+commands and remaining gates. Evidence is under
+`target/release-evidence/v33/priority5/`, against the reviewed patch on reachable
+`a81447c85739d375d8b1b32fffeae8c2df37dcc3` (the committed Priority 4), not a clean
+release revision.
+The pre-fix four-case desired-behavior run had three expected selection errors;
+the original V32 and V33 Priority 2 records remain historical provenance.
+Final runs: 264 focused starter cases (including 27 new cases), 18 assembled
+consumer cases and 73 documentation/archive/readiness cases; **355 passed**,
+zero failures/errors/skips, with explicit GC disabled. The companion record
+labels prior fixture failures, binding constraints and consumer coverage; the
+sealed bundle records consumed artifact hashes and actual classpath provenance.
+Diagnostics, public APIs, runtime routing, dependencies and coordinates are
+unchanged. Shared cross-path, full-suite/API/matrix/native/cost gates in
+Priorities 6-8 and release selection remain pending.
 
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 

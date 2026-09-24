@@ -1,0 +1,152 @@
+# V33 AOT Properties Selection
+
+> **Recorded:** 2026-09-24
+> **Source base:** `a81447c85739d375d8b1b32fffeae8c2df37dcc3` plus the reviewed Priority 5 patch
+> **Implementation:** V32-F003 implemented; shared verification pending
+> **Published / development:** `4.4.1` / `4.5.0-SNAPSHOT`
+> **Release scope:** unselected
+
+Companion to [Priority 5](CHECKLIST.md), the approved [fix decision](FIX-DECISION.md)
+and the historical [V32 selection review](../v32/EFFECTIVE-POLICY-SELECTION.md).
+The latter and V33 Priority 2 retain their original defect observations. This
+record does not turn those passing characterization tests into passing fix tests.
+
+## Selection and Binding
+
+The [AOT processor][processor] now uses Spring's `resolveNamedBean` for the
+properties selection. It no longer implements primary handling followed by a
+registration-order singleton fallback. The selected bean name is retained only
+for the binding step, not as a new registry or public selection API.
+
+| Boundary | Contract and evidence |
+|---|---|
+| Primary, non-fallback, priority, default candidate | The four paired [review cases][review-tests] now require AOT success against the runtime provider's selected instance. Each formerly failing non-primary case passes. |
+| Invalid preferred value | All four preferences select a zero-TTL policy while an inactive bean and environment contain valid policies. AOT fails selected-policy validation, without falling back. |
+| Ambiguity | Two ordinary candidates and two primary candidates retain Spring's non-unique error, even with valid environment configuration. A dependency-creation failure also propagates. |
+| No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
+| Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean sharing the selected parent's name cannot supply its binding environment or metadata. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
+| Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
+| Boot binding | AOT refresh does not install ordinary binding post-processors. A newly resolved ordinary bean uses the owning factory's Boot binding processor, including `@Bean` binding metadata, when that processor is registered but not installed. No processor is installed globally and no environment-derived replacement object is substituted. |
+| Existing values and products | A non-creating singleton inventory preserves already prepared properties by identity. Direct singletons, including one coexisting with a definition, are not rebound. FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
+| Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
+| Foreign client factory | An annotated interface backed by a foreign factory is excluded before properties or metadata lookup; its factory and product remain uncreated. |
+
+The [new contract suite][contract-tests] compares default and alternate-prefix
+`@Bean` configuration after `refreshForAotProcessing` with separately refreshed
+runtime contexts. It also rejects an invalid bound policy. Programmatic beans
+without Boot binding infrastructure remain application-prepared values rather
+than being overwritten with environment defaults. Existing primary programmatic,
+environment-only, foreign-factory and reflection-hint controls remain in the
+[AOT smoke suite][smoke-tests].
+
+This binding step prepares the selected configuration for build-time validation;
+it is not a complete replay of runtime bean initialization. Application property
+constructors/factory methods and custom binders/converters remain application
+code. They must not depend on business traffic or produce owned transport/cache
+resources during configuration creation. Already prepared instances are not
+hot-reloaded, and their preparation is the registering application's responsibility.
+
+## Ownership and Limits
+
+Properties and replacement metadata may be created. The new fixtures count
+metadata creation separately and install failing/counting suppliers for the
+business client factory, auth provider, transport provider and WebClient builder.
+Selected caching plus cache telemetry is configured in programmatic cases; the
+meter registry stays empty. No business factory is obtained, so its starter
+cache-manager, transport and signer assembly cannot run. These are assertions
+about this lookup boundary, not instrumentation of every application constructor.
+
+Diagnostics is unchanged: it does not call the eager AOT selection helper.
+The diagnostics/provider and component-selection controls retain non-instantiation
+and supported unknown values. F004 failed-construction lease/owner checks run
+with explicit GC disabled; no controlled reachability or universal collectability
+claim is made here.
+
+No public API, configuration property, dependency, coordinate, runtime resolver,
+request-path or diagnostics behavior is changed. The new inventory, candidate
+selection and binding occur during AOT processing, not each subscription.
+There is no new static cache or retained configuration model.
+
+Untested here: arbitrary custom BeanFactory implementations or resolver overrides,
+FactoryBeans that still report an unknowable product type after initialization,
+every custom binding converter/validator or early-initialization callback, concurrent
+bean-definition mutation, and native execution. The opaque-parent fixture proves
+provider delegation, not access to hidden parent binding metadata. Do not infer
+support for live properties mutation or universal AOT/runtime lifecycle equivalence.
+
+## Verification
+
+Oracle JDK 21.0.8, Maven 3.9.9, Boot 4.0.0, Java target 21 and Central-only settings.
+Passing test runs disable explicit GC. The source is the reviewed working-tree
+patch on the reachable base above, not a clean release revision.
+
+- Pre-fix desired-behavior run: four cases, three selection errors. Only test
+  expectations were changed at that checkpoint; the old processor was retained.
+- Final focused starter run: **264 passed**, zero failures/errors/skips, across
+  nine classes, including 27 new selection/binding/ownership cases and the four
+  converted review cases.
+- Assembled consumer: **18 passed**; documentation/archive/readiness guards:
+  **73 passed**, zero failures/errors/skips. The consumer retains the existing
+  primary programmatic properties witness; it is not new assembled evidence of
+  every non-primary preference. Final total: **355 passing cases**.
+- No full-suite, strict API, Boot 4.1, native or benchmark result is substituted
+  by these focused checks.
+
+Earlier unsuccessful iterations are preserved: a fixture constructor-generic
+compile error, 13 missing SAFE classifications for the deliberately uncreated
+builder, and two fixture errors around when Boot replaces a registered singleton.
+They are not counted as final passing evidence. One intermediate command named
+a nonexistent customization test; the final command below uses the actual
+`CacheBuilderOwnershipContractTest` and its 13 cases.
+
+## Reproduction and Evidence
+
+Run from the root with the reviewed patch. A fresh checkout can use another
+populated/writable Maven repository; its results are new evidence, not the
+original preserved bundle.
+
+```bash
+export JAVA_HOME=/usr/lib/jvm/jdk-21.0.8-oracle-x64
+export PATH="$JAVA_HOME/bin:$PATH"
+export MAVEN_OPTS='-Xmx512m -XX:ActiveProcessorCount=2'
+REPO=/tmp/v32-boot41-consumer.Z9m7kq/repository
+MVN=(mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local="$REPO")
+"${MVN[@]}" -pl reactive-http-client-starter -DargLine=-XX:+DisableExplicitGC \
+  -Dtest=AotPropertiesSelectionContractTest,EffectiveSelectionAotReviewTest,ReactiveHttpClientAotSmokeTest,ReactiveHttpClientDiagnosticsProviderTest,ReactiveHttpClientFactoryBeanDiagnosticsTest,ComponentSelectionReviewTest,ResourceOwnershipReviewTest,CacheBuilderOwnershipContractTest,PublicStaticMetadataContractTest test
+"${MVN[@]}" -DskipTests -Dmaven.javadoc.skip=true install
+"${MVN[@]}" -f .github/boot4-consumer/pom.xml \
+  -Dreactive-http-client.version=4.5.0-SNAPSHOT -Dconsumer.v32.extensions=true \
+  -DargLine=-XX:+DisableExplicitGC -Dtest=ExtensionScenariosTest clean test
+"${MVN[@]}" -pl reactive-http-client-starter -DargLine=-XX:+DisableExplicitGC \
+  -Dtest=DocumentationReleaseArtifactTest test
+git diff --check
+```
+
+Evidence under `target/release-evidence/v33/priority5/` retains commands, source
+and tree IDs, working-tree patches, logs, exit codes, relevant XML, reviewed
+source copies, consumed JARs, consumer POM/dependency/classpath inputs and an
+artifact audit. It is sealed with `SHA256SUMS`; from that directory run
+`sha256sum --quiet -c SHA256SUMS`. Preserve the bundle before cleaning `target/`.
+The reactor assembly is incremental and locally installed; the external consumer
+is cleaned and consumes artifacts, not starter module output directories or a
+published development version. JVM AOT is not a native binary.
+
+## Rollback and Remaining Gates
+
+Rollback this processor-only selection/binding correction with its desired-behavior
+tests if valid prepared values are overwritten, configuration is created twice,
+ambiguity is hidden, or business assembly is introduced at this boundary. Do not
+restore registration-order selection as a new supported precedence rule. The
+published `4.4.1` primary-bean workaround remains available on that release.
+
+F001-F003 implementation is now complete, but shared composed regressions,
+full module suites, assembled programmatic non-primary selection across supported
+Boot rows, strict source/binary API checks, clean-source native execution and
+the Priority 8 cost decision remain in Priorities 6-8. AOT-only changes do not
+justify a steady-state speed/memory claim. Release selection, signing and
+publication remain unselected. V1-V32 and earlier V33 evidence are unchanged.
+
+[processor]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientBeanFactoryInitializationAotProcessor.java
+[review-tests]: ../../reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/config/EffectiveSelectionAotReviewTest.java
+[contract-tests]: ../../reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/config/AotPropertiesSelectionContractTest.java
+[smoke-tests]: ../../reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/config/ReactiveHttpClientAotSmokeTest.java

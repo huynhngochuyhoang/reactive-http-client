@@ -9,11 +9,17 @@ import org.springframework.aot.hint.ReflectionHints;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.beans.PropertyValue;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.FactoryBean;
+import org.springframework.beans.factory.NoSuchBeanDefinitionException;
+import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.config.NamedBeanHolder;
+import org.springframework.beans.factory.support.AbstractBeanFactory;
+import org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.core.ResolvableType;
@@ -90,34 +96,74 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     }
 
     private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory) {
-        String[] beanNames = beanFactory.getBeanNamesForType(
-                ReactiveHttpClientProperties.class, false, false);
-        List<String> primaryBeanNames = new ArrayList<>();
-        for (String beanName : beanNames) {
-            if (beanFactory.containsBeanDefinition(beanName)
-                    && beanFactory.getBeanDefinition(beanName).isPrimary()) {
-                primaryBeanNames.add(beanName);
+        Set<Object> initialized = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (BeanFactory current = beanFactory; current instanceof ConfigurableListableBeanFactory configurable;
+             current = configurable.getParentBeanFactory()) {
+            for (String name : configurable.getSingletonNames()) {
+                if (configurable.getSingleton(name) instanceof ReactiveHttpClientProperties properties) {
+                    initialized.add(properties);
+                }
             }
         }
-        if (primaryBeanNames.size() == 1) {
-            return beanFactory.getBean(primaryBeanNames.get(0), ReactiveHttpClientProperties.class);
-        }
-        if (primaryBeanNames.size() > 1) {
-            return beanFactory.getBeanProvider(ReactiveHttpClientProperties.class)
-                    .getIfAvailable(ReactiveHttpClientProperties::new);
-        }
-        for (String beanName : beanNames) {
-            if (beanFactory.containsSingleton(beanName)) {
-                return beanFactory.getBean(beanName, ReactiveHttpClientProperties.class);
+        NamedBeanHolder<ReactiveHttpClientProperties> selected;
+        try {
+            selected = beanFactory.resolveNamedBean(ReactiveHttpClientProperties.class);
+        } catch (NoUniqueBeanDefinitionException ex) {
+            throw ex;
+        } catch (NoSuchBeanDefinitionException ex) {
+            if (ex.getResolvableType() == null
+                    || ex.getResolvableType().resolve() != ReactiveHttpClientProperties.class) {
+                throw ex;
             }
+            // Named resolution cannot delegate to an opaque parent, unlike a provider.
+            BeanFactory ancestor = beanFactory;
+            while (ancestor instanceof ConfigurableListableBeanFactory configurable) {
+                ancestor = configurable.getParentBeanFactory();
+            }
+            return ancestor != null
+                    ? ancestor.getBeanProvider(ReactiveHttpClientProperties.class)
+                            .getIfAvailable(this::environmentProperties)
+                    : environmentProperties();
         }
-        if (environment != null) {
-            return Binder.get(environment)
-                    .bind("reactive.http", Bindable.of(ReactiveHttpClientProperties.class))
-                    .orElseGet(ReactiveHttpClientProperties::new);
+        if (!initialized.contains(selected.getBeanInstance())) {
+            bindSelectedPropertiesForAot(beanFactory, selected);
         }
-        return beanFactory.getBeanProvider(ReactiveHttpClientProperties.class)
-                .getIfAvailable(ReactiveHttpClientProperties::new);
+        return selected.getBeanInstance();
+    }
+
+    private ReactiveHttpClientProperties environmentProperties() {
+        return environment != null
+                ? Binder.get(environment)
+                        .bind("reactive.http", Bindable.of(ReactiveHttpClientProperties.class))
+                        .orElseGet(ReactiveHttpClientProperties::new)
+                : new ReactiveHttpClientProperties();
+    }
+
+    private static void bindSelectedPropertiesForAot(ConfigurableListableBeanFactory beanFactory,
+                                                     NamedBeanHolder<ReactiveHttpClientProperties> selected) {
+        while (true) {
+            Class<?> localType = beanFactory.containsLocalBean(selected.getBeanName())
+                    ? beanFactory.getType(selected.getBeanName(), false) : null;
+            if (localType != null && ReactiveHttpClientProperties.class.isAssignableFrom(localType)) {
+                break;
+            }
+            if (!(beanFactory.getParentBeanFactory() instanceof ConfigurableListableBeanFactory parent)) {
+                return;
+            }
+            beanFactory = parent;
+        }
+        // AOT refresh omits ordinary BeanPostProcessors. Bind only the selected bean
+        // with Boot's own metadata/binder; do not install processors on the factory.
+        if (beanFactory instanceof AbstractBeanFactory factory
+                && beanFactory.containsBeanDefinition(selected.getBeanName())
+                && !factory.isFactoryBean(selected.getBeanName())
+                && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)
+                && factory.getBeanPostProcessors().stream()
+                        .noneMatch(ConfigurationPropertiesBindingPostProcessor.class::isInstance)) {
+            factory.getBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                            ConfigurationPropertiesBindingPostProcessor.class)
+                    .postProcessBeforeInitialization(selected.getBeanInstance(), selected.getBeanName());
+        }
     }
 
     private static boolean isCacheSelected(

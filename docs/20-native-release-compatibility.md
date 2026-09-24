@@ -182,8 +182,9 @@ Fresh Maven Central artifact and assembled-consumer verification establish
 published `4.4.1` as the public, strict API and benchmark baseline. Reactor-only
 coordinates are `4.5.0-SNAPSHOT`. [V33](../roadmaps/v33/CHECKLIST.md) is active
 with [F001/F002/F003 approved for correction](../roadmaps/v33/FIX-DECISION.md);
-[F001](../roadmaps/v33/BUILDER-OWNERSHIP.md) and
-[F002](../roadmaps/v33/STATIC-METADATA.md) are implemented, F003 is pending,
+[F001](../roadmaps/v33/BUILDER-OWNERSHIP.md),
+[F002](../roadmaps/v33/STATIC-METADATA.md) and
+[F003](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) are implemented,
 and next release scope remains unselected.
 V1-V32 are completed release records.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
@@ -191,7 +192,7 @@ records the release tag, successful signing/staging/packaging/deployment workflo
 13 verified signed Central artifacts and published-consumer results.
 The historical [architecture decision](../roadmaps/v32/ARCHITECTURE-DECISION.md)
 records F004/F005 implemented and F001-F003 deferred with their workarounds;
-the V33 decision selects those three, with F001 now corrected in development.
+the V33 decision selects those three, now corrected in development.
 [Priority 10](../roadmaps/v32/COMPATIBILITY-VERIFICATION.md) retains its original
 snapshot API, supported-Boot, JVM/AOT/native results and earlier failures.
 Publication does not relabel them as a new final-coordinate native build.
@@ -218,11 +219,19 @@ retained, and API-ref configuration still wins routing; keep all metadata
 consistent and do not mutate it after plan consumption. No internal type needs
 to be exposed or accessed reflectively.
 
-AOT properties selection can still differ from runtime for
+In published `4.4.1`, AOT properties selection can still differ from runtime for
 initialized non-primary candidates (F003); designate the intended programmatic
-properties bean primary. This remains pending, not a universal replacement
-or native guarantee. See the linked decision record for evidence gaps and
-reconsideration triggers; no reflective internal API workaround is supported.
+properties bean primary on that version. In `4.5.0-SNAPSHOT`,
+[AOT selection](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) delegates to Spring
+instead of choosing the first initialized bean. Ambiguity and invalid selected
+configuration fail; they do not select an inactive bean or environment fallback.
+Boot binds newly resolved ordinary properties for AOT validation when its normal
+binding processor is not installed. Existing prepared instances and FactoryBean
+products are not rebound, and a normal runtime binding pass is not repeated.
+Properties and metadata may be created for AOT validation, not business clients,
+cache managers, transports or signers. This is not an eager diagnostics path or
+a universal replacement/native guarantee; final native and supported-Boot
+evidence remains pending. No reflective internal API workaround is supported.
 
 ### V31 additive surface freeze
 
