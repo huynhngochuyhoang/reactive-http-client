@@ -28,6 +28,7 @@ import org.springframework.beans.factory.support.MergedBeanDefinitionPostProcess
 import org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.PriorityOrdered;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.env.Environment;
 import org.springframework.util.ClassUtils;
@@ -69,13 +70,19 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                                 .noneMatch(ConfigurationPropertiesBindingPostProcessor.class::isInstance)) {
                     var binding = new PropertiesBinding(factory);
                     bindings.put(factory, binding);
-                    // AOT appends merged-definition processors after context-awareness infrastructure.
-                    // Bind before their init callbacks without overtaking awareness callbacks.
                     var processors = factory.getBeanPostProcessors();
                     int index = 0;
-                    while (index < processors.size()
-                            && !(processors.get(index) instanceof MergedBeanDefinitionPostProcessor)) {
-                        index++;
+                    int bindingOrder = new ConfigurationPropertiesBindingPostProcessor().getOrder();
+                    // Preserve awareness and higher-priority regular processors; Spring
+                    // moves merged-definition processors into the trailing internal group.
+                    for (int i = 0; i < processors.size(); i++) {
+                        var processor = processors.get(i);
+                        if (isAwarenessInfrastructure(processor)
+                                || (!(processor instanceof MergedBeanDefinitionPostProcessor)
+                                    && processor instanceof PriorityOrdered ordered
+                                    && ordered.getOrder() < bindingOrder)) {
+                            index = i + 1;
+                        }
                     }
                     processors.add(index, binding);
                 }
@@ -125,6 +132,23 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 }
             });
         });
+    }
+
+    private static boolean isAwarenessInfrastructure(BeanPostProcessor processor) {
+        // Some Spring awareness processors are package-private; identify their types
+        // without invoking private APIs or linking the optional servlet integration.
+        for (Class<?> type = processor.getClass(); type != null; type = type.getSuperclass()) {
+            switch (type.getName()) {
+                case "org.springframework.context.support.ApplicationContextAwareProcessor",
+                     "org.springframework.context.annotation.ConfigurationClassPostProcessor$ImportAwareBeanPostProcessor",
+                     "org.springframework.context.weaving.LoadTimeWeaverAwareProcessor",
+                     "org.springframework.web.context.support.ServletContextAwareProcessor":
+                    return true;
+                default:
+                    break;
+            }
+        }
+        return false;
     }
 
     private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory,

@@ -387,6 +387,24 @@ errors, **289 focused cases** (52 selection cases) and **73 documentation cases*
 passing with explicit GC disabled, zero failures/errors/skips. The companion
 record retains earlier provenance and the pending consumer/API/matrix/native gates.
 
+Awareness-order review correction, 2026-09-24: temporary binding follows context
+awareness and precedes AOT's merged-definition/init processors. Existing lifecycle
+cases now require injected environment and application context during binding,
+matching normal refresh for ordinary and programmatic scoped-proxy properties.
+Evidence under `target/release-evidence/v33/priority5-awareness-binding/` retains
+three pre-fix errors and **289 focused / 73 documentation cases** passing, zero
+failures/errors/skips, explicit GC disabled. Cleanup, earlier provenance and
+pending consumer/API/matrix/native gates remain unchanged.
+
+Ordinary-processor review correction, 2026-09-24: the temporary binder now precedes
+ordinary application post-processors as well as init callbacks, while preserving
+Spring awareness infrastructure and higher-priority regular processors. Six new
+runtime/AOT ordering cases cover ordinary properties and both programmatic proxy
+forms. Evidence under `target/release-evidence/v33/priority5-ordinary-processors/`
+retains three pre-fix errors and **295 focused / 73 documentation cases** passing,
+zero failures/errors/skips, explicit GC disabled. The companion record explains
+the insertion boundary and retains prior evidence and pending release gates.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

@@ -45,6 +45,72 @@ class AotPropertiesSelectionContractTest {
     enum LifecycleShape { ORDINARY, BEAN_PROXY, SUPPLIER_PROXY }
 
     @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "BEAN_PROXY,false", "SUPPLIER_PROXY,false",
+            "ORDINARY,true", "BEAN_PROXY,true", "SUPPLIER_PROXY,true"})
+    void bindingPrecedesOrdinaryApplicationPostProcessors(LifecycleShape shape, boolean priorityProcessor) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            aot.registerBean("applicationProcessor", OrdinaryPropertiesPostProcessor.class);
+            runtime.registerBean("applicationProcessor", OrdinaryPropertiesPostProcessor.class);
+            if (priorityProcessor) {
+                aot.registerBean("priorityProcessor", BeforeBindingPostProcessor.class);
+                runtime.registerBean("priorityProcessor", BeforeBindingPostProcessor.class);
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            // An earlier AOT processor installs the application processor. As at runtime,
+            // merged-definition processors remain at the end of the registered chain.
+            var internalProcessors = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance)
+                    .toList();
+            if (priorityProcessor) factory.addBeanPostProcessor(aot.getBean(BeforeBindingPostProcessor.class));
+            factory.addBeanPostProcessor(aot.getBean(OrdinaryPropertiesPostProcessor.class));
+            factory.addBeanPostProcessors(internalProcessors);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            assertThat(aotCalls).isEmpty();
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject()
+                    .getClients().get("selection");
+            var expectedCalls = new java.util.ArrayList<>(java.util.List.of("construct", "environment", "applicationContext"));
+            if (priorityProcessor) expectedCalls.add("priority");
+            expectedCalls.addAll(java.util.List.of("bind", "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000"));
+            assertThat(runtimeCalls).containsExactlyElementsOf(expectedCalls);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class OrdinaryPropertiesPostProcessor implements org.springframework.beans.factory.config.BeanPostProcessor {
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            if (bean instanceof LifecycleProperties properties) properties.record("ordinary");
+            return bean;
+        }
+    }
+
+    static class BeforeBindingPostProcessor implements org.springframework.beans.factory.config.BeanPostProcessor,
+            org.springframework.core.PriorityOrdered {
+        @Override public int getOrder() { return HIGHEST_PRECEDENCE; }
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            if (bean instanceof LifecycleProperties properties) {
+                assertThat(properties.environment).isNotNull();
+                assertThat(properties.applicationContext).isNotNull();
+                assertThat(properties.getClients()).isEmpty();
+                properties.calls.add("priority");
+            }
+            return bean;
+        }
+    }
+
+    @ParameterizedTest
     @EnumSource(LifecycleShape.class)
     void bindingPrecedesInitializationAndSupportsProgrammaticProxies(LifecycleShape shape) {
         var aotCalls = new java.util.ArrayList<String>();

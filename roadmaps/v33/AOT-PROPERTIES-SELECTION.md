@@ -26,7 +26,7 @@ for the binding step, not as a new registry or public selection API.
 | No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
 | Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean sharing the selected parent's name cannot supply its binding environment or metadata. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
-| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor after context-awareness callbacks and before initialization callbacks, including `@Bean` binding metadata. It is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. No environment-derived replacement object is substituted. |
+| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor after context-awareness callbacks and before ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Higher-priority regular processors retain their precedence. It is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. No environment-derived replacement object is substituted. |
 | Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
 | Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. This covers `@Bean` and supplier-configured factories without a definition property. Binding uses the target name/definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
@@ -247,6 +247,8 @@ This retains awareness before binding and binding before init-annotation callbac
 without sorting or replacing the existing processor list. If no merged-definition
 processors are installed, the temporary callback follows the existing infrastructure;
 `InitializingBean` and custom init methods still run afterward.
+The ordinary-processor correction below supersedes this merged-definition-only
+insertion boundary; its recorded test results remain historical evidence.
 
 The three existing lifecycle success cases now require `EnvironmentAware` and
 `ApplicationContextAware` before the binding setter can run. The setter checks
@@ -264,6 +266,41 @@ cases, not additional test counts. Separate evidence under
 `target/release-evidence/v33/priority5-awareness-binding/` preserves the source
 base, patch, red/green XML, commands and logs, sealed with `SHA256SUMS`. Earlier
 bundles are unchanged; consumer/API/matrix/native checks were not rerun.
+
+## Ordinary-Processor Review Correction
+
+The follow-up on `71e18003` no longer uses the first merged-definition processor
+as the insertion boundary. Ordinary application processors can already be
+registered ahead of that trailing internal group. Three paired runtime/AOT cases
+reproduce the resulting AOT failure with `unbound initialization: ordinary` while
+normal refresh binds first.
+
+Temporary binding now follows Spring's awareness-infrastructure prefix and any
+regular `PriorityOrdered` processor ahead of Boot's binding order, but precedes
+ordinary application processors and the trailing init processors. Awareness
+infrastructure is identified by its Spring type names (including superclass
+checks), since some of those classes are package-private. No private member is
+invoked and no optional servlet class is linked. The existing processor order is
+not sorted or replaced, and temporary registration is still removed in `finally`.
+
+Six new cases install an ordinary non-merged processor before AOT validation,
+as an earlier AOT processor may do, with the merged-definition group at the end.
+For ordinary, `@Bean`-proxy and supplier-proxy properties, the complete sequence
+matches independently refreshed runtime contexts: awareness, binding, application
+processing, init annotation, `InitializingBean`, custom init. Three of those cases
+also require a highest-priority regular processor to run after awareness but
+before binding. The tests verify the selected values, original processor-list
+restoration and zero business-resource creation; existing failure cleanup and
+earlier-instance controls remain covered.
+
+The nine-class focused command above passes **295 cases**, including **58**
+selection-contract cases; the documentation command passes **73 cases**, zero
+failures/errors/skips, with explicit GC disabled. Separate evidence under
+`target/release-evidence/v33/priority5-ordinary-processors/` preserves the three-case
+pre-fix errors, final XML, commands, source base, reviewed patch and hashes.
+The incoming uncommitted checklist addition is retained in that patch. Earlier
+sealed bundles and consumer/API/matrix/native evidence are not relabeled as
+verification of this correction; those suites were not rerun here.
 
 ## Rollback and Remaining Gates
 
