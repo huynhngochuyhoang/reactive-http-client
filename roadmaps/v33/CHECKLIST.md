@@ -363,6 +363,18 @@ The nine-class focused rerun passes **271 cases**, including 34 selection cases;
 the documentation rerun passes **73 cases**, all with zero failures/errors/skips
 and explicit GC disabled. Original assembled/native scope is unchanged.
 
+Scoped-proxy review correction, 2026-09-24: Spring scoped proxies now resolve and
+bind their target using its definition metadata, and AOT validates that same
+instance (including prototype targets). Ordinary FactoryBean products remain
+excluded. Nine new cases cover scoped/prototype targets, alternate binding
+prefixes, invalid configuration, early creation, runtime binding and parent
+ownership, with counted creation and zero business-resource assembly.
+Follow-up evidence: `target/release-evidence/v33/priority5-scoped-binding/`;
+**280 focused cases** and **73 documentation cases** pass, zero failures/errors/
+skips, explicit GC disabled. Four pre-fix errors and the initial fixture compile
+error are retained. The companion record states scope availability and remaining
+consumer/API/matrix/native limitations; no release gate is closed by this rerun.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

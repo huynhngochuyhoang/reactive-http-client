@@ -4,6 +4,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
 import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBean;
+import org.springframework.aop.scope.ScopedProxyFactoryBean;
 import org.springframework.aot.hint.ExecutableMode;
 import org.springframework.aot.hint.ReflectionHints;
 import org.springframework.aot.hint.RuntimeHints;
@@ -116,8 +117,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                             .getIfAvailable(this::environmentProperties)
                     : environmentProperties();
         }
-        bindSelectedPropertiesForAot(beanFactory, selected);
-        return selected.getBeanInstance();
+        return bindSelectedPropertiesForAot(beanFactory, selected);
     }
 
     private ReactiveHttpClientProperties environmentProperties() {
@@ -128,8 +128,8 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 : new ReactiveHttpClientProperties();
     }
 
-    private static void bindSelectedPropertiesForAot(ConfigurableListableBeanFactory beanFactory,
-                                                     NamedBeanHolder<ReactiveHttpClientProperties> selected) {
+    private static ReactiveHttpClientProperties bindSelectedPropertiesForAot(
+            ConfigurableListableBeanFactory beanFactory, NamedBeanHolder<ReactiveHttpClientProperties> selected) {
         while (true) {
             Class<?> localType = beanFactory.containsLocalBean(selected.getBeanName())
                     ? beanFactory.getType(selected.getBeanName(), false) : null;
@@ -137,16 +137,30 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 break;
             }
             if (!(beanFactory.getParentBeanFactory() instanceof ConfigurableListableBeanFactory parent)) {
-                return;
+                return selected.getBeanInstance();
             }
             beanFactory = parent;
+        }
+        if (beanFactory.containsBeanDefinition(selected.getBeanName())
+                && beanFactory.isFactoryBean(selected.getBeanName())) {
+            Class<?> factoryType = beanFactory.getType(BeanFactory.FACTORY_BEAN_PREFIX + selected.getBeanName(), false);
+            if (factoryType == null || !ScopedProxyFactoryBean.class.isAssignableFrom(factoryType)) {
+                return selected.getBeanInstance();
+            }
+            Object targetName = beanFactory.getMergedBeanDefinition(selected.getBeanName())
+                    .getPropertyValues().get("targetBeanName");
+            if (!(targetName instanceof String name) || !StringUtils.hasText(name)) {
+                throw new IllegalStateException("Scoped properties proxy has no targetBeanName: " + selected.getBeanName());
+            }
+            // Validate the same target that was bound, including prototype-scoped targets.
+            return bindSelectedPropertiesForAot(beanFactory, new NamedBeanHolder<>(name,
+                    beanFactory.getBean(name, ReactiveHttpClientProperties.class)));
         }
         // AOT refresh omits ordinary BeanPostProcessors, even for a definition-created
         // singleton resolved by an earlier processor. Bind the selected definition;
         // definition-less registrations and normally bound beans need no manual pass.
         if (beanFactory instanceof AbstractBeanFactory factory
                 && beanFactory.containsBeanDefinition(selected.getBeanName())
-                && !factory.isFactoryBean(selected.getBeanName())
                 && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)
                 && factory.getBeanPostProcessors().stream()
                         .noneMatch(ConfigurationPropertiesBindingPostProcessor.class::isInstance)) {
@@ -154,6 +168,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                             ConfigurationPropertiesBindingPostProcessor.class)
                     .postProcessBeforeInitialization(selected.getBeanInstance(), selected.getBeanName());
         }
+        return selected.getBeanInstance();
     }
 
     private static boolean isCacheSelected(

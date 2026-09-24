@@ -227,8 +227,12 @@ instead of choosing the first initialized bean. Ambiguity and invalid selected
 configuration fail; they do not select an inactive bean or environment fallback.
 Boot binds selected definition-backed ordinary properties for AOT validation when
 its normal binding processor is not installed, including singletons resolved by
-an earlier AOT processor. Definition-less direct registrations and FactoryBean
-products are not rebound, and a normal runtime binding pass is not repeated.
+an earlier AOT processor. For Spring scoped proxies, AOT resolves one scoped
+target and binds it using the target definition's configuration metadata before
+validating that same target. The scope must be available during AOT processing;
+the starter does not activate request/session scopes. Definition-less direct
+registrations and ordinary FactoryBean products are not rebound, and a normal
+runtime binding pass is not repeated.
 A direct singleton registered under an existing properties definition still
 follows that definition's binding contract; singleton presence alone does not
 establish that configuration binding has already run.

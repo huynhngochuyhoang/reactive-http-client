@@ -20,10 +20,7 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.context.annotation.AnnotationConfigApplicationContext;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
+import org.springframework.context.annotation.*;
 import org.springframework.core.OrderComparator;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
@@ -220,6 +217,119 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({"false, true", "true, true", "false, false", "true, false"})
+    void scopedPropertiesBindTargetMetadataAndUseOneTarget(boolean prototype, boolean cacheSelected) {
+        var aotCreations = new AtomicInteger();
+        var runtimeCreations = new AtomicInteger();
+        try (var aot = scopedBindingContext(prototype, aotCreations);
+             var runtime = scopedBindingContext(prototype, runtimeCreations)) {
+            var witness = witness(aot.getDefaultListableBeanFactory(), cacheSelected ? Client.class : PlainClient.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var selected = aot.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+            assertThat(selected).isInstanceOf(org.springframework.aop.scope.ScopedObject.class);
+            assertThat(aotCreations).hasValue(0);
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject()
+                    .getClients().get("selection");
+            assertThat(runtimeCreations).hasValue(1);
+            assertThat(expected.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(aot.getDefaultListableBeanFactory())).isNotNull();
+
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000)
+                    .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
+            assertThat(aotCreations).hasValue(1);
+            witness.assertNoBusinessResources(aot.getDefaultListableBeanFactory());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void invalidScopedPropertiesDoNotFallBackToTheValidDefault(boolean prototype) {
+        var creations = new AtomicInteger();
+        try (var context = scopedBindingContext(prototype, creations)) {
+            String prefix = prototype ? "prototype" : "scoped";
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("invalid-scoped", Map.of(
+                    prefix + ".clients.selection.cache.policies.chosen.ttl-ms", "0")));
+            var witness = witness(context.getDefaultListableBeanFactory(), Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+
+            assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(context.getDefaultListableBeanFactory()))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("ttl-ms");
+
+            assertThat(creations).hasValue(1);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isZero();
+            witness.assertNoBusinessResources(context.getDefaultListableBeanFactory());
+        }
+    }
+
+    @Test
+    void earlyCreatedScopedTargetIsBoundWithoutRecreation() {
+        var creations = new AtomicInteger();
+        try (var context = scopedBindingContext(false, creations)) {
+            var witness = witness(context.getDefaultListableBeanFactory(), Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            var proxy = context.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+            var target = (ReactiveHttpClientProperties) ((org.springframework.aop.scope.ScopedObject) proxy).getTargetObject();
+            assertThat(target.getClients()).isEmpty();
+            assertThat(creations).hasValue(1);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(context.getDefaultListableBeanFactory())).isNotNull();
+
+            assertThat(witness.config).isSameAs(target.getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(creations).hasValue(1);
+            witness.assertNoBusinessResources(context.getDefaultListableBeanFactory());
+        }
+    }
+
+    @Test
+    void normallyBoundScopedTargetIsNotRebound() {
+        var creations = new AtomicInteger();
+        try (var context = scopedBindingContext(false, creations)) {
+            var witness = witness(context.getDefaultListableBeanFactory(), Client.class);
+            context.refresh();
+            var selected = context.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients().get("selection");
+            assertThat(selected.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("later-scoped", Map.of(
+                    "scoped.clients.selection.cache.policies.chosen.ttl-ms", "0")));
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(context.getDefaultListableBeanFactory())).isNotNull();
+
+            assertThat(witness.config).isSameAs(selected);
+            assertThat(selected.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(creations).hasValue(1);
+            witness.assertNoBusinessResources(context.getDefaultListableBeanFactory());
+        }
+    }
+
+    @Test
+    void inheritedScopedProxyUsesParentBindingMetadataAndEnvironment() {
+        var creations = new AtomicInteger();
+        try (var parent = scopedBindingContext(false, creations);
+             var child = new AnnotationConfigApplicationContext()) {
+            child.setParent(parent);
+            child.registerBean("selected", String.class, () -> "unrelated");
+            child.getEnvironment().getPropertySources().addFirst(new MapPropertySource("child-invalid", Map.of(
+                    "scoped.clients.selection.cache.policies.chosen.ttl-ms", "0")));
+            var witness = witness(child.getDefaultListableBeanFactory(), Client.class);
+            parent.refreshForAotProcessing(new RuntimeHints());
+            child.refreshForAotProcessing(new RuntimeHints());
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(child.getEnvironment())
+                    .processAheadOfTime(child.getDefaultListableBeanFactory())).isNotNull();
+
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(creations).hasValue(1);
+            witness.assertNoBusinessResources(child.getDefaultListableBeanFactory());
+        }
+    }
+
     @Test
     void normalBindingIsNotRepeatedOnAnInitializedBean() {
         try (var context = bindingContext(false)) {
@@ -367,6 +477,40 @@ class AotPropertiesSelectionContractTest {
     static class ReplacementBinding {
         @Bean @Primary @ConfigurationProperties("replacement")
         ReactiveHttpClientProperties selected() { return new ReactiveHttpClientProperties(); }
+    }
+
+    private static AnnotationConfigApplicationContext scopedBindingContext(boolean prototype, AtomicInteger creations) {
+        var context = bindingContext(false);
+        context.register(prototype ? PrototypeProxyBinding.class : ScopedProxyBinding.class);
+        String prefix = prototype ? "prototype" : "scoped";
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("scoped-binding", Map.of(
+                prefix + ".clients.selection.cache.policies.chosen.ttl-ms", "7000",
+                prefix + ".clients.selection.cache.policies.chosen.maximum-size", "16",
+                prefix + ".clients.selection.cache.policies.chosen.shared-response", "true",
+                prefix + ".clients.selection.cache.customizations.Builder", "SAFE")));
+        context.getBeanFactory().registerScope("test", new org.springframework.context.support.SimpleThreadScope());
+        context.getBeanFactory().registerSingleton("targetCreations", creations);
+        return context;
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class ScopedProxyBinding {
+        @Bean @Primary @ConfigurationProperties("scoped")
+        @Scope(value = "test", proxyMode = ScopedProxyMode.TARGET_CLASS)
+        ReactiveHttpClientProperties selected(AtomicInteger targetCreations) {
+            targetCreations.incrementAndGet();
+            return new ReactiveHttpClientProperties();
+        }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class PrototypeProxyBinding {
+        @Bean @Primary @ConfigurationProperties("prototype")
+        @Scope(value = "prototype", proxyMode = ScopedProxyMode.TARGET_CLASS)
+        ReactiveHttpClientProperties selected(AtomicInteger targetCreations) {
+            targetCreations.incrementAndGet();
+            return new ReactiveHttpClientProperties();
+        }
     }
 
     private static DefaultListableBeanFactory propertiesFactory(Shape shape, AtomicInteger products,

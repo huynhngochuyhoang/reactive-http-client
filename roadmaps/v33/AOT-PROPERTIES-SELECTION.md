@@ -27,7 +27,8 @@ for the binding step, not as a new registry or public selection API.
 | Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean sharing the selected parent's name cannot supply its binding environment or metadata. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
 | Boot binding | AOT refresh does not install ordinary binding post-processors. The selected definition-backed ordinary bean uses the owning factory's Boot binding processor, including `@Bean` binding metadata, when that processor is registered but not installed. This includes singletons resolved by an earlier AOT processor. No processor is installed globally and no environment-derived replacement object is substituted. |
-| Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
+| Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
+| Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved to its configured target. Binding uses the target name/definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
 | Foreign client factory | An annotated interface backed by a foreign factory is excluded before properties or metadata lookup; its factory and product remain uncreated. |
 
@@ -163,6 +164,41 @@ Final follow-up results: **271 focused cases** (34 in the selection contract) an
 **73 documentation cases**, zero failures/errors/skips, explicit GC disabled.
 The separate review bundle preserves red/green XML, commands, source base and
 reviewed patch and is sealed with `SHA256SUMS`.
+
+## Scoped-Proxy Review Correction
+
+The follow-up on `6e3ebf5c` distinguishes Spring scoped proxies from ordinary
+FactoryBean products. The prior blanket FactoryBean exclusion left scoped
+properties targets unbound during AOT processing. Four pre-fix cases reproduce
+cache-policy rejection or missing ordinary-client configuration, while separately
+refreshed runtime contexts bind the target correctly.
+
+The processor uses the selected scoped-proxy definition's `targetBeanName` and
+the owning bean factory, then applies the existing binding rules to that target.
+Returning the resolved target for this validation pass avoids binding one
+prototype instance and validating a different one. This is a build-time
+configuration sample, not a change to runtime scoped-proxy dispatch. Ordinary
+FactoryBean products remain excluded. Custom scopes must already be registered
+and usable; inactive request/session scopes are not manufactured or silently
+replaced with environment/default configuration.
+
+Nine new cases cover class-based scoped and prototype proxies with and without
+cache selection, an alternate `@Bean` prefix, invalid preferred configuration,
+an already-created unbound scoped target, normal runtime binding without rebind,
+and parent-owned scoped properties despite an unrelated child name collision.
+Creation counters require one target per validation pass; existing ownership
+assertions require no business client, transport, signer or cache telemetry.
+
+The nine-class focused command above passes **280 cases**, including **43**
+selection-contract cases. The documentation command passes **73 cases**; both
+runs have zero failures/errors/skips and disable explicit GC. The initial fixture
+compile error (duplicate metadata prefixes) and four pre-fix errors are retained
+under `target/release-evidence/v33/priority5-scoped-binding/`, separately from
+earlier sealed evidence. The regression-only command uses
+`-Dtest=AotPropertiesSelectionContractTest#scopedPropertiesBindTargetMetadataAndUseOneTarget`.
+Source/commands/patch, red/green XML and hashes are preserved with `SHA256SUMS`.
+Consumer, strict API, supported-Boot matrix and native checks were not rerun for
+this correction; their remaining gates and historical claims are unchanged.
 
 ## Rollback and Remaining Gates
 
