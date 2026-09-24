@@ -28,7 +28,7 @@ for the binding step, not as a new registry or public selection API.
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
 | Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor after context-awareness callbacks and before ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Higher-priority regular processors retain their precedence. It is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. No environment-derived replacement object is substituted. |
 | Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
-| Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. This covers `@Bean` and supplier-configured factories without a definition property. Binding uses the target name/definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
+| Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. Opaque programmatic proxies can instead use a build-time read of the cached singleton factory's target name. This covers `@Bean` and supplier-configured singleton factories without a definition property. Binding uses the target name/definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
 | Foreign client factory | An annotated interface backed by a foreign factory is excluded before properties or metadata lookup; its factory and product remain uncreated. |
 
@@ -301,6 +301,40 @@ pre-fix errors, final XML, commands, source base, reviewed patch and hashes.
 The incoming uncommitted checklist addition is retained in that patch. Earlier
 sealed bundles and consumer/API/matrix/native evidence are not relabeled as
 verification of this correction; those suites were not rerun here.
+
+## Opaque Scoped-Proxy Review Correction
+
+The follow-up on `1d032418` covers programmatic scoped factories using
+`setOpaque(true)`: their proxy intentionally hides `Advised`, and their bean
+definition need not contain the target name. A five-case pre-fix lifecycle run
+retains three successful controls and two target-name errors for opaque `@Bean`
+and supplier factories, even though the independent runtime contexts succeed.
+
+After public proxy and definition metadata are exhausted, AOT reads the
+`targetBeanName` field declared by `ScopedProxyFactoryBean` from its already-cached
+singleton instance. This is a narrow, build-time dependency on Spring's internal
+field, accessed through `ReflectionUtils`; it is not application-facing reflection
+or a runtime/native-image request path. No factory is created for this fallback,
+no proxy is rebuilt or made non-opaque, and no target name is guessed. An opaque
+factory outside the singleton cache must supply definition metadata; unavailable
+metadata still fails rather than instantiating a different factory. The existing
+target lookup/binding path then applies the correct target prefix and scope.
+
+Thirteen added cases cover opaque `@Bean` and supplier proxies across lifecycle
+ordering, ordinary/higher-priority application processing and binding/init failure
+cleanup. The success cases require the same proxy instance, no `Advised` exposure,
+and one prototype target with one binding pass. Further controls cover an
+already-created scoped target, a normally bound target without rebind, and
+parent-owned target metadata despite an unrelated child bean of the same name.
+Existing ordinary FactoryBean and business-resource ownership controls remain.
+
+The nine-class focused command above passes **308 cases**, including **71**
+selection-contract cases; the documentation command passes **73 cases**, with
+zero failures/errors/skips and explicit GC disabled. Evidence under
+`target/release-evidence/v33/priority5-opaque-scoped-binding/` preserves the pre-fix
+run, final XML, commands, source base, patch and `SHA256SUMS`. Earlier sealed
+bundles are unchanged. Consumer/API/matrix/native suites were not rerun; supported
+Spring upgrades must retain or deliberately replace this field-access bridge.
 
 ## Rollback and Remaining Gates
 

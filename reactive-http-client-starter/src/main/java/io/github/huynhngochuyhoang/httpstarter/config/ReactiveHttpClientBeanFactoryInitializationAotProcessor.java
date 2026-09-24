@@ -32,6 +32,7 @@ import org.springframework.core.PriorityOrdered;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.env.Environment;
 import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 import java.lang.reflect.Type;
@@ -211,6 +212,18 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             } else {
                 targetName = beanFactory.getMergedBeanDefinition(selected.getBeanName())
                         .getPropertyValues().get("targetBeanName");
+            }
+            if (!(targetName instanceof String candidate) || !StringUtils.hasText(candidate)) {
+                // Opaque programmatic proxies hide Advised and may have no definition property.
+                // Read only the initialized factory at build time; never create a second factory.
+                Object factory = beanFactory.getSingleton(selected.getBeanName());
+                if (factory instanceof ScopedProxyFactoryBean) {
+                    var field = ReflectionUtils.findField(ScopedProxyFactoryBean.class, "targetBeanName", String.class);
+                    if (field != null) {
+                        ReflectionUtils.makeAccessible(field);
+                        targetName = ReflectionUtils.getField(field, factory);
+                    }
+                }
             }
             if (!(targetName instanceof String name) || !StringUtils.hasText(name)) {
                 throw new IllegalStateException("Scoped properties proxy has no targetBeanName: " + selected.getBeanName());

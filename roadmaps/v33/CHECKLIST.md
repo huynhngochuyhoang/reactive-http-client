@@ -405,6 +405,17 @@ retains three pre-fix errors and **295 focused / 73 documentation cases** passin
 zero failures/errors/skips, explicit GC disabled. The companion record explains
 the insertion boundary and retains prior evidence and pending release gates.
 
+Opaque scoped-proxy review correction, 2026-09-24: when public proxy/definition
+metadata is unavailable, AOT reads the target name from the already-initialized
+singleton scoped factory without recreating it or changing proxy opacity. The
+companion record documents this build-time Spring field dependency and the
+definition-metadata requirement for non-cached opaque factories. Thirteen added
+cases cover opaque registration forms, target/binding counts, callback ordering,
+failure cleanup, early/normal targets and parent ownership. Separate evidence in
+`target/release-evidence/v33/priority5-opaque-scoped-binding/` records two pre-fix
+errors among five cases, then **308 focused / 73 documentation cases** passing,
+zero failures/errors/skips, explicit GC disabled. Remaining release gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

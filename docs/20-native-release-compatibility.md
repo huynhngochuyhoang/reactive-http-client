@@ -235,8 +235,12 @@ Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
 For Spring scoped proxies, AOT uses the initialized proxy's target source or its
 definition metadata to resolve one target, including proxies configured through
-an `@Bean` method or instance supplier. It binds using the target definition's
-configuration metadata and validates that same target. The scope must be available during AOT processing;
+an `@Bean` method or instance supplier. When an opaque proxy exposes neither,
+a build-time reflective read of the already-cached singleton factory supplies
+the target name; the proxy is not rebuilt or made non-opaque. A non-cached opaque
+factory must supply target-name definition metadata instead. Binding uses the
+target definition's configuration metadata and validates that same target.
+The scope must be available during AOT processing;
 the starter does not activate request/session scopes. Definition-less direct
 registrations and ordinary FactoryBean products are not rebound, and a normal
 runtime binding pass is not repeated.
@@ -246,7 +250,7 @@ establish that configuration binding has already run.
 Properties and metadata may be created for AOT validation, not business clients,
 cache managers, transports or signers. This is not an eager diagnostics path or
 a universal replacement/native guarantee; final native and supported-Boot
-evidence remains pending. No reflective internal API workaround is supported.
+evidence remains pending. No application-side reflective workaround is required.
 
 ### V31 additive surface freeze
 

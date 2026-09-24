@@ -42,11 +42,13 @@ class AotPropertiesSelectionContractTest {
     enum Preference { PRIMARY, NON_FALLBACK, PRIORITY, DEFAULT }
     enum Shape { LAZY, PROTOTYPE, TYPED_FACTORY, RAW_FACTORY, DIRECT_FACTORY, PROTOTYPE_FACTORY }
     enum Hierarchy { PARENT_ONLY, CHILD_SHADOWS, LOCAL_OVER_PARENT_PRIMARY }
-    enum LifecycleShape { ORDINARY, BEAN_PROXY, SUPPLIER_PROXY }
+    enum LifecycleShape { ORDINARY, BEAN_PROXY, SUPPLIER_PROXY, OPAQUE_BEAN_PROXY, OPAQUE_SUPPLIER_PROXY }
 
     @ParameterizedTest
     @CsvSource({"ORDINARY,false", "BEAN_PROXY,false", "SUPPLIER_PROXY,false",
-            "ORDINARY,true", "BEAN_PROXY,true", "SUPPLIER_PROXY,true"})
+            "ORDINARY,true", "BEAN_PROXY,true", "SUPPLIER_PROXY,true",
+            "OPAQUE_BEAN_PROXY,false", "OPAQUE_SUPPLIER_PROXY,false",
+            "OPAQUE_BEAN_PROXY,true", "OPAQUE_SUPPLIER_PROXY,true"})
     void bindingPrecedesOrdinaryApplicationPostProcessors(LifecycleShape shape, boolean priorityProcessor) {
         var aotCalls = new java.util.ArrayList<String>();
         var runtimeCalls = new java.util.ArrayList<String>();
@@ -125,9 +127,15 @@ class AotPropertiesSelectionContractTest {
                     .getClients().get("selection");
             assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
                     "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+            Object proxy = null;
             if (shape != LifecycleShape.ORDINARY) {
+                proxy = aot.getBean("selectedProxy");
                 assertThat(aot.getBeanFactory().getMergedBeanDefinition("selectedProxy")
                         .getPropertyValues().get("targetBeanName")).isNull();
+                if (shape == LifecycleShape.OPAQUE_BEAN_PROXY || shape == LifecycleShape.OPAQUE_SUPPLIER_PROXY) {
+                    assertThat(proxy).isNotInstanceOf(org.springframework.aop.framework.Advised.class);
+                }
+                assertThat(aotCalls).isEmpty();
             }
 
             assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
@@ -137,13 +145,16 @@ class AotPropertiesSelectionContractTest {
             assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
                     .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
             assertThat(aot.getDefaultListableBeanFactory().getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            if (proxy != null) assertThat(aot.getBean("selectedProxy")).isSameAs(proxy);
             witness.assertNoBusinessResources(aot.getDefaultListableBeanFactory());
         }
     }
 
     @ParameterizedTest
     @CsvSource({"ORDINARY,false", "BEAN_PROXY,false", "SUPPLIER_PROXY,false",
-            "ORDINARY,true", "BEAN_PROXY,true", "SUPPLIER_PROXY,true"})
+            "ORDINARY,true", "BEAN_PROXY,true", "SUPPLIER_PROXY,true",
+            "OPAQUE_BEAN_PROXY,false", "OPAQUE_SUPPLIER_PROXY,false",
+            "OPAQUE_BEAN_PROXY,true", "OPAQUE_SUPPLIER_PROXY,true"})
     void temporaryBindingIsRemovedAfterBindingOrInitializationFailure(LifecycleShape shape, boolean failInitialization) {
         var calls = new java.util.ArrayList<String>();
         try (var context = lifecycleContext(shape, calls, failInitialization)) {
@@ -187,11 +198,12 @@ class AotPropertiesSelectionContractTest {
                 "lifecycle.clients.selection.cache.policies.chosen.maximum-size", "16",
                 "lifecycle.clients.selection.cache.policies.chosen.shared-response", "true",
                 "lifecycle.clients.selection.cache.customizations.Builder", "SAFE")));
-        if (shape == LifecycleShape.BEAN_PROXY) {
-            context.register(ProgrammaticProxyBinding.class);
-        } else if (shape == LifecycleShape.SUPPLIER_PROXY) {
+        boolean opaque = shape == LifecycleShape.OPAQUE_BEAN_PROXY || shape == LifecycleShape.OPAQUE_SUPPLIER_PROXY;
+        if (shape == LifecycleShape.BEAN_PROXY || shape == LifecycleShape.OPAQUE_BEAN_PROXY) {
+            context.register(opaque ? OpaqueProgrammaticProxyBinding.class : ProgrammaticProxyBinding.class);
+        } else if (shape == LifecycleShape.SUPPLIER_PROXY || shape == LifecycleShape.OPAQUE_SUPPLIER_PROXY) {
             var definition = new RootBeanDefinition(org.springframework.aop.scope.ScopedProxyFactoryBean.class,
-                    AotPropertiesSelectionContractTest::programmaticProxy);
+                    () -> programmaticProxy(opaque));
             definition.setPrimary(true);
             definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, LifecycleProperties.class);
             context.registerBeanDefinition("selectedProxy", definition);
@@ -206,8 +218,13 @@ class AotPropertiesSelectionContractTest {
     }
 
     private static org.springframework.aop.scope.ScopedProxyFactoryBean programmaticProxy() {
+        return programmaticProxy(false);
+    }
+
+    private static org.springframework.aop.scope.ScopedProxyFactoryBean programmaticProxy(boolean opaque) {
         var factory = new org.springframework.aop.scope.ScopedProxyFactoryBean();
         factory.setTargetBeanName("lifecycleTarget");
+        factory.setOpaque(opaque);
         return factory;
     }
 
@@ -215,6 +232,12 @@ class AotPropertiesSelectionContractTest {
     static class ProgrammaticProxyBinding {
         @Bean @Primary
         org.springframework.aop.scope.ScopedProxyFactoryBean selectedProxy() { return programmaticProxy(); }
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class OpaqueProgrammaticProxyBinding {
+        @Bean @Primary
+        org.springframework.aop.scope.ScopedProxyFactoryBean selectedProxy() { return programmaticProxy(true); }
     }
 
     @Configuration(proxyBeanMethods = false)
@@ -498,10 +521,12 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
-    @Test
-    void earlyCreatedScopedTargetIsBoundWithoutRecreation() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void earlyCreatedScopedTargetIsBoundWithoutRecreation(boolean opaque) {
         var creations = new AtomicInteger();
         try (var context = scopedBindingContext(false, creations)) {
+            if (opaque) useOpaqueProgrammaticScopedProxy(context);
             var witness = witness(context.getDefaultListableBeanFactory(), Client.class);
             context.refreshForAotProcessing(new RuntimeHints());
             var proxy = context.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
@@ -519,10 +544,12 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
-    @Test
-    void normallyBoundScopedTargetIsNotRebound() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void normallyBoundScopedTargetIsNotRebound(boolean opaque) {
         var creations = new AtomicInteger();
         try (var context = scopedBindingContext(false, creations)) {
+            if (opaque) useOpaqueProgrammaticScopedProxy(context);
             var witness = witness(context.getDefaultListableBeanFactory(), Client.class);
             context.refresh();
             var selected = context.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients().get("selection");
@@ -540,11 +567,13 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
-    @Test
-    void inheritedScopedProxyUsesParentBindingMetadataAndEnvironment() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void inheritedScopedProxyUsesParentBindingMetadataAndEnvironment(boolean opaque) {
         var creations = new AtomicInteger();
         try (var parent = scopedBindingContext(false, creations);
              var child = new AnnotationConfigApplicationContext()) {
+            if (opaque) useOpaqueProgrammaticScopedProxy(parent);
             child.setParent(parent);
             child.registerBean("selected", String.class, () -> "unrelated");
             child.getEnvironment().getPropertySources().addFirst(new MapPropertySource("child-invalid", Map.of(
@@ -723,6 +752,22 @@ class AotPropertiesSelectionContractTest {
         context.getBeanFactory().registerScope("test", new org.springframework.context.support.SimpleThreadScope());
         context.getBeanFactory().registerSingleton("targetCreations", creations);
         return context;
+    }
+
+    private static void useOpaqueProgrammaticScopedProxy(AnnotationConfigApplicationContext context) {
+        context.addBeanFactoryPostProcessor(factory -> {
+            var proxy = new RootBeanDefinition(org.springframework.aop.scope.ScopedProxyFactoryBean.class, () -> {
+                var value = new org.springframework.aop.scope.ScopedProxyFactoryBean();
+                value.setTargetBeanName("scopedTarget.selected");
+                value.setOpaque(true);
+                return value;
+            });
+            proxy.setPrimary(true);
+            proxy.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ReactiveHttpClientProperties.class);
+            var registry = (org.springframework.beans.factory.support.BeanDefinitionRegistry) factory;
+            registry.removeBeanDefinition("selected");
+            registry.registerBeanDefinition("selected", proxy);
+        });
     }
 
     @Configuration(proxyBeanMethods = false)
