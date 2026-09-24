@@ -26,8 +26,8 @@ for the binding step, not as a new registry or public selection API.
 | No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
 | Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean sharing the selected parent's name cannot supply its binding environment or metadata. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
-| Boot binding | AOT refresh does not install ordinary binding post-processors. A newly resolved ordinary bean uses the owning factory's Boot binding processor, including `@Bean` binding metadata, when that processor is registered but not installed. No processor is installed globally and no environment-derived replacement object is substituted. |
-| Existing values and products | A non-creating singleton inventory preserves already prepared properties by identity. Direct singletons, including one coexisting with a definition, are not rebound. FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
+| Boot binding | AOT refresh does not install ordinary binding post-processors. The selected definition-backed ordinary bean uses the owning factory's Boot binding processor, including `@Bean` binding metadata, when that processor is registered but not installed. This includes singletons resolved by an earlier AOT processor. No processor is installed globally and no environment-derived replacement object is substituted. |
+| Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
 | Foreign client factory | An annotated interface backed by a foreign factory is excluded before properties or metadata lookup; its factory and product remain uncreated. |
 
@@ -43,8 +43,11 @@ This binding step prepares the selected configuration for build-time validation;
 it is not a complete replay of runtime bean initialization. Application property
 constructors/factory methods and custom binders/converters remain application
 code. They must not depend on business traffic or produce owned transport/cache
-resources during configuration creation. Already prepared instances are not
-hot-reloaded, and their preparation is the registering application's responsibility.
+resources during configuration creation. Definition-less prepared registrations
+are not hot-reloaded, and their preparation is the registering application's
+responsibility. The public bean-factory API does not reliably distinguish a
+direct registration under an existing definition from that definition's early
+AOT-created singleton, so both follow the declared binding contract.
 
 ## Ownership and Limits
 
@@ -74,7 +77,7 @@ bean-definition mutation, and native execution. The opaque-parent fixture proves
 provider delegation, not access to hidden parent binding metadata. Do not infer
 support for live properties mutation or universal AOT/runtime lifecycle equivalence.
 
-## Verification
+## Initial Verification
 
 Oracle JDK 21.0.8, Maven 3.9.9, Boot 4.0.0, Java target 21 and Central-only settings.
 Passing test runs disable explicit GC. The source is the reviewed working-tree
@@ -130,6 +133,36 @@ artifact audit. It is sealed with `SHA256SUMS`; from that directory run
 The reactor assembly is incremental and locally installed; the external consumer
 is cleaned and consumes artifacts, not starter module output directories or a
 published development version. JVM AOT is not a native binary.
+
+## Binding-Order Review Correction
+
+The follow-up on committed Priority 5 (`2281abed`) removes its singleton-presence
+shortcut. Another AOT processor can resolve a definition-created properties
+instance before this processor without triggering Boot binding. The former
+guard silently accepted defaults for ordinary clients or rejected declared cache
+policies as missing. Four desired-behavior cases reproduce that defect: two
+assertion failures and two validation errors before the fix.
+
+The corrected tests resolve properties from an earlier AOT processor and compare
+the same instance's bound client policy with a separately refreshed runtime
+context. Both default class binding and an alternate-prefix `@Bean` are covered,
+with and without annotation-selected caching. Additional controls resolve parent
+properties early, reject an early-resolved invalid policy, and distinguish a
+definition-less direct registration from one still backed by a binding definition.
+Normal runtime binding, FactoryBean products, materialization counts and zero
+business-resource creation remain covered. The old mixed-registration exemption
+was based on the same invalid inference and is explicitly superseded here.
+
+Review evidence is separate from the sealed initial bundle, under
+`target/release-evidence/v33/priority5-binding-order/`. The focused command is the
+same nine-class command above; the regression-only command uses
+`-Dtest=AotPropertiesSelectionContractTest#propertiesResolvedByAnEarlierAotProcessorAreStillBound`.
+The documentation command above is also rerun. The initial consumer/API/native
+scope and results are not relabeled as verification of this correction.
+Final follow-up results: **271 focused cases** (34 in the selection contract) and
+**73 documentation cases**, zero failures/errors/skips, explicit GC disabled.
+The separate review bundle preserves red/green XML, commands, source base and
+reviewed patch and is sealed with `SHA256SUMS`.
 
 ## Rollback and Remaining Gates
 

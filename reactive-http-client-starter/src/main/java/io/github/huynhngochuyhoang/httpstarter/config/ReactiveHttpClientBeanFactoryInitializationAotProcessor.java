@@ -96,15 +96,6 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     }
 
     private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory) {
-        Set<Object> initialized = Collections.newSetFromMap(new IdentityHashMap<>());
-        for (BeanFactory current = beanFactory; current instanceof ConfigurableListableBeanFactory configurable;
-             current = configurable.getParentBeanFactory()) {
-            for (String name : configurable.getSingletonNames()) {
-                if (configurable.getSingleton(name) instanceof ReactiveHttpClientProperties properties) {
-                    initialized.add(properties);
-                }
-            }
-        }
         NamedBeanHolder<ReactiveHttpClientProperties> selected;
         try {
             selected = beanFactory.resolveNamedBean(ReactiveHttpClientProperties.class);
@@ -125,9 +116,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                             .getIfAvailable(this::environmentProperties)
                     : environmentProperties();
         }
-        if (!initialized.contains(selected.getBeanInstance())) {
-            bindSelectedPropertiesForAot(beanFactory, selected);
-        }
+        bindSelectedPropertiesForAot(beanFactory, selected);
         return selected.getBeanInstance();
     }
 
@@ -152,8 +141,9 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             }
             beanFactory = parent;
         }
-        // AOT refresh omits ordinary BeanPostProcessors. Bind only the selected bean
-        // with Boot's own metadata/binder; do not install processors on the factory.
+        // AOT refresh omits ordinary BeanPostProcessors, even for a definition-created
+        // singleton resolved by an earlier processor. Bind the selected definition;
+        // definition-less registrations and normally bound beans need no manual pass.
         if (beanFactory instanceof AbstractBeanFactory factory
                 && beanFactory.containsBeanDefinition(selected.getBeanName())
                 && !factory.isFactoryBean(selected.getBeanName())

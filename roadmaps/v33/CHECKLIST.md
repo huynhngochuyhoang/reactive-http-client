@@ -342,7 +342,7 @@ commands and remaining gates. Evidence is under
 release revision.
 The pre-fix four-case desired-behavior run had three expected selection errors;
 the original V32 and V33 Priority 2 records remain historical provenance.
-Final runs: 264 focused starter cases (including 27 new cases), 18 assembled
+Initial completion runs: 264 focused starter cases (including 27 new cases), 18 assembled
 consumer cases and 73 documentation/archive/readiness cases; **355 passed**,
 zero failures/errors/skips, with explicit GC disabled. The companion record
 labels prior fixture failures, binding constraints and consumer coverage; the
@@ -350,6 +350,18 @@ sealed bundle records consumed artifact hashes and actual classpath provenance.
 Diagnostics, public APIs, runtime routing, dependencies and coordinates are
 unchanged. Shared cross-path, full-suite/API/matrix/native/cost gates in
 Priorities 6-8 and release selection remain pending.
+
+Binding-order review correction, 2026-09-24: the selected definition-backed
+properties bean is bound even when an earlier AOT processor resolved its
+singleton. Definition-less direct registrations, FactoryBean products and the
+normal runtime binding pass remain excluded. A direct registration sharing a
+properties definition's name follows that definition's binding contract.
+The companion record supersedes the original singleton-presence assumption.
+Follow-up evidence is under `target/release-evidence/v33/priority5-binding-order/`;
+the pre-fix four-case run failed in both cache-selected and ordinary-client forms.
+The nine-class focused rerun passes **271 cases**, including 34 selection cases;
+the documentation rerun passes **73 cases**, all with zero failures/errors/skips
+and explicit GC disabled. Original assembled/native scope is unchanged.
 
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 

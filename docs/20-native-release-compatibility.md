@@ -225,9 +225,13 @@ properties bean primary on that version. In `4.5.0-SNAPSHOT`,
 [AOT selection](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) delegates to Spring
 instead of choosing the first initialized bean. Ambiguity and invalid selected
 configuration fail; they do not select an inactive bean or environment fallback.
-Boot binds newly resolved ordinary properties for AOT validation when its normal
-binding processor is not installed. Existing prepared instances and FactoryBean
+Boot binds selected definition-backed ordinary properties for AOT validation when
+its normal binding processor is not installed, including singletons resolved by
+an earlier AOT processor. Definition-less direct registrations and FactoryBean
 products are not rebound, and a normal runtime binding pass is not repeated.
+A direct singleton registered under an existing properties definition still
+follows that definition's binding contract; singleton presence alone does not
+establish that configuration binding has already run.
 Properties and metadata may be created for AOT validation, not business clients,
 cache managers, transports or signers. This is not an eager diagnostics path or
 a universal replacement/native guarantee; final native and supported-Boot

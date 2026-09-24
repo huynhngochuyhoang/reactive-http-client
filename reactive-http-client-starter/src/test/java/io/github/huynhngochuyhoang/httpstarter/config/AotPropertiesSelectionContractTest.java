@@ -9,6 +9,7 @@ import io.github.huynhngochuyhoang.httpstarter.core.ReactiveHttpClientFactoryBea
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.aot.hint.RuntimeHints;
@@ -192,6 +193,33 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
+    @ParameterizedTest
+    @CsvSource({"false, true", "true, true", "false, false", "true, false"})
+    void propertiesResolvedByAnEarlierAotProcessorAreStillBound(boolean replacement, boolean cacheSelected) {
+        try (var aot = bindingContext(replacement); var runtime = bindingContext(replacement)) {
+            var witness = witness(aot.getDefaultListableBeanFactory(), cacheSelected ? Client.class : PlainClient.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var early = new java.util.concurrent.atomic.AtomicReference<ReactiveHttpClientProperties>();
+            org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor earlierProcessor = factory -> {
+                early.set(factory.getBeanProvider(ReactiveHttpClientProperties.class).getObject());
+                return null;
+            };
+            earlierProcessor.processAheadOfTime(aot.getDefaultListableBeanFactory());
+            assertThat(early.get().getClients()).isEmpty();
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(aot.getDefaultListableBeanFactory())).isNotNull();
+
+            assertThat(aot.getBeanProvider(ReactiveHttpClientProperties.class).getObject()).isSameAs(early.get());
+            assertThat(witness.config).isSameAs(early.get().getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(expected.getClients().get("selection").getCache().getPolicies().get("chosen").getTtlMs());
+            witness.assertNoBusinessResources(aot.getDefaultListableBeanFactory());
+        }
+    }
+
     @Test
     void normalBindingIsNotRepeatedOnAnInitializedBean() {
         try (var context = bindingContext(false)) {
@@ -206,8 +234,9 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
-    @Test
-    void parentBindingUsesItsOwnerDespiteAnUnrelatedChildBeanWithTheSameName() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void parentBindingUsesItsOwnerDespiteAnUnrelatedChildBeanWithTheSameName(boolean resolvedEarly) {
         try (var parent = bindingContext(false); var child = new AnnotationConfigApplicationContext()) {
             child.setParent(parent);
             String name = "reactive.http-" + ReactiveHttpClientProperties.class.getName();
@@ -218,6 +247,9 @@ class AotPropertiesSelectionContractTest {
             var witness = witness(child.getDefaultListableBeanFactory(), Client.class);
             parent.refreshForAotProcessing(new RuntimeHints());
             child.refreshForAotProcessing(new RuntimeHints());
+            if (resolvedEarly) {
+                assertThat(parent.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients()).isEmpty();
+            }
             assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(child.getEnvironment())
                     .processAheadOfTime(child.getDefaultListableBeanFactory())).isNotNull();
             var selected = child.getBeanProvider(ReactiveHttpClientProperties.class).getIfAvailable();
@@ -227,20 +259,24 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
-    @Test
-    void directlyRegisteredSingletonKeepsItsProgrammaticValuesDuringAotBinding() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void directlyRegisteredSingletonFollowsAnyRemainingBindingDefinition(boolean definitionBacked) {
         try (var context = bindingContext(false)) {
             var selected = properties(9000);
             String generatedName = "reactive.http-" + ReactiveHttpClientProperties.class.getName();
             var witness = witness(context.getDefaultListableBeanFactory(), Client.class);
             context.refreshForAotProcessing(new RuntimeHints());
+            if (!definitionBacked) {
+                context.removeBeanDefinition(generatedName);
+            }
             context.getBeanFactory().registerSingleton(generatedName, selected);
-            // A definition can coexist with the directly registered, already prepared value.
-            assertThat(context.containsBeanDefinition(generatedName)).isTrue();
+            assertThat(context.containsBeanDefinition(generatedName)).isEqualTo(definitionBacked);
             assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
                     .processAheadOfTime(context.getDefaultListableBeanFactory())).isNotNull();
             assertThat(witness.config).isSameAs(selected.getClients().get("selection"));
-            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(9000);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(definitionBacked ? 5000 : 9000);
             witness.assertNoBusinessResources(context.getDefaultListableBeanFactory());
         }
     }
@@ -268,13 +304,17 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
-    @Test
-    void invalidBoundEnvironmentFailsSelectedPolicyValidation() {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void invalidBoundEnvironmentFailsSelectedPolicyValidation(boolean resolvedEarly) {
         try (var context = bindingContext(false)) {
             context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("invalid", Map.of(
                     "reactive.http.clients.selection.cache.policies.chosen.ttl-ms", "0")));
             var witness = witness(context.getDefaultListableBeanFactory(), Client.class);
             context.refreshForAotProcessing(new RuntimeHints());
+            if (resolvedEarly) {
+                assertThat(context.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients()).isEmpty();
+            }
             assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
                     .processAheadOfTime(context.getDefaultListableBeanFactory()))
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("ttl-ms");
