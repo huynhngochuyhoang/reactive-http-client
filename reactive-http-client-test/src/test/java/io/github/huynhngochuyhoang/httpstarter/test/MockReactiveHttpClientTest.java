@@ -1930,6 +1930,33 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void freshPublicStaticMetadataDrivesMockTargetsAndResults() {
+        MethodMetadataCache metadata = new MethodMetadataCache() {
+            @Override public MethodMetadata get(Method method) {
+                if (!method.getName().equals("getUser")) { return super.get(method); }
+                var meta = new MethodMetadata();
+                meta.setMethod(method);
+                meta.setApiName("custom-user");
+                meta.setHttpMethod("GET");
+                meta.setPathTemplate("/custom/{id}");
+                meta.getPathVars().put(0, "id");
+                meta.setReturnsMono(true);
+                meta.setResponseType(String.class);
+                return meta;
+            }
+        };
+        try (var mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .methodMetadataCache(metadata)
+                .respondTo(HttpMethod.GET, "/custom/42", ex -> MockReactiveHttpClient.json(200, "alice"))
+                .build()) {
+            Mono<String> call = mock.proxy().getUser(42);
+            assertThat(call.block()).isEqualTo("alice");
+            assertThat(call.block()).isEqualTo("alice");
+            assertThat(mock.exchanges()).hasSize(2);
+        }
+    }
+
+    @Test
     void unmatchedRequestFallsThroughToFallbackResponse() {
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class).build();
 

@@ -59,12 +59,19 @@ record RequestPlan(
     }
 
     static RequestPlan from(MethodMetadata meta, Class<?> concreteClientInterface) {
+        boolean deriveStaticApi = meta.getApiRefName() == null && meta.getStaticEffectiveApi() == null;
+        if (deriveStaticApi && concreteClientInterface != null) {
+            validateFreshStaticMetadata(meta, concreteClientInterface);
+        }
+        EffectiveApi staticApi = deriveStaticApi
+                ? new EffectiveApi(meta.getHttpMethod(), meta.getPathTemplate(), MethodMetadata.TIMEOUT_NOT_SET)
+                : meta.getStaticEffectiveApi();
         Type bodyType = bodyType(meta, concreteClientInterface);
-        return new RequestPlan(
+        RequestPlan plan = new RequestPlan(
                 meta.getMethod(),
                 meta.getApiName(),
                 meta.getApiRefName(),
-                meta.getStaticEffectiveApi(),
+                staticApi,
                 meta.getHttpMethod(),
                 meta.getPathTemplate(),
                 namedBindings(meta.getPathVars()),
@@ -93,6 +100,34 @@ record RequestPlan(
                 bodyRepeatability(meta, concreteClientInterface, bodyType),
                 bodyType,
                 parameterTypes(meta, concreteClientInterface));
+        if (deriveStaticApi && concreteClientInterface != null) {
+            DeclarativeRequestUri.validate(plan.pathTemplate(),
+                    ReactiveHttpClientFactoryBean.pathVarNames(plan), "Method " + plan.method() + " URI template");
+            DeclarativeReturnTypeGrammar.validate(concreteClientInterface, meta.getApiName(), plan);
+        }
+        return plan;
+    }
+
+    private static void validateFreshStaticMetadata(MethodMetadata meta, Class<?> concreteClientInterface) {
+        Method method = meta.getMethod();
+        String context = "Invalid static MethodMetadata for " + concreteClientInterface.getName() + ": ";
+        if (method == null || !method.getDeclaringClass().isAssignableFrom(concreteClientInterface)) {
+            throw new IllegalStateException(context + "method must belong to the concrete client or an inherited interface");
+        }
+        if (!ReactiveHttpClientFactoryBean.isSupportedOutboundHttpMethod(meta.getHttpMethod())) {
+            throw new IllegalStateException(context + "httpMethod must be a supported uppercase HTTP method on " + method);
+        }
+        if (meta.getPathTemplate() == null) {
+            throw new IllegalStateException(context + "pathTemplate must be supplied (empty is allowed) on " + method);
+        }
+        boolean mono = Mono.class.equals(method.getReturnType());
+        boolean flux = Flux.class.equals(method.getReturnType());
+        if ((!mono && !flux) || meta.isReturnsMono() != mono || meta.isReturnsFlux() != flux) {
+            throw new IllegalStateException(context + "return flags must match the declared Mono or Flux on " + method);
+        }
+        if (method.getGenericReturnType() instanceof ParameterizedType && meta.getResponseType() == null) {
+            throw new IllegalStateException(context + "responseType must be supplied for the reactive element on " + method);
+        }
     }
 
     private static List<NamedArgumentBinding> namedBindings(Map<Integer, String> source) {

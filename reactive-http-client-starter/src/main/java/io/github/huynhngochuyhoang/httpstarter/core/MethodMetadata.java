@@ -16,6 +16,13 @@ import java.util.Set;
  * Instances are mutable while metadata is parsed; cached instances may expose immutable
  * maps and sets after parsing is complete. Treat the no-arg constructor, accessors,
  * {@link #TIMEOUT_NOT_SET}, and mutability phase as compatibility-covered.
+ *
+ * <p>Fresh static metadata can leave the internal derived API unset: request planning
+ * derives it from {@code httpMethod} and {@code pathTemplate}. Supply the reflective
+ * method, API name, matching Mono/Flux flags and element type (when parameterized).
+ * Concrete-client planning validates this shape before use. An existing derived
+ * value is retained; {@code apiRefName} still selects configured routing instead.
+ * Do not mutate metadata after a client has consumed it into a request plan.
  */
 public class MethodMetadata {
 

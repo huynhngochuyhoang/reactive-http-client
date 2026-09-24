@@ -182,7 +182,8 @@ Fresh Maven Central artifact and assembled-consumer verification establish
 published `4.4.1` as the public, strict API and benchmark baseline. Reactor-only
 coordinates are `4.5.0-SNAPSHOT`. [V33](../roadmaps/v33/CHECKLIST.md) is active
 with [F001/F002/F003 approved for correction](../roadmaps/v33/FIX-DECISION.md);
-[F001 is implemented](../roadmaps/v33/BUILDER-OWNERSHIP.md), F002/F003 are pending,
+[F001](../roadmaps/v33/BUILDER-OWNERSHIP.md) and
+[F002](../roadmaps/v33/STATIC-METADATA.md) are implemented, F003 is pending,
 and next release scope remains unselected.
 V1-V32 are completed release records.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
@@ -203,13 +204,24 @@ failed-handler-construction cleanup is published in `4.4.1`, not `4.4.0`;
 F005 changes contributor test lanes only. Neither adds a public API,
 configuration property or metric.
 
-Two reviewed replacement-bean limits remain in `4.4.1` and the current snapshot:
+Two reviewed replacement-bean limits remain in published `4.4.1`:
 fresh static `MethodMetadata` built only through public setters can fail before
 returning a publisher (F002); delegate built-in parsing or use the tested public
-API-ref alternative. AOT properties selection can differ from runtime for
+API-ref alternative on that version. In `4.5.0-SNAPSHOT`,
+[static request planning](../roadmaps/v33/STATIC-METADATA.md) now derives the
+missing internal value from public metadata. Supply the method, API name,
+supported uppercase HTTP verb, non-null path (empty intentionally means the base
+URL), matching Mono/Flux flags and parameterized element type. Concrete-client
+planning rejects incomplete or invalid fresh metadata before dispatch rather
+than failing later with a null derived value. Existing derived values are
+retained, and API-ref configuration still wins routing; keep all metadata
+consistent and do not mutate it after plan consumption. No internal type needs
+to be exposed or accessed reflectively.
+
+AOT properties selection can still differ from runtime for
 initialized non-primary candidates (F003); designate the intended programmatic
-properties bean primary. These are deferred findings, not universal replacement
-or native guarantees. See the linked decision record for evidence gaps and
+properties bean primary. This remains pending, not a universal replacement
+or native guarantee. See the linked decision record for evidence gaps and
 reconsideration triggers; no reflective internal API workaround is supported.
 
 ### V31 additive surface freeze
