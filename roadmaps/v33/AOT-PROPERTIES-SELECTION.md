@@ -26,7 +26,7 @@ for the binding step, not as a new registry or public selection API.
 | No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
 | Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean sharing the selected parent's name cannot supply its binding environment or metadata. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
-| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor before initialization callbacks, including `@Bean` binding metadata. It is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. No environment-derived replacement object is substituted. |
+| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor after context-awareness callbacks and before initialization callbacks, including `@Bean` binding metadata. It is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. No environment-derived replacement object is substituted. |
 | Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
 | Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. This covers `@Bean` and supplier-configured factories without a definition property. Binding uses the target name/definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
@@ -40,7 +40,7 @@ than being overwritten with environment defaults. Existing primary programmatic,
 environment-only, foreign-factory and reflection-hint controls remain in the
 [AOT smoke suite][smoke-tests].
 
-New properties are bound before initialization during this processor's lookup.
+New properties are bound after context awareness and before initialization during this processor's lookup.
 For objects created by an earlier AOT processor, fallback binding cannot undo
 callbacks already run on defaults; initialization is not replayed. Application property
 constructors/factory methods and custom binders/converters remain application
@@ -238,6 +238,32 @@ source base, reviewed patch, commands, logs, XML and `SHA256SUMS`. Initial fixtu
 compilation/injection/product-discovery errors are retained separately from the
 three final pre-fix errors. Earlier sealed bundles are unchanged. Consumer,
 strict API, supported-Boot matrix and native execution were not rerun here.
+
+## Awareness-Order Review Correction
+
+The follow-up on `95e7b5e1` moves temporary binding behind context-awareness
+infrastructure, before the merged-definition processors installed by AOT refresh.
+This retains awareness before binding and binding before init-annotation callbacks,
+without sorting or replacing the existing processor list. If no merged-definition
+processors are installed, the temporary callback follows the existing infrastructure;
+`InitializingBean` and custom init methods still run afterward.
+
+The three existing lifecycle success cases now require `EnvironmentAware` and
+`ApplicationContextAware` before the binding setter can run. The setter checks
+the injected environment against the owning context and the bound configuration;
+the full callback sequence matches separately refreshed runtime contexts for
+ordinary, `@Bean`-proxy and supplier-proxy properties. All three fail on the prior
+processor with `awareness callbacks must precede binding`. The six failure cases
+also assert awareness delivery before binding failure or init-method rejection,
+while retaining processor-list cleanup and zero business-resource assertions.
+
+The nine-class focused command above passes **289 cases** (including **52** in the
+selection contract), and the documentation command passes **73 cases**, all with
+zero failures/errors/skips and explicit GC disabled. These strengthen existing
+cases, not additional test counts. Separate evidence under
+`target/release-evidence/v33/priority5-awareness-binding/` preserves the source
+base, patch, red/green XML, commands and logs, sealed with `SHA256SUMS`. Earlier
+bundles are unchanged; consumer/API/matrix/native checks were not rerun.
 
 ## Rollback and Remaining Gates
 

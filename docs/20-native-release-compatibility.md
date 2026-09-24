@@ -226,8 +226,9 @@ properties bean primary on that version. In `4.5.0-SNAPSHOT`,
 instead of choosing the first initialized bean. Ambiguity and invalid selected
 configuration fail; they do not select an inactive bean or environment fallback.
 When Boot's normal binding processor is not installed, a temporary properties-only
-callback binds newly created properties before `@PostConstruct`, `InitializingBean`
-and custom init methods. The callback is removed after lookup, including failures.
+callback binds newly created properties after context-awareness callbacks (including
+`EnvironmentAware` and `ApplicationContextAware`) but before `@PostConstruct`,
+`InitializingBean` and custom init methods. The callback is removed after lookup, including failures.
 Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
 For Spring scoped proxies, AOT uses the initialized proxy's target source or its

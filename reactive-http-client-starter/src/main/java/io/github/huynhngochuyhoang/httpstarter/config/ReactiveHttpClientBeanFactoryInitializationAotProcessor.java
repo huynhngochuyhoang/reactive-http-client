@@ -24,6 +24,7 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.NamedBeanHolder;
 import org.springframework.beans.factory.support.AbstractBeanFactory;
+import org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor;
 import org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -68,8 +69,15 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                                 .noneMatch(ConfigurationPropertiesBindingPostProcessor.class::isInstance)) {
                     var binding = new PropertiesBinding(factory);
                     bindings.put(factory, binding);
-                    // Binding must precede init-annotation processors already installed by AOT refresh.
-                    factory.getBeanPostProcessors().add(0, binding);
+                    // AOT appends merged-definition processors after context-awareness infrastructure.
+                    // Bind before their init callbacks without overtaking awareness callbacks.
+                    var processors = factory.getBeanPostProcessors();
+                    int index = 0;
+                    while (index < processors.size()
+                            && !(processors.get(index) instanceof MergedBeanDefinitionPostProcessor)) {
+                        index++;
+                    }
+                    processors.add(index, binding);
                 }
             }
             metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)

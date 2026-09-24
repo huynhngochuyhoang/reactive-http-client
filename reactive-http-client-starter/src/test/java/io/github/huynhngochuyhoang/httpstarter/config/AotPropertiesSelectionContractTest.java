@@ -20,8 +20,12 @@ import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.ApplicationContext;
+import org.springframework.context.ApplicationContextAware;
+import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.*;
 import org.springframework.core.OrderComparator;
+import org.springframework.core.env.Environment;
 import org.springframework.core.env.MapPropertySource;
 import org.springframework.core.env.StandardEnvironment;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -53,7 +57,8 @@ class AotPropertiesSelectionContractTest {
             runtime.refresh();
             var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject()
                     .getClients().get("selection");
-            assertThat(runtimeCalls).containsExactly("construct", "bind", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
+                    "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
             if (shape != LifecycleShape.ORDINARY) {
                 assertThat(aot.getBeanFactory().getMergedBeanDefinition("selectedProxy")
                         .getPropertyValues().get("targetBeanName")).isNull();
@@ -94,9 +99,10 @@ class AotPropertiesSelectionContractTest {
             assertThat(witness.config).isNull();
             witness.assertNoBusinessResources(factory);
             if (failInitialization) {
-                assertThat(calls).containsExactly("construct", "bind", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+                assertThat(calls).containsExactly("construct", "environment", "applicationContext", "bind",
+                        "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
             } else {
-                assertThat(calls).containsExactly("construct");
+                assertThat(calls).containsExactly("construct", "environment", "applicationContext");
             }
         }
     }
@@ -155,15 +161,33 @@ class AotPropertiesSelectionContractTest {
 
     record LifecycleCalls(java.util.List<String> values, boolean failInitialization) { }
 
-    static class LifecycleProperties extends ReactiveHttpClientProperties implements org.springframework.beans.factory.InitializingBean {
+    static class LifecycleProperties extends ReactiveHttpClientProperties
+            implements org.springframework.beans.factory.InitializingBean, EnvironmentAware, ApplicationContextAware {
         private final java.util.List<String> calls;
         private final boolean failInitialization;
+        private Environment environment;
+        private ApplicationContext applicationContext;
         LifecycleProperties(java.util.List<String> calls, boolean failInitialization) {
             this.calls = calls;
             this.failInitialization = failInitialization;
             calls.add("construct");
         }
+        @Override public void setEnvironment(Environment environment) {
+            this.environment = environment;
+            calls.add("environment");
+        }
+        @Override public void setApplicationContext(ApplicationContext applicationContext) {
+            this.applicationContext = applicationContext;
+            calls.add("applicationContext");
+        }
         @Override public void setClients(Map<String, ClientConfig> clients) {
+            if (environment == null || applicationContext == null) {
+                throw new IllegalStateException("awareness callbacks must precede binding");
+            }
+            assertThat(applicationContext.getEnvironment()).isSameAs(environment);
+            assertThat(clients.get("selection").getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(environment.getRequiredProperty(
+                            "lifecycle.clients.selection.cache.policies.chosen.ttl-ms", Long.class));
             calls.add("bind");
             super.setClients(clients);
         }
