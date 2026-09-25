@@ -450,6 +450,18 @@ failures among ten cases, followed by **345 focused / 73 documentation cases**
 passing, zero failures/errors/skips, explicit GC disabled. The companion record
 qualifies the tested runtime baseline; remaining release gates are unchanged.
 
+Registered-binder/dual-role/scoped-target correction, 2026-09-25: insertion uses
+the actual registered binding processor's order and binding callback. Only names
+returned by Spring's processor discovery classify cached identities as auto-detected,
+preserving a directly installed factory when only its separate product is discovered.
+Resolved scoped targets use by-name ownership, including broad predictions and
+parent aliases. Twelve added cases retain lifecycle/creation/ownership controls.
+Evidence in `target/release-evidence/v33/priority5-custom-binding-targets/` separates
+fixture setup iterations from the corrected ten-case pre-fix run (six errors),
+then records **357 focused / 73 documentation cases** passing, zero failures/errors/
+skips, explicit GC disabled. The companion record qualifies the broad-target fixture;
+remaining release gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

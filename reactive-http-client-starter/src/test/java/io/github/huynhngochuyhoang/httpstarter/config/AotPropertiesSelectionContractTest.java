@@ -46,6 +46,239 @@ class AotPropertiesSelectionContractTest {
     enum DirectProcessorKind { ORDINARY, ORDERED, PRIORITY_ORDERED }
 
     @ParameterizedTest
+    @EnumSource(value = LifecycleShape.class, names = {"ORDINARY", "OPAQUE_SUPPLIER_PROXY"})
+    void registeredBindingProcessorOrderDeterminesTheInsertionPoint(LifecycleShape shape) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                        LaterBindingPostProcessor.class);
+                context.registerBean("preparer", IntermediatePreparingProcessor.class);
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internalProcessors = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            factory.addBeanPostProcessor(aot.getBean(IntermediatePreparingProcessor.class));
+            factory.addBeanPostProcessors(internalProcessors);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "direct", "bind",
+                    "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(aot.getBean(LaterBindingPostProcessor.class).bindings).hasValue(1);
+            assertThat(runtime.getBean(LaterBindingPostProcessor.class).bindings).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class LaterBindingPostProcessor extends org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor {
+        final AtomicInteger bindings = new AtomicInteger();
+        @Override public int getOrder() { return HIGHEST_PRECEDENCE + 10; }
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            if (bean instanceof LifecycleProperties && !(bean instanceof org.springframework.aop.scope.ScopedObject)) {
+                bindings.incrementAndGet();
+            }
+            return super.postProcessBeforeInitialization(bean, beanName);
+        }
+    }
+
+    static class IntermediatePreparingProcessor extends DirectPreparingProcessor implements org.springframework.core.PriorityOrdered {
+        @Override public int getOrder() { return HIGHEST_PRECEDENCE + 5; }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = LifecycleShape.class, names = {"ORDINARY", "OPAQUE_SUPPLIER_PROXY"})
+    void dualRoleFactoryKeepsItsDirectPositionWhileItsProductIsDiscovered(LifecycleShape shape) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("dualRole", DualRoleProcessorFactory.class);
+                context.addBeanFactoryPostProcessor(factory -> {
+                    factory.addBeanPostProcessor(factory.getBean("&dualRole", DualRoleProcessorFactory.class));
+                    factory.getBean("dualRole");
+                });
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            assertThat(factory.getBeanNamesForType(org.springframework.beans.factory.config.BeanPostProcessor.class, true, false))
+                    .contains("dualRole").doesNotContain("&dualRole");
+            var internalProcessors = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            factory.addBeanPostProcessor(aot.getBean("dualRole", OrdinaryPropertiesPostProcessor.class));
+            factory.addBeanPostProcessors(internalProcessors);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "direct", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+            var runtimeProcessors = runtime.getDefaultListableBeanFactory().getBeanPostProcessors();
+            int bindingIndex = runtimeProcessors.indexOf(runtime.getBean(
+                    org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME));
+            assertThat(runtimeProcessors.indexOf(runtime.getBean("&dualRole"))).isLessThan(bindingIndex);
+            assertThat(runtimeProcessors.indexOf(runtime.getBean("dualRole"))).isGreaterThan(bindingIndex);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(aot.getBean("&dualRole", DualRoleProcessorFactory.class).products).hasValue(1);
+            assertThat(runtime.getBean("&dualRole", DualRoleProcessorFactory.class).products).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class DualRoleProcessorFactory extends DirectPreparingProcessor implements FactoryBean<OrdinaryPropertiesPostProcessor> {
+        final AtomicInteger products = new AtomicInteger();
+        @Override public OrdinaryPropertiesPostProcessor getObject() {
+            products.incrementAndGet();
+            return new OrdinaryPropertiesPostProcessor();
+        }
+        @Override public Class<?> getObjectType() { return OrdinaryPropertiesPostProcessor.class; }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false,false", "false,false,true", "false,true,false", "false,true,true", "true,false,false", "true,true,false"})
+    void scopedTargetBindingUsesTheResolvedInstanceDespiteBroadDeclaredType(boolean prototype, boolean opaque, boolean early) {
+        var aotCreations = new AtomicInteger();
+        var runtimeCreations = new AtomicInteger();
+        try (var aot = broadScopedContext(prototype, opaque, aotCreations);
+             var runtime = broadScopedContext(prototype, opaque, runtimeCreations)) {
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            ReactiveHttpClientProperties target = early ? aot.getBean("targetAlias", ReactiveHttpClientProperties.class) : null;
+            if (early) assertThat(target.getClients()).isEmpty();
+            assertThat(factory.getType("targetAlias", false)).isEqualTo(Object.class);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients().get("selection");
+            assertThat(expected.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
+            if (early) assertThat(witness.config).isSameAs(target.getClients().get("selection"));
+            assertThat(aotCreations).hasValue(1);
+            assertThat(runtimeCreations).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void broadScopedTargetFollowsChildAliasToParentBindingMetadata(boolean opaque) {
+        var creations = new AtomicInteger();
+        try (var parent = broadScopedContext(false, opaque, creations);
+             var child = new AnnotationConfigApplicationContext()) {
+            child.setParent(parent);
+            child.registerAlias("broadTarget", "targetAlias");
+            child.registerBean("broadProxy", TypedScopedProxyFactory.class, () -> new TypedScopedProxyFactory(opaque), definition -> {
+                definition.setPrimary(true);
+                definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ReactiveHttpClientProperties.class);
+            });
+            org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.register(child);
+            child.getEnvironment().getPropertySources().addFirst(new MapPropertySource("child-invalid", Map.of(
+                    "scoped.clients.selection.cache.policies.chosen.ttl-ms", "0")));
+            var witness = witness(child.getDefaultListableBeanFactory(), Client.class);
+            parent.refreshForAotProcessing(new RuntimeHints());
+            child.refreshForAotProcessing(new RuntimeHints());
+            var target = parent.getBean("broadTarget", ReactiveHttpClientProperties.class);
+            assertThat(target.getClients()).isEmpty();
+            assertThat(parent.getBeanFactory().getType("broadTarget", false)).isEqualTo(Object.class);
+            var parentProcessors = java.util.List.copyOf(parent.getDefaultListableBeanFactory().getBeanPostProcessors());
+            var childProcessors = java.util.List.copyOf(child.getDefaultListableBeanFactory().getBeanPostProcessors());
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(child.getEnvironment())
+                    .processAheadOfTime(child.getDefaultListableBeanFactory())).isNotNull();
+
+            assertThat(witness.config).isSameAs(target.getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(creations).hasValue(1);
+            assertThat(parent.getDefaultListableBeanFactory().getBeanPostProcessors()).containsExactlyElementsOf(parentProcessors);
+            assertThat(child.getDefaultListableBeanFactory().getBeanPostProcessors()).containsExactlyElementsOf(childProcessors);
+            witness.assertNoBusinessResources(child.getDefaultListableBeanFactory());
+        }
+    }
+
+    private static AnnotationConfigApplicationContext broadScopedContext(boolean prototype, boolean opaque, AtomicInteger creations) {
+        var context = bindingContext(false);
+        context.register(BroadScopedBinding.class);
+        context.getBeanFactory().registerScope("test", new org.springframework.context.support.SimpleThreadScope());
+        context.getBeanFactory().registerSingleton("targetCreations", creations);
+        context.registerAlias("broadTarget", "targetAlias");
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("broad", Map.of(
+                "scoped.clients.selection.cache.policies.chosen.ttl-ms", "7000",
+                "scoped.clients.selection.cache.policies.chosen.maximum-size", "16",
+                "scoped.clients.selection.cache.policies.chosen.shared-response", "true",
+                "scoped.clients.selection.cache.customizations.Builder", "SAFE")));
+        context.registerBean("broadProxy", TypedScopedProxyFactory.class, () -> new TypedScopedProxyFactory(opaque),
+                definition -> {
+                    definition.setPrimary(true);
+                    definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ReactiveHttpClientProperties.class);
+                });
+        context.addBeanFactoryPostProcessor(factory -> {
+            var target = (RootBeanDefinition) factory.getBeanDefinition("broadTarget");
+            target.setTargetType(Object.class);
+            if (prototype) target.setScope("prototype");
+            // Keep the prediction broad even after one custom-scoped target has been created.
+            factory.addBeanPostProcessor(new org.springframework.beans.factory.config.SmartInstantiationAwareBeanPostProcessor() {
+                @Override public Class<?> predictBeanType(Class<?> beanClass, String beanName) {
+                    return beanName.equals("broadTarget") ? Object.class : null;
+                }
+            });
+        });
+        return context;
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    static class BroadScopedBinding {
+        @Bean @ConfigurationProperties("scoped") @Scope("test")
+        Object broadTarget(AtomicInteger targetCreations) {
+            targetCreations.incrementAndGet();
+            return new ReactiveHttpClientProperties();
+        }
+    }
+
+    // Programmatic proxies can supply their target class independently of broad definition metadata.
+    static class TypedScopedProxyFactory extends org.springframework.aop.scope.ScopedProxyFactoryBean {
+        private Object proxy;
+        TypedScopedProxyFactory(boolean opaque) {
+            setTargetBeanName("targetAlias");
+            setOpaque(opaque);
+        }
+        @Override public void setBeanFactory(org.springframework.beans.factory.BeanFactory factory) {
+            var source = new org.springframework.aop.target.SimpleBeanTargetSource();
+            source.setTargetBeanName("targetAlias");
+            source.setTargetClass(ReactiveHttpClientProperties.class);
+            source.setBeanFactory(factory);
+            var builder = new org.springframework.aop.framework.ProxyFactory();
+            builder.copyFrom(this);
+            builder.setTargetSource(source);
+            builder.addAdvice(new org.springframework.aop.support.DelegatingIntroductionInterceptor(
+                    new org.springframework.aop.scope.DefaultScopedObject(
+                            (org.springframework.beans.factory.config.ConfigurableBeanFactory) factory, "targetAlias")));
+            proxy = builder.getProxy();
+        }
+        @Override public Object getObject() { return proxy; }
+        @Override public Class<?> getObjectType() { return ReactiveHttpClientProperties.class; }
+    }
+
+    @ParameterizedTest
     @CsvSource({"ORDINARY,ORDINARY", "ORDINARY,ORDERED", "ORDINARY,PRIORITY_ORDERED",
             "OPAQUE_SUPPLIER_PROXY,ORDINARY", "OPAQUE_SUPPLIER_PROXY,ORDERED", "OPAQUE_SUPPLIER_PROXY,PRIORITY_ORDERED"})
     void beanBackedDirectProcessorIsRediscoveredAtRuntime(LifecycleShape shape, DirectProcessorKind kind) {

@@ -236,9 +236,14 @@ removes the earlier occurrence and registers it in auto-detected order; AOT foll
 that order. Higher-priority regular processor beans retain their precedence over
 Boot binding, and equal-priority beans follow stable type-discovery order relative
 to Boot's binding definition.
+The registered binding processor supplies both the order value and the binding
+callback, including application subclasses with an overridden `getOrder()`.
 Cached FactoryBean products count as auto-detected processors only when their
 factory exposes a matching processor type. Directly added products whose type is
 null or non-processor remain in the direct prefix.
+A directly installed factory that also implements `BeanPostProcessor` remains
+in that prefix when Spring discovers only its distinct processor product, not
+the factory's `&beanName` identity.
 The callback is removed after lookup, including failures.
 Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
@@ -252,8 +257,10 @@ a build-time reflective read of the already-cached singleton factory supplies
 the target name; the proxy is not rebuilt or made non-opaque. A non-cached opaque
 factory must supply target-name definition metadata instead. Binding uses the
 target definition's configuration metadata and validates that same target.
-Target aliases are canonicalized in the owning factory before definition lookup
-and binding, including targets already created by an earlier AOT processor.
+Scoped targets follow the same by-name alias traversal as their typed `getBean`
+lookup, including parent-owned targets. Binding uses that resolved instance and
+the owner's definition even when target-type prediction remains broad; it does
+not infer a usable proxy type from an arbitrary `Object`-returning bean.
 A descendant's unrelated alias does not rewrite an inherited selected bean name.
 The scope must be available during AOT processing;
 the starter does not activate request/session scopes. Definition-less direct
