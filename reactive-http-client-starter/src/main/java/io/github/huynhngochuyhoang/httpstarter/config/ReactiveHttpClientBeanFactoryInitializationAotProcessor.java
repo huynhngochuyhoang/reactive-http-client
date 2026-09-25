@@ -21,11 +21,13 @@ import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.config.NamedBeanHolder;
 import org.springframework.beans.factory.support.AbstractBeanFactory;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.beans.factory.support.FactoryBeanRegistrySupport;
 import org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor;
 import org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor;
 import org.springframework.boot.context.properties.bind.Bindable;
 import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.OrderComparator;
 import org.springframework.core.PriorityOrdered;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.env.Environment;
@@ -64,10 +66,11 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             for (BeanFactory current = beanFactory; current instanceof ConfigurableListableBeanFactory configurable;
                  current = configurable.getParentBeanFactory()) {
                 if (current instanceof AbstractBeanFactory factory
-                        && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)
-                        && factory.getBeanPostProcessors().stream()
-                                .noneMatch(ConfigurationPropertiesBindingPostProcessor.class::isInstance)) {
+                        && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)) {
                     var binding = new PropertiesBinding(factory);
+                    if (factory.getBeanPostProcessors().stream().anyMatch(processor -> processor == binding.delegate)) {
+                        continue;
+                    }
                     bindings.put(factory, binding);
                     var processors = factory.getBeanPostProcessors();
                     Map<Object, String> processorBeans = existingProcessorBeans(factory);
@@ -76,7 +79,9 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     processorBeans.entrySet().removeIf(entry -> !registrationOrder.contains(entry.getValue()));
                     int bindingRegistrationIndex = registrationOrder.indexOf(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
                     int index = 0;
-                    int bindingOrder = binding.delegate.getOrder();
+                    Comparator<Object> comparator = configurable instanceof DefaultListableBeanFactory listable
+                            && listable.getDependencyComparator() != null
+                            ? listable.getDependencyComparator() : OrderComparator.INSTANCE;
                     // Direct-only registrations precede auto-detected processors regardless of order.
                     while (index < processors.size() && !processorBeans.containsKey(processors.get(index))) {
                         index++;
@@ -86,11 +91,12 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                         var processor = processors.get(i);
                         int registrationIndex = registrationOrder.indexOf(processorBeans.get(processor));
                         if (!(processor instanceof MergedBeanDefinitionPostProcessor)
-                                && processor instanceof PriorityOrdered ordered
-                                && (ordered.getOrder() < bindingOrder
-                                    || (ordered.getOrder() == bindingOrder && registrationIndex >= 0
-                                        && registrationIndex < bindingRegistrationIndex))) {
-                            index = i + 1;
+                                && registrationIndex >= 0
+                                && configurable.isTypeMatch(processorBeans.get(processor), PriorityOrdered.class)) {
+                            int comparison = comparator.compare(processor, binding.delegate);
+                            if (comparison < 0 || (comparison == 0 && registrationIndex < bindingRegistrationIndex)) {
+                                index = i + 1;
+                            }
                         }
                     }
                     processors.add(index, binding);

@@ -46,6 +46,157 @@ class AotPropertiesSelectionContractTest {
     enum DirectProcessorKind { ORDINARY, ORDERED, PRIORITY_ORDERED }
 
     @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
+    void unrelatedBindingSubclassDoesNotSuppressTheRegisteredBinder(LifecycleShape shape, boolean named) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            var aotObserver = new ObservingBindingPostProcessor();
+            var runtimeObserver = new ObservingBindingPostProcessor();
+            if (named) {
+                aot.registerBean("observingBinder", ObservingBindingPostProcessor.class, () -> aotObserver);
+                runtime.registerBean("observingBinder", ObservingBindingPostProcessor.class, () -> runtimeObserver);
+            } else {
+                aot.addBeanFactoryPostProcessor(factory -> factory.addBeanPostProcessor(aotObserver));
+                runtime.addBeanFactoryPostProcessor(factory -> factory.addBeanPostProcessor(runtimeObserver));
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            if (named) {
+                var internal = factory.getBeanPostProcessors().stream()
+                        .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+                factory.addBeanPostProcessor(aot.getBean("observingBinder", ObservingBindingPostProcessor.class));
+                factory.addBeanPostProcessors(internal);
+            }
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
+                    "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(aotObserver.calls).hasValue(1);
+            assertThat(runtimeObserver.calls).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class ObservingBindingPostProcessor extends org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor {
+        final AtomicInteger calls = new AtomicInteger();
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            if (bean instanceof LifecycleProperties && !(bean instanceof org.springframework.aop.scope.ScopedObject)) {
+                calls.incrementAndGet();
+            }
+            return bean;
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = LifecycleShape.class, names = {"ORDINARY", "OPAQUE_SUPPLIER_PROXY"})
+    void dependencyComparatorDeterminesBothSidesOfTheBindingBoundary(LifecycleShape shape) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("beforeBinder", ComparatorPreparingProcessor.class);
+                context.registerBean("afterBinder", HighestPriorityObservingProcessor.class);
+                context.addBeanFactoryPostProcessor(factory -> ((DefaultListableBeanFactory) factory)
+                        .setDependencyComparator((left, right) -> {
+                            if (left == right) return 0;
+                            if (left instanceof ComparatorPreparingProcessor) return -1;
+                            if (right instanceof ComparatorPreparingProcessor) return 1;
+                            if (left instanceof HighestPriorityObservingProcessor) return 1;
+                            if (right instanceof HighestPriorityObservingProcessor) return -1;
+                            return OrderComparator.INSTANCE.compare(left, right);
+                        }));
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internal = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            factory.addBeanPostProcessor(aot.getBean(ComparatorPreparingProcessor.class));
+            factory.addBeanPostProcessor(aot.getBean(HighestPriorityObservingProcessor.class));
+            factory.addBeanPostProcessors(internal);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "direct", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class ComparatorPreparingProcessor extends DirectPreparingProcessor implements org.springframework.core.PriorityOrdered {
+        @Override public int getOrder() { return LOWEST_PRECEDENCE; }
+    }
+
+    static class HighestPriorityObservingProcessor extends OrderedPropertiesPostProcessor implements org.springframework.core.PriorityOrdered {
+        @Override public int getOrder() { return HIGHEST_PRECEDENCE; }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
+    void factoryProductKeepsItsPredictedProcessorRegistrationGroup(LifecycleShape shape, boolean ordered) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("observingFactory", BroadProcessorFactory.class, () -> new BroadProcessorFactory(ordered));
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internal = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            var product = aot.getBean("observingFactory", org.springframework.beans.factory.config.BeanPostProcessor.class);
+            assertThat(product).isInstanceOf(org.springframework.core.PriorityOrdered.class);
+            assertThat(factory.isTypeMatch("observingFactory", org.springframework.core.PriorityOrdered.class)).isFalse();
+            assertThat(factory.isTypeMatch("observingFactory", org.springframework.core.Ordered.class)).isEqualTo(ordered);
+            factory.addBeanPostProcessor(product);
+            factory.addBeanPostProcessors(internal);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(aot.getBean("&observingFactory", BroadProcessorFactory.class).products).hasValue(1);
+            assertThat(runtime.getBean("&observingFactory", BroadProcessorFactory.class).products).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class BroadProcessorFactory implements FactoryBean<org.springframework.beans.factory.config.BeanPostProcessor> {
+        final AtomicInteger products = new AtomicInteger();
+        final boolean ordered;
+        BroadProcessorFactory(boolean ordered) { this.ordered = ordered; }
+        @Override public org.springframework.beans.factory.config.BeanPostProcessor getObject() {
+            products.incrementAndGet();
+            return new HighestPriorityObservingProcessor();
+        }
+        @Override public Class<?> getObjectType() {
+            return ordered ? OrderedPropertiesPostProcessor.class : org.springframework.beans.factory.config.BeanPostProcessor.class;
+        }
+    }
+
+    @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void propertiesFactoryObjectUsesItsDefinitionBindingMetadata(boolean early) {
         try (var aot = bindingContext(false); var runtime = bindingContext(false)) {

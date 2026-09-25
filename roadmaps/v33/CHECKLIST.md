@@ -474,6 +474,19 @@ cases (two failures, seven errors, one control), then **370 focused / 73 documen
 cases** passing, zero failures/errors/skips, explicit GC disabled. Remaining
 consumer/API/matrix/native and release gates are unchanged.
 
+Binder-discovery/comparator correction, 2026-09-25: installation is skipped only
+for the exact standard registered binding processor, not an unrelated binder
+subclass. Predictive type checks preserve FactoryBean processor registration groups;
+the configured dependency comparator orders the priority group, with standard
+fallback ordering and stable discovery-order ties. Ten new paired runtime/AOT cases
+cover direct/named observer binders, custom comparator precedence, and ordinary/
+ordered predictions for priority-ordered products. Evidence in
+`target/release-evidence/v33/priority5-processor-discovery/` records ten initial
+AOT errors after passing runtime checks, then **380 focused / 73 documentation
+cases** passing, zero failures/errors/skips, explicit GC disabled. Ownership and
+processor-restoration checks remain active; consumer/API/matrix/native and release
+gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

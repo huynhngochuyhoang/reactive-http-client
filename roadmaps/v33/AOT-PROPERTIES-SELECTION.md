@@ -26,7 +26,7 @@ for the binding step, not as a new registry or public selection API.
 | No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
 | Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean or alias sharing the selected parent's name cannot supply its binding environment or metadata; the selected name is preserved until its owner is found. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
-| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's registered Boot binding processor and uses that same instance's order, including subclass overrides. It follows the direct-only prefix (including context awareness) and precedes auto-detected ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Rediscovered singleton processor beans follow auto-detected ordering. Higher-priority regular processor beans retain their precedence, with equal priorities following stable type-discovery order. Only identities named in actual processor discovery count as auto-detected: a directly installed dual-role factory stays in the prefix when only its distinct product is discovered. The callback is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. Tracking creation-time binding by bean name prevents rebinding a later wrapper, without suppressing binding of distinct prototype instances. No environment-derived replacement object is substituted. |
+| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's registered Boot binding processor and compares that same instance, including subclass overrides. It follows the direct-only prefix (including context awareness) and precedes auto-detected ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Rediscovered singleton processor beans follow auto-detected ordering. Predictive type checks determine registration groups; the factory's dependency comparator (or `OrderComparator` fallback) orders the priority group, with comparator ties retaining type-discovery order. Only identities named in actual processor discovery count as auto-detected: a directly installed dual-role factory stays in the prefix when only its distinct product is discovered. The callback is installed only when the standard registered processor instance is absent from the chain; unrelated binder subclasses do not suppress it. It is removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. Tracking creation-time binding by bean name prevents rebinding a later wrapper, without suppressing binding of distinct prototype instances. No environment-derived replacement object is substituted. |
 | Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
 | Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. Opaque programmatic proxies can instead use a build-time read of the cached singleton factory's target name. This covers `@Bean` and supplier-configured singleton factories without a definition property. A successfully typed by-name target lookup supplies the instance type; owner traversal follows that named lookup's aliases without requiring precise type prediction. Binding uses the owner's target definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
@@ -507,6 +507,37 @@ Evidence under `target/release-evidence/v33/priority5-binding-identity/` retains
 source base, reviewed patch, commands, logs, XML and `SHA256SUMS`. Earlier bundles
 are unchanged. Consumer/API/matrix/native suites were not rerun and remaining
 release gates stay pending.
+
+## Binder Discovery and Comparator Review
+
+The 2026-09-25 correction on `235ba71f` tests the chain for the exact standard
+registered binding processor, not any instance of its base class. A directly
+installed or separately named observer-only subclass therefore does not prevent
+the missing standard processor's temporary callback from being installed.
+
+Placement now uses the owning `DefaultListableBeanFactory` dependency comparator,
+with `OrderComparator` as the fallback, matching the installed Spring 7.0.1
+registration implementation. Comparator ties retain discovery order. Predictive
+`isTypeMatch(name, PriorityOrdered.class)` checks preserve registration groups:
+a cached priority-ordered product advertised as an ordinary or merely ordered
+processor remains after the binder. The actual product still participates in
+comparison when its predicted group is priority-ordered. Direct-only prefixes and
+the trailing merged-definition processor group retain their existing treatment.
+
+Ten added paired runtime/AOT cases cover unrelated direct/named binder subclasses,
+a custom comparator placing processors on both sides of the binder contrary to
+numeric order, and ordinary/ordered FactoryBean type predictions. Ordinary and
+opaque-scoped properties are covered. All ten pass runtime checks and fail AOT
+before the correction; the initial run records **ten errors**. Final verification
+passes **380 focused cases**, including **143** selection-contract cases, plus
+**73 documentation cases**, with zero failures/errors/skips and explicit GC
+disabled (**453 passing cases** total). The fixtures assert processor-list
+restoration, no business resources, and one factory product where applicable.
+
+Evidence under `target/release-evidence/v33/priority5-processor-discovery/` retains
+the source base, reviewed patch, commands, logs, XML and `SHA256SUMS`. Earlier
+bundles are unchanged. Consumer/API/matrix/native checks were not rerun and
+remaining release gates stay pending.
 
 ## Rollback and Remaining Gates
 
