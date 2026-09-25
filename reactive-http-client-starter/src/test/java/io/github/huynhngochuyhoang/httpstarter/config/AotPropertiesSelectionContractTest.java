@@ -46,6 +46,218 @@ class AotPropertiesSelectionContractTest {
     enum DirectProcessorKind { ORDINARY, ORDERED, PRIORITY_ORDERED }
 
     @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void propertiesFactoryObjectUsesItsDefinitionBindingMetadata(boolean early) {
+        try (var aot = bindingContext(false); var runtime = bindingContext(false)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("propertiesFactory", AnnotatedPropertiesFactory.class,
+                        definition -> definition.setPrimary(true));
+                context.registerAlias("propertiesFactory", "factoryAlias");
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var original = early ? aot.getBean("&factoryAlias", AnnotatedPropertiesFactory.class) : null;
+            if (early) assertThat(original.getClients()).isEmpty();
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+            assertThat(expected).isInstanceOf(AnnotatedPropertiesFactory.class);
+            assertThat(expected.getClients().get("selection").getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(7000);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            var selected = factory.resolveNamedBean(ReactiveHttpClientProperties.class);
+            assertThat(selected.getBeanName()).isEqualTo("&propertiesFactory");
+            if (early) assertThat(selected.getBeanInstance()).isSameAs(original);
+            assertThat(witness.config).isSameAs(selected.getBeanInstance().getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @ConfigurationProperties("replacement")
+    static class AnnotatedPropertiesFactory extends ReactiveHttpClientProperties implements FactoryBean<String> {
+        @Override public String getObject() { return "not properties"; }
+        @Override public Class<?> getObjectType() { return String.class; }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false,false", "false,false,true", "true,false,false", "true,false,true",
+            "true,true,false", "true,true,true"})
+    void scopedObjectImplementationsAreBoundUnlessTheyAreTheScopedProxy(boolean scoped, boolean opaque, boolean early) {
+        try (var aot = bindingContext(false); var runtime = bindingContext(false)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("scopedImplementation", ScopedObjectProperties.class,
+                        definition -> definition.setPrimary(!scoped));
+                if (scoped) {
+                    context.getBeanFactory().registerScope("test", new org.springframework.context.support.SimpleThreadScope());
+                    context.getBeanDefinition("scopedImplementation").setScope("test");
+                    context.registerBean("propertiesProxy", org.springframework.aop.scope.ScopedProxyFactoryBean.class, () -> {
+                        var proxy = new org.springframework.aop.scope.ScopedProxyFactoryBean();
+                        proxy.setTargetBeanName("scopedImplementation");
+                        proxy.setOpaque(opaque);
+                        return proxy;
+                    }, definition -> {
+                        definition.setPrimary(true);
+                        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ScopedObjectProperties.class);
+                    });
+                }
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var original = early ? aot.getBean("scopedImplementation", ScopedObjectProperties.class) : null;
+            if (early) assertThat(original.getClients()).isEmpty();
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients().get("selection");
+            assertThat(expected.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            var target = aot.getBean("scopedImplementation", ScopedObjectProperties.class);
+            if (early) assertThat(target).isSameAs(original);
+            assertThat(witness.config).isSameAs(target.getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @ConfigurationProperties("replacement")
+    static class ScopedObjectProperties extends ReactiveHttpClientProperties implements org.springframework.aop.scope.ScopedObject {
+        @Override public Object getTargetObject() { throw new AssertionError("not a scoped proxy"); }
+        @Override public void removeFromScope() { throw new AssertionError("not a scoped proxy"); }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "true,false", "false,true", "true,true"})
+    void registeredBinderReplacementReachesInitializationAndValidation(boolean proxy, boolean early) {
+        try (var aot = bindingContext(false); var runtime = bindingContext(false)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("replaceable", ReplaceableProperties.class, definition -> definition.setPrimary(true));
+                context.registerBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                        ReplacingBindingPostProcessor.class, () -> new ReplacingBindingPostProcessor(proxy));
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var original = early ? aot.getBean("replaceable", ReplaceableProperties.class) : null;
+            if (early) assertThat(original.getClients()).isEmpty();
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+            var runtimeBinder = runtime.getBean(ReplacingBindingPostProcessor.class);
+            assertThat(expected).isSameAs(runtimeBinder.replacement);
+            assertThat(runtimeBinder.target.initializations).hasValue(1);
+            assertThat(runtimeBinder.original.initializations).hasValue(0);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            var binder = aot.getBean(ReplacingBindingPostProcessor.class);
+            if (!early) {
+                assertThat(aot.getBeanProvider(ReactiveHttpClientProperties.class).getObject()).isSameAs(binder.replacement);
+            } else {
+                // Fallback selects the replacement for validation; it does not recreate a cached singleton or replay init.
+                assertThat(binder.original).isSameAs(original);
+                assertThat(aot.getBean("replaceable")).isSameAs(original);
+            }
+            assertThat(witness.config).isSameAs(binder.replacement.getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(11000);
+            assertThat(binder.calls).hasValue(1);
+            assertThat(binder.target.initializations).hasValue(early ? 0 : 1);
+            assertThat(binder.original.initializations).hasValue(early ? 1 : 0);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @Test
+    void registeredBinderNullResultStopsLaterBeforeInitializationProcessors() {
+        try (var aot = bindingContext(false); var runtime = bindingContext(false)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("replaceable", ReplaceableProperties.class, definition -> definition.setPrimary(true));
+                context.registerBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                        NullBindingPostProcessor.class);
+                context.registerBean("following", FollowingPropertiesProcessor.class);
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internal = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            factory.addBeanPostProcessor(aot.getBean(FollowingPropertiesProcessor.class));
+            factory.addBeanPostProcessors(internal);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            assertThat(runtime.getBean(FollowingPropertiesProcessor.class).calls).hasValue(0);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            var selected = aot.getBean("replaceable", ReplaceableProperties.class);
+            assertThat(witness.config).isSameAs(selected.getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(selected.initializations).hasValue(1);
+            assertThat(aot.getBean(FollowingPropertiesProcessor.class).calls).hasValue(0);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class NullBindingPostProcessor extends org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor {
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            Object result = super.postProcessBeforeInitialization(bean, beanName);
+            return bean instanceof ReplaceableProperties ? null : result;
+        }
+    }
+
+    static class FollowingPropertiesProcessor implements org.springframework.beans.factory.config.BeanPostProcessor {
+        final AtomicInteger calls = new AtomicInteger();
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            if (bean instanceof ReplaceableProperties) calls.incrementAndGet();
+            return bean;
+        }
+    }
+
+    @ConfigurationProperties("replacement")
+    static class ReplaceableProperties extends ReactiveHttpClientProperties implements org.springframework.beans.factory.InitializingBean {
+        final AtomicInteger initializations = new AtomicInteger();
+        @Override public void afterPropertiesSet() { initializations.incrementAndGet(); }
+    }
+
+    static class ReplacingBindingPostProcessor extends org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor {
+        final boolean proxy;
+        final AtomicInteger calls = new AtomicInteger();
+        ReplaceableProperties original;
+        ReplaceableProperties target;
+        ReactiveHttpClientProperties replacement;
+        ReplacingBindingPostProcessor(boolean proxy) { this.proxy = proxy; }
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            Object result = super.postProcessBeforeInitialization(bean, beanName);
+            if (bean instanceof ReplaceableProperties value) {
+                calls.incrementAndGet();
+                original = value;
+                target = new ReplaceableProperties();
+                target.setClients(properties(11000).getClients());
+                if (proxy) {
+                    var builder = new org.springframework.aop.framework.ProxyFactory(target);
+                    builder.setProxyTargetClass(true);
+                    replacement = (ReactiveHttpClientProperties) builder.getProxy();
+                } else replacement = target;
+                return replacement;
+            }
+            return result;
+        }
+    }
+
+    @ParameterizedTest
     @EnumSource(value = LifecycleShape.class, names = {"ORDINARY", "OPAQUE_SUPPLIER_PROXY"})
     void registeredBindingProcessorOrderDeterminesTheInsertionPoint(LifecycleShape shape) {
         var aotCalls = new java.util.ArrayList<String>();

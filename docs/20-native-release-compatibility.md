@@ -238,6 +238,8 @@ Boot binding, and equal-priority beans follow stable type-discovery order relati
 to Boot's binding definition.
 The registered binding processor supplies both the order value and the binding
 callback, including application subclasses with an overridden `getOrder()`.
+Its returned replacement or proxy continues through creation-time processing;
+a null return stops later before-initialization processors, as at runtime.
 Cached FactoryBean products count as auto-detected processors only when their
 factory exposes a matching processor type. Directly added products whose type is
 null or non-processor remain in the direct prefix.
@@ -247,6 +249,10 @@ the factory's `&beanName` identity.
 The callback is removed after lookup, including failures.
 Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
+When Spring selects an annotated properties FactoryBean itself as `&name`, binding
+uses the canonical `name` definition and the selected factory instance, not its product.
+Fallback uses a binder-returned replacement for validation without replacing an
+already registered singleton or replaying initialization on the replacement.
 Creation-time binding is tracked by bean name as well as instance identity, so
 a later post-processor wrapping the properties does not trigger a second pass.
 This fallback guard does not suppress binding of separate prototype instances.
@@ -257,6 +263,8 @@ a build-time reflective read of the already-cached singleton factory supplies
 the target name; the proxy is not rebuilt or made non-opaque. A non-cached opaque
 factory must supply target-name definition metadata instead. Binding uses the
 target definition's configuration metadata and validates that same target.
+Only the scoped proxy product is skipped, based on its factory type; ordinary
+properties and target classes implementing `ScopedObject` still receive binding.
 Scoped targets follow the same by-name alias traversal as their typed `getBean`
 lookup, including parent-owned targets. Binding uses that resolved instance and
 the owner's definition even when target-type prediction remains broad; it does

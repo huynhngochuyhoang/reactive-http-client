@@ -53,6 +53,14 @@ AOT-created singleton, so both follow the declared binding contract.
 
 ## Ownership and Limits
 
+Binding preserves the registered processor's return value: creation-time replacements
+and proxies continue to subsequent processors and initialization, while a null result
+stops the remaining before-initialization chain. Fallback can use a replacement for
+validation, but does not replace an already registered singleton or replay its init
+callbacks. Definition lookup strips a selected factory's `&` prefix while retaining
+the selected factory object. A `ScopedObject` implementation alone is not proof of
+a scoped proxy; ordinary implementations and resolved scoped targets are bound.
+
 Properties and replacement metadata may be created. The new fixtures count
 metadata creation separately and install failing/counting suppliers for the
 business client factory, auth provider, transport provider and WebClient builder.
@@ -470,6 +478,35 @@ pass **73 cases**, all with zero failures/errors/skips and explicit GC disabled
 `SHA256SUMS` are under `target/release-evidence/v33/priority5-custom-binding-targets/`.
 Earlier sealed bundles are unchanged. Consumer/API/matrix/native suites were not
 rerun, and remaining release gates stay pending.
+
+## Factory Identity and Binder Result Review
+
+The 2026-09-25 correction on `53a3fb0d` separates selected factory identity from
+definition identity. An annotated properties FactoryBean selected as `&name` keeps
+its factory instance, while canonical definition lookup and Boot binding receive
+`name`. Ordinary products keep their existing no-rebind contract. Scoped-proxy
+exclusion now requires the owning factory to be a `ScopedProxyFactoryBean`, not
+merely a properties object implementing the public `ScopedObject` interface.
+
+The temporary adapter returns and tracks the registered binder's result, including
+replacement objects, proxies and null. Newly created replacements reach initialization
+and final selection. Early-instance fallback uses a replacement for validation only;
+it neither rewrites the singleton registry nor replays callbacks already completed.
+
+Thirteen added cases compare independent runtime and AOT contexts: fresh/early
+annotated factory objects, ordinary `ScopedObject` implementations, opaque and
+non-opaque scoped targets implementing that interface, fresh/early binder replacements
+and proxies, and the null-result stop-processing contract. Every successful AOT case
+checks restoration of the processor list and absence of business resources.
+
+The initial ten-case run has **two failures, seven errors and one passing fresh-factory
+control**. The final nine-class focused command above passes **370 cases**, including
+**133** selection-contract cases; documentation guards pass **73 cases**, with zero
+failures/errors/skips and explicit GC disabled (**443 passing cases** total).
+Evidence under `target/release-evidence/v33/priority5-binding-identity/` retains the
+source base, reviewed patch, commands, logs, XML and `SHA256SUMS`. Earlier bundles
+are unchanged. Consumer/API/matrix/native suites were not rerun and remaining
+release gates stay pending.
 
 ## Rollback and Remaining Gates
 

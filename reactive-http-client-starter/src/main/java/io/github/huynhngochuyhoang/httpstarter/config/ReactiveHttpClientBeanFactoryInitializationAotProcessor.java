@@ -13,10 +13,7 @@ import org.springframework.aot.hint.ReflectionHints;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.TypeReference;
 import org.springframework.beans.PropertyValue;
-import org.springframework.beans.factory.BeanFactory;
-import org.springframework.beans.factory.FactoryBean;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.NoUniqueBeanDefinitionException;
+import org.springframework.beans.factory.*;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotContribution;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.BeanDefinition;
@@ -203,8 +200,12 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             ConfigurableListableBeanFactory beanFactory, NamedBeanHolder<ReactiveHttpClientProperties> selected,
             Map<AbstractBeanFactory, PropertiesBinding> bindings, boolean resolvedByName) {
         while (true) {
+            String beanName = BeanFactoryUtils.transformedBeanName(selected.getBeanName());
             String localName = beanFactory instanceof AbstractBeanFactory factory
-                    ? factory.canonicalName(selected.getBeanName()) : selected.getBeanName();
+                    ? factory.canonicalName(beanName) : beanName;
+            if (BeanFactoryUtils.isFactoryDereference(selected.getBeanName())) {
+                localName = BeanFactory.FACTORY_BEAN_PREFIX + localName;
+            }
             boolean local = beanFactory.containsLocalBean(localName);
             Class<?> localType = local && !resolvedByName ? beanFactory.getType(localName, false) : null;
             if (local && (resolvedByName || (localType != null && ReactiveHttpClientProperties.class.isAssignableFrom(localType)))) {
@@ -219,9 +220,10 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             }
             beanFactory = parent;
         }
-        if (beanFactory.containsBeanDefinition(selected.getBeanName())
-                && beanFactory.isFactoryBean(selected.getBeanName())) {
-            Class<?> factoryType = beanFactory.getType(BeanFactory.FACTORY_BEAN_PREFIX + selected.getBeanName(), false);
+        String beanName = BeanFactoryUtils.transformedBeanName(selected.getBeanName());
+        if (!BeanFactoryUtils.isFactoryDereference(selected.getBeanName())
+                && beanFactory.containsBeanDefinition(beanName) && beanFactory.isFactoryBean(beanName)) {
+            Class<?> factoryType = beanFactory.getType(BeanFactory.FACTORY_BEAN_PREFIX + beanName, false);
             if (factoryType == null || !ScopedProxyFactoryBean.class.isAssignableFrom(factoryType)) {
                 return selected.getBeanInstance();
             }
@@ -230,13 +232,13 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     && advised.getTargetSource() instanceof SimpleBeanTargetSource targetSource) {
                 targetName = targetSource.getTargetBeanName();
             } else {
-                targetName = beanFactory.getMergedBeanDefinition(selected.getBeanName())
+                targetName = beanFactory.getMergedBeanDefinition(beanName)
                         .getPropertyValues().get("targetBeanName");
             }
             if (!(targetName instanceof String candidate) || !StringUtils.hasText(candidate)) {
                 // Opaque programmatic proxies hide Advised and may have no definition property.
                 // Read only the initialized factory at build time; never create a second factory.
-                Object factory = beanFactory.getSingleton(selected.getBeanName());
+                Object factory = beanFactory.getSingleton(beanName);
                 if (factory instanceof ScopedProxyFactoryBean) {
                     var field = ReflectionUtils.findField(ScopedProxyFactoryBean.class, "targetBeanName", String.class);
                     if (field != null) {
@@ -254,8 +256,8 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         }
         // Existing instances missed the creation callback; newly created ones are already tracked.
         PropertiesBinding binding = bindings.get(beanFactory);
-        if (binding != null && beanFactory.containsBeanDefinition(selected.getBeanName())) {
-            binding.bindExisting(selected.getBeanInstance(), selected.getBeanName());
+        if (binding != null && beanFactory.containsBeanDefinition(beanName)) {
+            return (ReactiveHttpClientProperties) binding.bindExisting(selected.getBeanInstance(), beanName);
         }
         return selected.getBeanInstance();
     }
@@ -263,7 +265,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     private static final class PropertiesBinding implements BeanPostProcessor {
         private final AbstractBeanFactory factory;
         private final ConfigurationPropertiesBindingPostProcessor delegate;
-        private final Set<Object> bound = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final Map<Object, Object> bound = new IdentityHashMap<>();
         private final Set<String> boundBeanNames = new HashSet<>();
 
         private PropertiesBinding(AbstractBeanFactory factory) {
@@ -272,22 +274,33 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     ConfigurationPropertiesBindingPostProcessor.class);
         }
 
-        private void bindExisting(Object bean, String beanName) {
+        private Object bindExisting(Object bean, String beanName) {
             // A later post-processor may replace the bound instance. This name guard
             // applies only to fallback; each new prototype still takes the creation callback.
             if (!boundBeanNames.contains(factory.canonicalName(beanName))) {
-                postProcessBeforeInitialization(bean, beanName);
+                Object result = postProcessBeforeInitialization(bean, beanName);
+                return result != null ? result : bean;
             }
+            return bean;
         }
 
         @Override
         public Object postProcessBeforeInitialization(Object bean, String beanName) {
-            if (bean instanceof ReactiveHttpClientProperties && !(bean instanceof ScopedObject) && !bound.contains(bean)) {
-                delegate.postProcessBeforeInitialization(bean, beanName);
-                bound.add(bean);
+            if (bean instanceof ReactiveHttpClientProperties && !isScopedProxy(bean, beanName)) {
+                if (bound.containsKey(bean)) return bound.get(bean);
+                Object result = delegate.postProcessBeforeInitialization(bean, beanName);
+                bound.put(bean, result);
+                if (result != null && result != bean) bound.put(result, result);
                 boundBeanNames.add(factory.canonicalName(beanName));
+                return result;
             }
             return bean;
+        }
+
+        private boolean isScopedProxy(Object bean, String beanName) {
+            if (!(bean instanceof ScopedObject) || !factory.isFactoryBean(beanName)) return false;
+            Class<?> factoryType = factory.getType(BeanFactory.FACTORY_BEAN_PREFIX + beanName, false);
+            return factoryType != null && ScopedProxyFactoryBean.class.isAssignableFrom(factoryType);
         }
     }
 

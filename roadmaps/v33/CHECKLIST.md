@@ -462,6 +462,18 @@ then records **357 focused / 73 documentation cases** passing, zero failures/err
 skips, explicit GC disabled. The companion record qualifies the broad-target fixture;
 remaining release gates are unchanged.
 
+Factory-identity/binder-result correction, 2026-09-25: dereferenced properties
+factories retain their selected instance while definition/binding metadata uses
+the canonical name without `&`. Ordinary properties and scoped targets implementing
+`ScopedObject` bind; only scoped proxy products are excluded. Binder replacements,
+proxies and null results propagate through the creation callback; early fallback
+uses returned replacements for validation without registry replacement or init replay.
+Thirteen added cases retain paired runtime checks and ownership controls. Evidence
+in `target/release-evidence/v33/priority5-binding-identity/` records the initial ten
+cases (two failures, seven errors, one control), then **370 focused / 73 documentation
+cases** passing, zero failures/errors/skips, explicit GC disabled. Remaining
+consumer/API/matrix/native and release gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points
