@@ -24,11 +24,11 @@ for the binding step, not as a new registry or public selection API.
 | Invalid preferred value | All four preferences select a zero-TTL policy while an inactive bean and environment contain valid policies. AOT fails selected-policy validation, without falling back. |
 | Ambiguity | Two ordinary candidates and two primary candidates retain Spring's non-unique error, even with valid environment configuration. A dependency-creation failure also propagates. |
 | No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
-| Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean sharing the selected parent's name cannot supply its binding environment or metadata. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
+| Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean or alias sharing the selected parent's name cannot supply its binding environment or metadata; the selected name is preserved until its owner is found. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
-| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor after the directly registered prefix (including context awareness) and before auto-detected ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Direct registrations retain their position regardless of order; higher-priority regular processor beans retain their precedence. It is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. No environment-derived replacement object is substituted. |
+| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor after the directly registered prefix (including context awareness) and before auto-detected ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Direct registrations retain their position regardless of order; higher-priority regular processor beans retain their precedence. Cached processor products must expose a discoverable processor type to count as auto-detected. The callback is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. Tracking creation-time binding by bean name prevents rebinding a later wrapper, without suppressing binding of distinct prototype instances. No environment-derived replacement object is substituted. |
 | Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
-| Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. Opaque programmatic proxies can instead use a build-time read of the cached singleton factory's target name. This covers `@Bean` and supplier-configured singleton factories without a definition property. Target aliases are canonicalized in each owning factory before definition checks and binding, including early-created targets. Binding uses the target definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
+| Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. Opaque programmatic proxies can instead use a build-time read of the cached singleton factory's target name. This covers `@Bean` and supplier-configured singleton factories without a definition property. Target aliases are canonicalized after finding their owning factory and before definition checks and binding, including early-created targets. Binding uses the target definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
 | Foreign client factory | An annotated interface backed by a foreign factory is excluded before properties or metadata lookup; its factory and product remain uncreated. |
 
@@ -374,6 +374,38 @@ Separate evidence under `target/release-evidence/v33/priority5-registration-alia
 preserves the pre-fix errors, reviewed patch, commands, XML and `SHA256SUMS`.
 Earlier sealed evidence is unchanged. Consumer/API/matrix/native suites were not
 rerun; this is reviewed-patch evidence, not a clean release qualification.
+
+## Product Discovery, Parent Names and Wrapped Properties
+
+The 2026-09-25 follow-up on `59e2b386` narrows cached-product classification to
+factory names whose exposed type matches `BeanPostProcessor`. Products added
+directly while their factory reports null or a non-processor type remain in the
+direct prefix, as at runtime. No additional processor product is created.
+This refines the earlier unconditional cached-product classification.
+
+Owner traversal now retains the inherited holder name across unrelated child
+aliases and canonicalizes it only after finding the local properties owner.
+This supersedes rewriting the holder at every descendant, while preserving the
+early-created scoped-target alias-chain controls. Temporary binding also records
+successful creation-time binding by canonical bean name. Fallback binding skips
+a final wrapper for that name; creation callbacks still bind each distinct
+prototype instance, and genuinely early unbound instances still receive fallback.
+Tracking remains local to the temporary callback and is discarded after lookup.
+
+The pre-fix run records **13 cases: five failures, five errors, three passing
+controls**. Four opaque-product cases compare runtime/AOT callback ordering;
+seven wrapper cases cover ordinary properties, four scoped-proxy registration
+forms and two same-name prototype creations during one lookup. Two added parent
+alias cases cover fresh and early-created parent values, alongside the existing
+same-name controls. Each retains processor-list and business-resource assertions.
+
+The nine-class focused command passes **335 cases**, including **98** selection
+cases; documentation guards pass **73 cases**, all with zero failures/errors/skips
+and explicit GC disabled (**408 passing cases** total). Separate evidence under
+`target/release-evidence/v33/priority5-product-owner-binding/` preserves source,
+patch, red/green reports, commands and `SHA256SUMS`. Earlier sealed bundles remain
+unchanged. Consumer, API, supported-Boot matrix and native suites were not rerun;
+this does not close the remaining release gates.
 
 ## Rollback and Remaining Gates
 

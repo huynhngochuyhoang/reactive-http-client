@@ -121,6 +121,103 @@ class AotPropertiesSelectionContractTest {
     }
 
     @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
+    void opaqueFactoryProcessorProductsRemainInTheDirectPrefix(LifecycleShape shape, boolean nullType) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("directProcessorFactory", OpaqueProcessorFactory.class,
+                        () -> new OpaqueProcessorFactory(nullType));
+                context.addBeanFactoryPostProcessor(factory -> factory.addBeanPostProcessor(
+                        factory.getBean("directProcessorFactory", DirectPreparingProcessor.class)));
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            assertThat(factory.getBeanNamesForType(org.springframework.beans.factory.config.BeanPostProcessor.class))
+                    .doesNotContain("directProcessorFactory");
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "direct", "bind",
+                    "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(9000);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            assertThat(aot.getBean("&directProcessorFactory", OpaqueProcessorFactory.class).products).hasValue(1);
+            assertThat(runtime.getBean("&directProcessorFactory", OpaqueProcessorFactory.class).products).hasValue(1);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class OpaqueProcessorFactory implements FactoryBean<Object> {
+        final AtomicInteger products = new AtomicInteger();
+        private final boolean nullType;
+        OpaqueProcessorFactory(boolean nullType) { this.nullType = nullType; }
+        @Override public Object getObject() {
+            products.incrementAndGet();
+            return new DirectPreparingProcessor();
+        }
+        @Override public Class<?> getObjectType() { return nullType ? null : Object.class; }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "BEAN_PROXY,false", "SUPPLIER_PROXY,false",
+            "OPAQUE_BEAN_PROXY,false", "OPAQUE_SUPPLIER_PROXY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,true"})
+    void wrappingPropertiesDoesNotRepeatCreationTimeBinding(LifecycleShape shape, boolean earlierPrototype) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            aot.registerBean("wrapper", PropertiesWrappingProcessor.class);
+            runtime.registerBean("wrapper", PropertiesWrappingProcessor.class);
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            if (earlierPrototype) factory.getBeanDefinition("metadata").setDependsOn("lifecycleTarget");
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var wrapper = aot.getBean(PropertiesWrappingProcessor.class);
+            factory.addBeanPostProcessor(wrapper);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            if (earlierPrototype) runtime.getBean("lifecycleTarget");
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients().get("selection");
+            var sequence = java.util.List.of("construct", "environment", "applicationContext", "bind",
+                    "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+            var expectedCalls = new java.util.ArrayList<>(sequence);
+            if (earlierPrototype) expectedCalls.addAll(sequence);
+            assertThat(runtimeCalls).containsExactlyElementsOf(expectedCalls);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(wrapper.wrappers).hasValue(earlierPrototype ? 2 : 1);
+            assertThat(runtime.getBean(PropertiesWrappingProcessor.class).wrappers).hasValue(earlierPrototype ? 2 : 1);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class PropertiesWrappingProcessor implements org.springframework.beans.factory.config.BeanPostProcessor {
+        final AtomicInteger wrappers = new AtomicInteger();
+        @Override public Object postProcessAfterInitialization(Object bean, String beanName) {
+            if (beanName.equals("lifecycleTarget")) {
+                var proxy = new org.springframework.aop.framework.ProxyFactory(bean);
+                proxy.setProxyTargetClass(true);
+                wrappers.incrementAndGet();
+                return proxy.getProxy();
+            }
+            return bean;
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource({"ORDINARY,false", "BEAN_PROXY,false", "SUPPLIER_PROXY,false",
             "ORDINARY,true", "BEAN_PROXY,true", "SUPPLIER_PROXY,true",
             "OPAQUE_BEAN_PROXY,false", "OPAQUE_SUPPLIER_PROXY,false",
@@ -711,12 +808,13 @@ class AotPropertiesSelectionContractTest {
     }
 
     @ParameterizedTest
-    @ValueSource(booleans = {false, true})
-    void parentBindingUsesItsOwnerDespiteAnUnrelatedChildBeanWithTheSameName(boolean resolvedEarly) {
+    @CsvSource({"false,false", "true,false", "false,true", "true,true"})
+    void parentBindingUsesItsOwnerDespiteAnUnrelatedChildNameOrAlias(boolean resolvedEarly, boolean alias) {
         try (var parent = bindingContext(false); var child = new AnnotationConfigApplicationContext()) {
             child.setParent(parent);
             String name = "reactive.http-" + ReactiveHttpClientProperties.class.getName();
-            child.registerBean(name, String.class, () -> "unrelated");
+            child.registerBean(alias ? "unrelated" : name, String.class, () -> "unrelated");
+            if (alias) child.registerAlias("unrelated", name);
             org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.register(child);
             child.getEnvironment().getPropertySources().addFirst(new MapPropertySource("child-invalid", Map.of(
                     "reactive.http.clients.selection.cache.policies.chosen.ttl-ms", "0")));
@@ -726,11 +824,15 @@ class AotPropertiesSelectionContractTest {
             if (resolvedEarly) {
                 assertThat(parent.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients()).isEmpty();
             }
+            var parentProcessors = java.util.List.copyOf(parent.getDefaultListableBeanFactory().getBeanPostProcessors());
+            var childProcessors = java.util.List.copyOf(child.getDefaultListableBeanFactory().getBeanPostProcessors());
             assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(child.getEnvironment())
                     .processAheadOfTime(child.getDefaultListableBeanFactory())).isNotNull();
             var selected = child.getBeanProvider(ReactiveHttpClientProperties.class).getIfAvailable();
             assertThat(witness.config).isSameAs(selected.getClients().get("selection"));
             assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(5000);
+            assertThat(parent.getDefaultListableBeanFactory().getBeanPostProcessors()).containsExactlyElementsOf(parentProcessors);
+            assertThat(child.getDefaultListableBeanFactory().getBeanPostProcessors()).containsExactlyElementsOf(childProcessors);
             witness.assertNoBusinessResources(child.getDefaultListableBeanFactory());
         }
     }

@@ -428,6 +428,17 @@ pre-fix errors and **322 focused / 73 documentation cases** passing, zero
 failures/errors/skips, explicit GC disabled. The companion record documents the
 build-time cached-product accessor dependency; release gates remain unchanged.
 
+Product/owner/wrapper correction, 2026-09-25: cached processor products with null
+or non-processor exposed types retain direct-registration ordering; unrelated
+child aliases no longer rewrite parent-selected names. Creation-time binding is
+tracked by canonical name for fallback decisions so later wrappers are not
+rebound, while separate prototypes still bind individually. Thirteen added cases
+cover these paths. Evidence under
+`target/release-evidence/v33/priority5-product-owner-binding/` retains the initial
+13-case run (five failures, five errors, three controls) and **335 focused / 73
+documentation cases** passing, zero failures/errors/skips, explicit GC disabled.
+Earlier bundles and remaining release gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

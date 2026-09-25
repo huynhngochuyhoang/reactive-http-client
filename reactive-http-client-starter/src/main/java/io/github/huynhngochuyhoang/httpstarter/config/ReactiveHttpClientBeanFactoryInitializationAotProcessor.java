@@ -148,7 +148,8 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             Object singleton = factory.getSingleton(name);
             if (singleton instanceof BeanPostProcessor) processors.add(singleton);
             // Inspect cached products only: classifying the chain must not create processors.
-            if (singleton instanceof FactoryBean<?> && cachedProduct != null) {
+            if (singleton instanceof FactoryBean<?> && cachedProduct != null
+                    && factory.isTypeMatch(name, BeanPostProcessor.class)) {
                 Object product = ReflectionUtils.invokeMethod(cachedProduct, factory, name);
                 if (product instanceof BeanPostProcessor) processors.add(product);
             }
@@ -193,12 +194,12 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             ConfigurableListableBeanFactory beanFactory, NamedBeanHolder<ReactiveHttpClientProperties> selected,
             Map<AbstractBeanFactory, PropertiesBinding> bindings) {
         while (true) {
-            if (beanFactory instanceof AbstractBeanFactory factory) {
-                selected = new NamedBeanHolder<>(factory.canonicalName(selected.getBeanName()), selected.getBeanInstance());
-            }
             Class<?> localType = beanFactory.containsLocalBean(selected.getBeanName())
                     ? beanFactory.getType(selected.getBeanName(), false) : null;
             if (localType != null && ReactiveHttpClientProperties.class.isAssignableFrom(localType)) {
+                if (beanFactory instanceof AbstractBeanFactory factory) {
+                    selected = new NamedBeanHolder<>(factory.canonicalName(selected.getBeanName()), selected.getBeanInstance());
+                }
                 break;
             }
             if (!(beanFactory.getParentBeanFactory() instanceof ConfigurableListableBeanFactory parent)) {
@@ -242,7 +243,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         // Existing instances missed the creation callback; newly created ones are already tracked.
         PropertiesBinding binding = bindings.get(beanFactory);
         if (binding != null && beanFactory.containsBeanDefinition(selected.getBeanName())) {
-            binding.postProcessBeforeInitialization(selected.getBeanInstance(), selected.getBeanName());
+            binding.bindExisting(selected.getBeanInstance(), selected.getBeanName());
         }
         return selected.getBeanInstance();
     }
@@ -250,9 +251,18 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     private static final class PropertiesBinding implements BeanPostProcessor {
         private final AbstractBeanFactory factory;
         private final Set<Object> bound = Collections.newSetFromMap(new IdentityHashMap<>());
+        private final Set<String> boundBeanNames = new HashSet<>();
 
         private PropertiesBinding(AbstractBeanFactory factory) {
             this.factory = factory;
+        }
+
+        private void bindExisting(Object bean, String beanName) {
+            // A later post-processor may replace the bound instance. This name guard
+            // applies only to fallback; each new prototype still takes the creation callback.
+            if (!boundBeanNames.contains(factory.canonicalName(beanName))) {
+                postProcessBeforeInitialization(bean, beanName);
+            }
         }
 
         @Override
@@ -262,6 +272,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                                 ConfigurationPropertiesBindingPostProcessor.class)
                         .postProcessBeforeInitialization(bean, beanName);
                 bound.add(bean);
+                boundBeanNames.add(factory.canonicalName(beanName));
             }
             return bean;
         }
