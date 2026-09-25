@@ -416,6 +416,18 @@ failure cleanup, early/normal targets and parent ownership. Separate evidence in
 errors among five cases, then **308 focused / 73 documentation cases** passing,
 zero failures/errors/skips, explicit GC disabled. Remaining release gates are unchanged.
 
+Direct-registration/target-alias correction, 2026-09-25: temporary binding now
+preserves the directly installed processor prefix regardless of ordering interfaces,
+while remaining before auto-detected ordinary processor beans. Cache-only identity
+inspection includes singleton FactoryBean products without creating them. Scoped
+target aliases are canonicalized before definition lookup and binding, so early
+targets retain their binding metadata without recreation. Twelve runtime/AOT
+ordering cases and two alias-chain cases cover the correction. Evidence under
+`target/release-evidence/v33/priority5-registration-alias/` preserves eight initial
+pre-fix errors and **322 focused / 73 documentation cases** passing, zero
+failures/errors/skips, explicit GC disabled. The companion record documents the
+build-time cached-product accessor dependency; release gates remain unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

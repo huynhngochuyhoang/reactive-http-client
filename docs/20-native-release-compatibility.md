@@ -226,10 +226,12 @@ properties bean primary on that version. In `4.5.0-SNAPSHOT`,
 instead of choosing the first initialized bean. Ambiguity and invalid selected
 configuration fail; they do not select an inactive bean or environment fallback.
 When Boot's normal binding processor is not installed, a temporary properties-only
-callback binds newly created properties after context-awareness callbacks (including
-`EnvironmentAware` and `ApplicationContextAware`) but before ordinary application
+callback binds newly created properties after the directly registered processor
+prefix, including context-awareness callbacks (`EnvironmentAware` and
+`ApplicationContextAware`), but before auto-detected ordinary application
 post-processors, `@PostConstruct`, `InitializingBean` and custom init methods.
-Higher-priority regular processors retain their precedence over Boot binding.
+Direct registrations retain their prefix position regardless of `Ordered`;
+higher-priority regular processor beans retain their precedence over Boot binding.
 The callback is removed after lookup, including failures.
 Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
@@ -240,6 +242,8 @@ a build-time reflective read of the already-cached singleton factory supplies
 the target name; the proxy is not rebuilt or made non-opaque. A non-cached opaque
 factory must supply target-name definition metadata instead. Binding uses the
 target definition's configuration metadata and validates that same target.
+Target aliases are canonicalized in the owning factory before definition lookup
+and binding, including targets already created by an earlier AOT processor.
 The scope must be available during AOT processing;
 the starter does not activate request/session scopes. Definition-less direct
 registrations and ordinary FactoryBean products are not rebound, and a normal

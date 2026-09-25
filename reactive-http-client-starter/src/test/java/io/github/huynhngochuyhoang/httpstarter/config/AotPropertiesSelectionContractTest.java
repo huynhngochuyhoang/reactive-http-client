@@ -43,6 +43,82 @@ class AotPropertiesSelectionContractTest {
     enum Shape { LAZY, PROTOTYPE, TYPED_FACTORY, RAW_FACTORY, DIRECT_FACTORY, PROTOTYPE_FACTORY }
     enum Hierarchy { PARENT_ONLY, CHILD_SHADOWS, LOCAL_OVER_PARENT_PRIMARY }
     enum LifecycleShape { ORDINARY, BEAN_PROXY, SUPPLIER_PROXY, OPAQUE_BEAN_PROXY, OPAQUE_SUPPLIER_PROXY }
+    enum DirectProcessorKind { ORDINARY, ORDERED, PRIORITY_ORDERED }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,ORDINARY,false", "ORDINARY,ORDERED,false", "ORDINARY,PRIORITY_ORDERED,false",
+            "OPAQUE_SUPPLIER_PROXY,ORDINARY,false", "OPAQUE_SUPPLIER_PROXY,ORDERED,false", "OPAQUE_SUPPLIER_PROXY,PRIORITY_ORDERED,false",
+            "ORDINARY,ORDINARY,true", "ORDINARY,ORDERED,true", "ORDINARY,PRIORITY_ORDERED,true",
+            "OPAQUE_SUPPLIER_PROXY,ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,ORDERED,true", "OPAQUE_SUPPLIER_PROXY,PRIORITY_ORDERED,true"})
+    void directProcessorsPreparePropertiesBeforeBinding(LifecycleShape shape, DirectProcessorKind kind, boolean factoryProduct) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.addBeanFactoryPostProcessor(factory -> factory.addBeanPostProcessor(switch (kind) {
+                    case ORDINARY -> new DirectPreparingProcessor();
+                    case ORDERED -> new OrderedDirectPreparingProcessor();
+                    case PRIORITY_ORDERED -> new PriorityDirectPreparingProcessor();
+                }));
+                if (factoryProduct) context.registerBean("applicationProcessor", PropertiesPostProcessorFactory.class);
+                else context.registerBean("applicationProcessor", OrdinaryPropertiesPostProcessor.class);
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internalProcessors = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance)
+                    .toList();
+            factory.addBeanPostProcessor(aot.getBean(OrdinaryPropertiesPostProcessor.class));
+            factory.addBeanPostProcessors(internalProcessors);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            assertThat(aotCalls).isEmpty();
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients().get("selection");
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "direct", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            if (factoryProduct) {
+                assertThat(aot.getBean("&applicationProcessor", PropertiesPostProcessorFactory.class).products).hasValue(1);
+                assertThat(runtime.getBean("&applicationProcessor", PropertiesPostProcessorFactory.class).products).hasValue(1);
+            }
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class DirectPreparingProcessor implements org.springframework.beans.factory.config.BeanPostProcessor {
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            if (bean instanceof LifecycleProperties properties) {
+                assertThat(properties.environment).isNotNull();
+                assertThat(properties.applicationContext).isNotNull();
+                assertThat(properties.getClients()).isEmpty();
+                properties.calls.add("direct");
+            }
+            return bean;
+        }
+    }
+
+    static class OrderedDirectPreparingProcessor extends DirectPreparingProcessor implements org.springframework.core.Ordered {
+        @Override public int getOrder() { return LOWEST_PRECEDENCE; }
+    }
+
+    static class PriorityDirectPreparingProcessor extends OrderedDirectPreparingProcessor implements org.springframework.core.PriorityOrdered { }
+
+    static class PropertiesPostProcessorFactory implements FactoryBean<OrdinaryPropertiesPostProcessor> {
+        final AtomicInteger products = new AtomicInteger();
+        @Override public OrdinaryPropertiesPostProcessor getObject() {
+            products.incrementAndGet();
+            return new OrdinaryPropertiesPostProcessor();
+        }
+        @Override public Class<?> getObjectType() { return OrdinaryPropertiesPostProcessor.class; }
+    }
 
     @ParameterizedTest
     @CsvSource({"ORDINARY,false", "BEAN_PROXY,false", "SUPPLIER_PROXY,false",
@@ -546,6 +622,35 @@ class AotPropertiesSelectionContractTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    void earlyCreatedAliasedScopedTargetUsesCanonicalBindingMetadata(boolean opaque) {
+        var creations = new AtomicInteger();
+        try (var context = scopedBindingContext(false, creations)) {
+            context.registerAlias("scopedTarget.selected", "targetAlias");
+            context.registerAlias("targetAlias", "targetAliasChain");
+            useProgrammaticScopedProxy(context, opaque, "targetAliasChain");
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            var proxy = context.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+            var target = (ReactiveHttpClientProperties) ((org.springframework.aop.scope.ScopedObject) proxy).getTargetObject();
+            assertThat(target.getClients()).isEmpty();
+            assertThat(factory.containsBeanDefinition("targetAliasChain")).isFalse();
+            assertThat(creations).hasValue(1);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(witness.config).isSameAs(target.getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(creations).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
     void normallyBoundScopedTargetIsNotRebound(boolean opaque) {
         var creations = new AtomicInteger();
         try (var context = scopedBindingContext(false, creations)) {
@@ -755,11 +860,15 @@ class AotPropertiesSelectionContractTest {
     }
 
     private static void useOpaqueProgrammaticScopedProxy(AnnotationConfigApplicationContext context) {
+        useProgrammaticScopedProxy(context, true, "scopedTarget.selected");
+    }
+
+    private static void useProgrammaticScopedProxy(AnnotationConfigApplicationContext context, boolean opaque, String targetName) {
         context.addBeanFactoryPostProcessor(factory -> {
             var proxy = new RootBeanDefinition(org.springframework.aop.scope.ScopedProxyFactoryBean.class, () -> {
                 var value = new org.springframework.aop.scope.ScopedProxyFactoryBean();
-                value.setTargetBeanName("scopedTarget.selected");
-                value.setOpaque(true);
+                value.setTargetBeanName(targetName);
+                value.setOpaque(opaque);
                 return value;
             });
             proxy.setPrimary(true);
