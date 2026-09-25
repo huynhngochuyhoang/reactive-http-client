@@ -439,6 +439,17 @@ cover these paths. Evidence under
 documentation cases** passing, zero failures/errors/skips, explicit GC disabled.
 Earlier bundles and remaining release gates are unchanged.
 
+Stable processor ordering review, 2026-09-25: equal-priority regular processor
+beans now retain their type-discovery registration order relative to Boot's binder.
+Six paired runtime/AOT controls do not reproduce the ordinary bean-backed direct
+prefix finding: Spring removes the earlier singleton occurrence and re-registers
+it in auto-detected order. Four tie-order cases cover definitions registered before
+and after the binder. Evidence in
+`target/release-evidence/v33/priority5-stable-processor-order/` records two initial
+failures among ten cases, followed by **345 focused / 73 documentation cases**
+passing, zero failures/errors/skips, explicit GC disabled. The companion record
+qualifies the tested runtime baseline; remaining release gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

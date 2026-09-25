@@ -230,8 +230,12 @@ callback binds newly created properties after the directly registered processor
 prefix, including context-awareness callbacks (`EnvironmentAware` and
 `ApplicationContextAware`), but before auto-detected ordinary application
 post-processors, `@PostConstruct`, `InitializingBean` and custom init methods.
-Direct registrations retain their prefix position regardless of `Ordered`;
-higher-priority regular processor beans retain their precedence over Boot binding.
+Direct-only registrations retain their prefix position regardless of `Ordered`.
+When Spring also discovers that same singleton as a processor bean, normal refresh
+removes the earlier occurrence and registers it in auto-detected order; AOT follows
+that order. Higher-priority regular processor beans retain their precedence over
+Boot binding, and equal-priority beans follow stable type-discovery order relative
+to Boot's binding definition.
 Cached FactoryBean products count as auto-detected processors only when their
 factory exposes a matching processor type. Directly added products whose type is
 null or non-processor remain in the direct prefix.

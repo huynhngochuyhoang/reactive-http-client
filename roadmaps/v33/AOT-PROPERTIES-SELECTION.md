@@ -26,7 +26,7 @@ for the binding step, not as a new registry or public selection API.
 | No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
 | Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean or alias sharing the selected parent's name cannot supply its binding environment or metadata; the selected name is preserved until its owner is found. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
 | Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
-| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor after the directly registered prefix (including context awareness) and before auto-detected ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Direct registrations retain their position regardless of order; higher-priority regular processor beans retain their precedence. Cached processor products must expose a discoverable processor type to count as auto-detected. The callback is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. Tracking creation-time binding by bean name prevents rebinding a later wrapper, without suppressing binding of distinct prototype instances. No environment-derived replacement object is substituted. |
+| Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's Boot binding processor after the direct-only prefix (including context awareness) and before auto-detected ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Direct-only registrations retain their position regardless of order; rediscovered singleton processor beans follow auto-detected ordering. Higher-priority regular processor beans retain their precedence, with equal priorities following stable type-discovery order relative to Boot's binding definition. Cached processor products must expose a discoverable processor type to count as auto-detected. The callback is installed only when Boot's processor is registered but not installed, and removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. Tracking creation-time binding by bean name prevents rebinding a later wrapper, without suppressing binding of distinct prototype instances. No environment-derived replacement object is substituted. |
 | Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
 | Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. Opaque programmatic proxies can instead use a build-time read of the cached singleton factory's target name. This covers `@Bean` and supplier-configured singleton factories without a definition property. Target aliases are canonicalized after finding their owning factory and before definition checks and binding, including early-created targets. Binding uses the target definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
 | Normal refresh | When the binding processor is already installed, normal creation performs binding and AOT does not repeat it. An environment change after refresh does not overwrite that prepared value. |
@@ -406,6 +406,36 @@ and explicit GC disabled (**408 passing cases** total). Separate evidence under
 patch, red/green reports, commands and `SHA256SUMS`. Earlier sealed bundles remain
 unchanged. Consumer, API, supported-Boot matrix and native suites were not rerun;
 this does not close the remaining release gates.
+
+## Stable Processor Ordering Review
+
+The 2026-09-25 follow-up on `c2d61fc7` resolves equal `PriorityOrdered` values using
+the bean names returned by Spring's non-eager processor type discovery, including
+the binding processor's own position. A processor registered before that binder
+stays before it; registering it afterward does not move it ahead. Cached processor
+identities now retain their bean names for this comparison, without materializing
+additional processors or sorting the installed chain.
+
+The reported ordinary bean-backed direct-prefix defect does **not** reproduce on
+the tested Boot 4.0.0 / Spring 7.0.1 baseline. Normal refresh rediscovering the same
+singleton removes its direct occurrence and re-registers it in auto-detected order
+(`AbstractBeanFactory.addBeanPostProcessors` removes existing occurrences before
+appending the group). Six independent runtime/AOT cases cover ordinary, ordered
+and priority-ordered bean-backed direct registrations with ordinary and opaque
+scoped properties. They require one runtime occurrence after the binder and the
+same bound callback sequence in AOT. No production change forces these discovered
+beans into a direct-only prefix; that would disagree with this runtime oracle.
+
+Four further cases cover equal-priority definitions on both sides of the binder
+for ordinary and opaque scoped properties. The initial ten-case run has **two
+failures and eight passing controls**; only the registered-first ties fail before
+the correction. The final nine-class focused run passes **345 cases**, including
+**108** selection-contract cases, and documentation guards pass **73 cases**:
+**418 passing cases**, zero failures/errors/skips, with explicit GC disabled.
+Separate evidence under `target/release-evidence/v33/priority5-stable-processor-order/`
+retains the source base, reviewed patch, commands, XML and `SHA256SUMS`. Earlier
+sealed bundles remain unchanged. Consumer/API/matrix/native suites were not rerun;
+the runtime ordering claim is limited to the tested baseline and fixtures.
 
 ## Rollback and Remaining Gates
 

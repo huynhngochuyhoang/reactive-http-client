@@ -46,6 +46,115 @@ class AotPropertiesSelectionContractTest {
     enum DirectProcessorKind { ORDINARY, ORDERED, PRIORITY_ORDERED }
 
     @ParameterizedTest
+    @CsvSource({"ORDINARY,ORDINARY", "ORDINARY,ORDERED", "ORDINARY,PRIORITY_ORDERED",
+            "OPAQUE_SUPPLIER_PROXY,ORDINARY", "OPAQUE_SUPPLIER_PROXY,ORDERED", "OPAQUE_SUPPLIER_PROXY,PRIORITY_ORDERED"})
+    void beanBackedDirectProcessorIsRediscoveredAtRuntime(LifecycleShape shape, DirectProcessorKind kind) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                Class<? extends OrdinaryPropertiesPostProcessor> processorType = switch (kind) {
+                    case ORDINARY -> OrdinaryPropertiesPostProcessor.class;
+                    case ORDERED -> OrderedPropertiesPostProcessor.class;
+                    case PRIORITY_ORDERED -> LowPriorityPropertiesPostProcessor.class;
+                };
+                context.registerBean("preparer", processorType);
+                context.addBeanFactoryPostProcessor(factory -> factory.addBeanPostProcessor(
+                        factory.getBean("preparer", org.springframework.beans.factory.config.BeanPostProcessor.class)));
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients().get("selection");
+            var runtimeProcessors = runtime.getDefaultListableBeanFactory().getBeanPostProcessors();
+            Object preparer = runtime.getBean("preparer");
+            Object binder = runtime.getBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
+            assertThat(runtimeProcessors.stream().filter(value -> value == preparer).count()).isEqualTo(1);
+            assertThat(runtimeProcessors.indexOf(preparer)).isGreaterThan(runtimeProcessors.indexOf(binder));
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class OrderedPropertiesPostProcessor extends OrdinaryPropertiesPostProcessor implements org.springframework.core.Ordered {
+        @Override public int getOrder() { return LOWEST_PRECEDENCE; }
+    }
+
+    static class LowPriorityPropertiesPostProcessor extends OrderedPropertiesPostProcessor implements org.springframework.core.PriorityOrdered { }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,true", "ORDINARY,false", "OPAQUE_SUPPLIER_PROXY,true", "OPAQUE_SUPPLIER_PROXY,false"})
+    void equalPriorityProcessorsRetainDefinitionRegistrationOrder(LifecycleShape shape, boolean registeredFirst) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            for (var context : java.util.List.of(aot, runtime)) {
+                if (!registeredFirst) {
+                    org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.register(context);
+                }
+                context.registerBean("equalProcessor", EqualPriorityPropertiesPostProcessor.class);
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internalProcessors = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance)
+                    .toList();
+            factory.addBeanPostProcessor(aot.getBean(EqualPriorityPropertiesPostProcessor.class));
+            factory.addBeanPostProcessors(internalProcessors);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients().get("selection");
+            var runtimeProcessors = runtime.getDefaultListableBeanFactory().getBeanPostProcessors();
+            int processorIndex = runtimeProcessors.indexOf(runtime.getBean("equalProcessor"));
+            int bindingIndex = runtimeProcessors.indexOf(runtime.getBean(
+                    org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME));
+            assertThat(processorIndex < bindingIndex).isEqualTo(registeredFirst);
+            var expectedCalls = new java.util.ArrayList<>(java.util.List.of("construct", "environment", "applicationContext"));
+            expectedCalls.addAll(registeredFirst ? java.util.List.of("equal:unbound", "bind")
+                    : java.util.List.of("bind", "equal:9000"));
+            expectedCalls.addAll(java.util.List.of("postConstruct:9000", "afterPropertiesSet:9000", "init:9000"));
+            assertThat(runtimeCalls).containsExactlyElementsOf(expectedCalls);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(expected.getCache().getPolicies().get("chosen").getTtlMs());
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class EqualPriorityPropertiesPostProcessor implements org.springframework.beans.factory.config.BeanPostProcessor,
+            org.springframework.core.PriorityOrdered {
+        @Override public int getOrder() {
+            return new org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor().getOrder();
+        }
+        @Override public Object postProcessBeforeInitialization(Object bean, String beanName) {
+            if (bean instanceof LifecycleProperties properties) {
+                assertThat(properties.environment).isNotNull();
+                assertThat(properties.applicationContext).isNotNull();
+                if (properties.getClients().isEmpty()) properties.calls.add("equal:unbound");
+                else properties.record("equal");
+            }
+            return bean;
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource({"ORDINARY,ORDINARY,false", "ORDINARY,ORDERED,false", "ORDINARY,PRIORITY_ORDERED,false",
             "OPAQUE_SUPPLIER_PROXY,ORDINARY,false", "OPAQUE_SUPPLIER_PROXY,ORDERED,false", "OPAQUE_SUPPLIER_PROXY,PRIORITY_ORDERED,false",
             "ORDINARY,ORDINARY,true", "ORDINARY,ORDERED,true", "ORDINARY,PRIORITY_ORDERED,true",

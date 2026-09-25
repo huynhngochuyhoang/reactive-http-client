@@ -73,19 +73,25 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     var binding = new PropertiesBinding(factory);
                     bindings.put(factory, binding);
                     var processors = factory.getBeanPostProcessors();
-                    Set<Object> processorBeans = existingProcessorBeans(factory);
+                    Map<Object, String> processorBeans = existingProcessorBeans(factory);
+                    List<String> registrationOrder = Arrays.asList(
+                            configurable.getBeanNamesForType(BeanPostProcessor.class, true, false));
+                    int bindingRegistrationIndex = registrationOrder.indexOf(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
                     int index = 0;
                     int bindingOrder = new ConfigurationPropertiesBindingPostProcessor().getOrder();
-                    // Direct registrations precede auto-detected processors regardless of order.
-                    while (index < processors.size() && !processorBeans.contains(processors.get(index))) {
+                    // Direct-only registrations precede auto-detected processors regardless of order.
+                    while (index < processors.size() && !processorBeans.containsKey(processors.get(index))) {
                         index++;
                     }
                     // Spring moves merged-definition processors into the trailing internal group.
                     for (int i = index; i < processors.size(); i++) {
                         var processor = processors.get(i);
+                        int registrationIndex = registrationOrder.indexOf(processorBeans.get(processor));
                         if (!(processor instanceof MergedBeanDefinitionPostProcessor)
                                 && processor instanceof PriorityOrdered ordered
-                                && ordered.getOrder() < bindingOrder) {
+                                && (ordered.getOrder() < bindingOrder
+                                    || (ordered.getOrder() == bindingOrder && registrationIndex >= 0
+                                        && registrationIndex < bindingRegistrationIndex))) {
                             index = i + 1;
                         }
                     }
@@ -139,19 +145,21 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         });
     }
 
-    private static Set<Object> existingProcessorBeans(AbstractBeanFactory factory) {
-        Set<Object> processors = Collections.newSetFromMap(new IdentityHashMap<>());
+    private static Map<Object, String> existingProcessorBeans(AbstractBeanFactory factory) {
+        Map<Object, String> processors = new IdentityHashMap<>();
         var cachedProduct = ReflectionUtils.findMethod(
                 FactoryBeanRegistrySupport.class, "getCachedObjectForFactoryBean", String.class);
         if (cachedProduct != null) ReflectionUtils.makeAccessible(cachedProduct);
         for (String name : factory.getSingletonNames()) {
             Object singleton = factory.getSingleton(name);
-            if (singleton instanceof BeanPostProcessor) processors.add(singleton);
+            if (singleton instanceof BeanPostProcessor) {
+                processors.put(singleton, singleton instanceof FactoryBean<?> ? BeanFactory.FACTORY_BEAN_PREFIX + name : name);
+            }
             // Inspect cached products only: classifying the chain must not create processors.
             if (singleton instanceof FactoryBean<?> && cachedProduct != null
                     && factory.isTypeMatch(name, BeanPostProcessor.class)) {
                 Object product = ReflectionUtils.invokeMethod(cachedProduct, factory, name);
-                if (product instanceof BeanPostProcessor) processors.add(product);
+                if (product instanceof BeanPostProcessor) processors.put(product, name);
             }
         }
         return processors;
