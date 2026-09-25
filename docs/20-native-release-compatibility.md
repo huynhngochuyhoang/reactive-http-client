@@ -225,6 +225,12 @@ properties bean primary on that version. In `4.5.0-SNAPSHOT`,
 [AOT selection](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) delegates to Spring
 instead of choosing the first initialized bean. Ambiguity and invalid selected
 configuration fail; they do not select an inactive bean or environment fallback.
+Properties and metadata selection now use non-eager type discovery through a
+short-lived Spring selection view; actual beans are still created by their owning
+factory. Raw properties FactoryBeans must expose their product type through generics,
+definition metadata (`FactoryBean.OBJECT_TYPE_ATTRIBUTE`), or an already initialized
+factory. An uninitialized factory with no predictable product type is not probed;
+if no visible properties candidate remains, the documented environment fallback applies.
 When Boot's standard registered binding processor instance is not installed, a temporary properties-only
 callback binds newly created properties after the directly registered processor
 prefix, including context-awareness callbacks (`EnvironmentAware` and
@@ -250,6 +256,10 @@ null or non-processor remain in the direct prefix.
 A directly installed factory that also implements `BeanPostProcessor` remains
 in that prefix when Spring discovers only its distinct processor product, not
 the factory's `&beanName` identity.
+Installed non-singleton processors with a unique concrete predicted type are
+associated without requesting another prototype or FactoryBean product. Ambiguous
+type associations fail explicitly; use a singleton processor or distinct concrete
+processor types rather than relying on inferred registration provenance.
 The callback is removed after lookup, including failures.
 Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
@@ -281,8 +291,12 @@ runtime binding pass is not repeated.
 A direct singleton registered under an existing properties definition still
 follows that definition's binding contract; singleton presence alone does not
 establish that configuration binding has already run.
-Properties and metadata may be created for AOT validation, not business clients,
-cache managers, transports or signers. This is not an eager diagnostics path or
+The starter's selection does not create unrelated unknown factories to discover
+types. This does not suppress Spring's earlier AOT refresh, dependency resolution
+inside selected bean creation, or Boot's binding-advisor discovery; those framework
+paths can still initialize raw FactoryBeans. Expose predictable product types and
+avoid allocating business resources in configuration/factory construction.
+This is not an eager diagnostics path or
 a universal replacement/native guarantee; final native and supported-Boot
 evidence remains pending. No application-side reflective workaround is required.
 

@@ -13,8 +13,9 @@ record does not turn those passing characterization tests into passing fix tests
 
 ## Selection and Binding
 
-The [AOT processor][processor] now uses Spring's `resolveNamedBean` for the
-properties selection. It no longer implements primary handling followed by a
+The [AOT processor][processor] now uses Spring's `resolveNamedBean` through a
+short-lived non-eager selection view for properties and metadata. Instance creation
+remains delegated to the owning factory. It no longer implements primary handling followed by a
 registration-order singleton fallback. The selected bean name is retained only
 for the binding step, not as a new registry or public selection API.
 
@@ -25,7 +26,7 @@ for the binding step, not as a new registry or public selection API.
 | Ambiguity | Two ordinary candidates and two primary candidates retain Spring's non-unique error, even with valid environment configuration. A dependency-creation failure also propagates. |
 | No properties bean | Only absence permits binding `reactive.http` from the supplied environment, or defaults when no environment was supplied. |
 | Hierarchy | Parent-only selection, child same-name shadowing, and a local candidate beside a parent primary follow the runtime provider. An unrelated child bean or alias sharing the selected parent's name cannot supply its binding environment or metadata; the selected name is preserved until its owner is found. An opaque parent supporting only provider lookup is consulted when named resolution cannot delegate to it. |
-| Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed/raw singleton factories, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. |
+| Lazy/prototype/FactoryBean | Unique lazy and prototype properties, typed factories, raw factories with product-type definition metadata, a directly registered singleton factory, and a prototype factory produce one properties object per AOT lookup, matching independent runtime-oracle factories. Factory constructor counts are also checked. Uninitialized factories with unpredictable product types are not probed by selection; no visible candidate permits the environment fallback. |
 | Boot binding | AOT refresh does not install ordinary binding post-processors. A temporary properties-only callback delegates to the owning factory's registered Boot binding processor and compares that same instance, including subclass overrides. It follows the direct-only prefix (including context awareness) and precedes auto-detected ordinary application post-processors and initialization callbacks, including `@Bean` binding metadata. Rediscovered singleton processor beans follow auto-detected ordering. Predictive type checks determine registration groups; the factory's dependency comparator (or `OrderComparator` fallback) orders the priority group, with comparator ties retaining type-discovery order. Only identities named in actual processor discovery count as auto-detected: a directly installed dual-role factory stays in the prefix when only its distinct product is discovered. The callback is installed only when the standard registered processor instance is absent from the chain; unrelated binder subclasses do not suppress it. It is removed in `finally`. A fallback binds definition-backed instances resolved earlier, without replaying initialization. Tracking creation-time binding by bean name prevents rebinding a later wrapper, without suppressing binding of distinct prototype instances. No environment-derived replacement object is substituted. |
 | Existing values and products | Singleton presence does not establish that binding ran. Definition-less direct registrations remain application-prepared; a direct registration coexisting with a properties definition follows that definition's binding contract. Ordinary FactoryBean products retain factory-supplied values; runtime does not run the ordinary before-initialization binding pass on those products. |
 | Scoped proxies | A selected Spring ScopedProxyFactoryBean is resolved using its initialized proxy's public target-source metadata, with definition metadata as a fallback. Opaque programmatic proxies can instead use a build-time read of the cached singleton factory's target name. This covers `@Bean` and supplier-configured singleton factories without a definition property. A successfully typed by-name target lookup supplies the instance type; owner traversal follows that named lookup's aliases without requiring precise type prediction. Binding uses the owner's target definition, including its `@Bean` prefix, and validation reads that same instance instead of asking a prototype proxy for another target. The owning scope must be available at build time; no request/session scope is activated. |
@@ -61,6 +62,18 @@ callbacks. Definition lookup strips a selected factory's `&` prefix while retain
 the selected factory object. A `ScopedObject` implementation alone is not proof of
 a scoped proxy; ordinary implementations and resolved scoped targets are bound.
 
+Installed non-singleton processor identities cannot be read from the singleton
+registry. A unique concrete predicted type can associate an installed processor
+with its discovery name without creating a replacement; ambiguous type matches
+fail explicitly. This does not establish arbitrary custom registration provenance.
+Use singleton processors or distinct concrete types for that boundary.
+
+Non-eager selection does not disable framework-owned discovery during Spring's
+earlier AOT refresh, dependency injection into a selected bean, or Boot binding
+advisor lookup. Characterization cases below distinguish these paths from the
+starter's candidate discovery. Product-type metadata and resource-free configuration
+constructors remain necessary; no universal non-instantiation guarantee is made.
+
 Properties and replacement metadata may be created. The new fixtures count
 metadata creation separately and install failing/counting suppliers for the
 business client factory, auth provider, transport provider and WebClient builder.
@@ -81,7 +94,7 @@ selection and binding occur during AOT processing, not each subscription.
 There is no new static cache or retained configuration model.
 
 Untested here: arbitrary custom BeanFactory implementations or resolver overrides,
-FactoryBeans that still report an unknowable product type after initialization,
+arbitrary non-singleton processor wrappers or broad interface-only predictions,
 every custom binding converter/validator, initialization before this processor, concurrent
 bean-definition mutation, and native execution. The opaque-parent fixture proves
 provider delegation, not access to hidden parent binding metadata. Do not infer
@@ -537,6 +550,42 @@ restoration, no business resources, and one factory product where applicable.
 Evidence under `target/release-evidence/v33/priority5-processor-discovery/` retains
 the source base, reviewed patch, commands, logs, XML and `SHA256SUMS`. Earlier
 bundles are unchanged. Consumer/API/matrix/native checks were not rerun and
+remaining release gates stay pending.
+
+## Non-Singleton and Non-Eager Review
+
+The 2026-09-25 correction on `ed87c4ee` recovers a non-singleton processor's discovery
+name from a unique concrete type when no singleton/product-cache identity exists.
+Ordinary prototypes, non-singleton products, and products of prototype factories
+therefore stay after binding without a second creation. Ambiguous type associations
+fail explicitly instead of silently selecting a registration order.
+
+Spring 7.0.1's `resolveNamedBean` has no non-eager overload; its provider's
+`allowEagerInit` flag applies to streams, not `getIfAvailable`. A private short-lived
+selection view retains Spring's candidate rules and comparator while delegating
+non-eager name/type discovery and all creation to the original owner. It covers
+both metadata and properties, including configurable ancestors. No original
+definitions, singleton registrations or factory settings are changed. A raw
+properties factory must declare a predictable product type to participate without
+prior initialization. The existing raw-factory fixture now supplies that metadata;
+a separate unhinted control requires no factory/product creation and environment fallback.
+
+Fourteen added cases cover six paired non-singleton processor cases, four unrelated
+unknown-factory cases across local/parent and present/absent properties, the unhinted
+properties-factory control, ambiguous processor types, and two framework-boundary
+characterizations. The initial ten-case run records **four failures and six errors**.
+An intermediate focused run exposed the old raw-factory fixture's eager-discovery
+assumption. Additional probes demonstrated that Spring's AOT refresh can create a
+raw factory before this processor, and creation initiated here can reach eager
+framework dependency/advisor discovery. The final characterizations identify those
+framework stack paths rather than treating them as fixed selection behavior.
+
+Final verification passes **394 focused cases**, including **157** selection-contract
+cases, and **73 documentation cases**, with zero failures/errors/skips and explicit
+GC disabled (**467 passing cases** total). Evidence under
+`target/release-evidence/v33/priority5-non-eager-selection/` preserves source base,
+reviewed patch, commands, logs, XML, intermediate failures and `SHA256SUMS`.
+Earlier bundles are unchanged. Consumer/API/matrix/native checks were not rerun;
 remaining release gates stay pending.
 
 ## Rollback and Remaining Gates

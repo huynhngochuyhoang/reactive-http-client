@@ -44,6 +44,173 @@ class AotPropertiesSelectionContractTest {
     enum Hierarchy { PARENT_ONLY, CHILD_SHADOWS, LOCAL_OVER_PARENT_PRIMARY }
     enum LifecycleShape { ORDINARY, BEAN_PROXY, SUPPLIER_PROXY, OPAQUE_BEAN_PROXY, OPAQUE_SUPPLIER_PROXY }
     enum DirectProcessorKind { ORDINARY, ORDERED, PRIORITY_ORDERED }
+    enum ProcessorScope { PROTOTYPE, NON_SINGLETON_PRODUCT, PROTOTYPE_FACTORY }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,PROTOTYPE", "ORDINARY,NON_SINGLETON_PRODUCT", "ORDINARY,PROTOTYPE_FACTORY",
+            "OPAQUE_SUPPLIER_PROXY,PROTOTYPE", "OPAQUE_SUPPLIER_PROXY,NON_SINGLETON_PRODUCT",
+            "OPAQUE_SUPPLIER_PROXY,PROTOTYPE_FACTORY"})
+    void nonSingletonProcessorsRemainAfterBindingWithoutRecreation(LifecycleShape shape, ProcessorScope scope) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        var aotCreations = new AtomicInteger();
+        var runtimeCreations = new AtomicInteger();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            registerNonSingletonProcessor(aot, scope, aotCreations);
+            registerNonSingletonProcessor(runtime, scope, runtimeCreations);
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internal = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            factory.addBeanPostProcessor(aot.getBean("nonSingletonProcessor", org.springframework.beans.factory.config.BeanPostProcessor.class));
+            factory.addBeanPostProcessors(internal);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(aotCreations).hasValue(1);
+            assertThat(runtimeCreations).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    private static void registerNonSingletonProcessor(AnnotationConfigApplicationContext context,
+                                                       ProcessorScope scope, AtomicInteger creations) {
+        if (scope == ProcessorScope.PROTOTYPE) {
+            context.registerBean("nonSingletonProcessor", OrdinaryPropertiesPostProcessor.class, () -> {
+                creations.incrementAndGet();
+                return new OrdinaryPropertiesPostProcessor();
+            }, definition -> definition.setScope("prototype"));
+        } else {
+            context.registerBean("nonSingletonProcessor", NonSingletonProcessorFactory.class,
+                    () -> new NonSingletonProcessorFactory(creations), definition -> {
+                        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, OrdinaryPropertiesPostProcessor.class);
+                        if (scope == ProcessorScope.PROTOTYPE_FACTORY) definition.setScope("prototype");
+                    });
+        }
+    }
+
+    static class NonSingletonProcessorFactory implements FactoryBean<OrdinaryPropertiesPostProcessor> {
+        final AtomicInteger creations;
+        NonSingletonProcessorFactory(AtomicInteger creations) { this.creations = creations; }
+        @Override public OrdinaryPropertiesPostProcessor getObject() {
+            creations.incrementAndGet();
+            return new OrdinaryPropertiesPostProcessor();
+        }
+        @Override public Class<?> getObjectType() { return OrdinaryPropertiesPostProcessor.class; }
+        @Override public boolean isSingleton() { return false; }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,false", "false,true", "true,false", "true,true"})
+    void unknownUnrelatedFactoryRemainsUninitialized(boolean parent, boolean propertiesPresent) {
+        var owner = new DefaultListableBeanFactory();
+        var factory = parent ? new DefaultListableBeanFactory(owner) : owner;
+        var creations = new AtomicInteger();
+        var business = new RootBeanDefinition(UnpredictableBusinessFactory.class, () -> {
+            creations.incrementAndGet();
+            return new UnpredictableBusinessFactory();
+        });
+        business.setLazyInit(true);
+        owner.registerBeanDefinition("unrelatedBusinessFactory", business);
+        if (propertiesPresent) owner.registerSingleton("selectedProperties", properties(7000));
+        var witness = witness(factory, Client.class);
+
+        assertThat(processor().processAheadOfTime(factory)).isNotNull();
+
+        assertThat(creations).hasValue(0);
+        assertThat(owner.containsSingleton("unrelatedBusinessFactory")).isFalse();
+        assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                .isEqualTo(propertiesPresent ? 7000 : 1000);
+        witness.assertNoBusinessResources(factory);
+    }
+
+    @SuppressWarnings("rawtypes")
+    static class UnpredictableBusinessFactory implements FactoryBean {
+        @Override public Object getObject() { throw new AssertionError("unrelated product must not be created"); }
+        @Override public Class<?> getObjectType() { return null; }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void frameworkCreationRetainsItsOwnEagerDiscoveryBoundaries(boolean scoped) {
+        var creations = new AtomicInteger();
+        var creationSite = new java.util.concurrent.atomic.AtomicReference<java.util.List<String>>();
+        try (var context = scoped ? scopedBindingContext(false, new AtomicInteger()) : bindingContext(false)) {
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            // Model an earlier AOT processor registering an as-yet uninitialized business factory.
+            context.registerBean("unknownBusiness", UnpredictableBusinessFactory.class, () -> {
+                creations.incrementAndGet();
+                creationSite.set(StackWalker.getInstance().walk(frames -> frames.limit(24)
+                        .map(frame -> frame.getClassName() + "#" + frame.getMethodName()).toList()));
+                return new UnpredictableBusinessFactory();
+            }, definition -> definition.setLazyInit(true));
+            assertThat(creations).hasValue(0);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(creations).hasValue(1);
+            assertThat(creationSite.get()).contains(scoped
+                    ? "org.springframework.beans.factory.support.ConstructorResolver#resolveAutowiredArgument"
+                    : "org.springframework.boot.context.properties.ConfigurationPropertiesBinder#getBindHandlerAdvisors");
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs())
+                    .isEqualTo(scoped ? 7000 : 5000);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @Test
+    void unknownPropertiesFactoryRequiresNonEagerProductTypeMetadata() {
+        var products = new AtomicInteger();
+        var factories = new AtomicInteger();
+        var factory = propertiesFactory(Shape.RAW_FACTORY, products, factories);
+        factory.getBeanDefinition("properties").removeAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
+        var witness = witness(factory, Client.class);
+
+        assertThat(processor().processAheadOfTime(factory)).isNotNull();
+
+        assertThat(products).hasValue(0);
+        assertThat(factories).hasValue(0);
+        assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(1000);
+        witness.assertNoBusinessResources(factory);
+    }
+
+    @Test
+    void ambiguousNonSingletonProcessorNamesFailWithoutCreatingReplacements() {
+        var calls = new java.util.ArrayList<String>();
+        var creations = new AtomicInteger();
+        try (var context = lifecycleContext(LifecycleShape.ORDINARY, calls)) {
+            registerNonSingletonProcessor(context, ProcessorScope.PROTOTYPE, creations);
+            context.registerBean("otherProcessor", OrdinaryPropertiesPostProcessor.class, () -> {
+                creations.incrementAndGet();
+                return new OrdinaryPropertiesPostProcessor();
+            }, definition -> definition.setScope("prototype"));
+            var factory = context.getDefaultListableBeanFactory();
+            witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            factory.addBeanPostProcessor(context.getBean("nonSingletonProcessor", OrdinaryPropertiesPostProcessor.class));
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+
+            assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(factory)).isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Cannot identify installed non-singleton processor");
+
+            assertThat(creations).hasValue(1);
+            assertThat(calls).isEmpty();
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+        }
+    }
 
     @ParameterizedTest
     @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
@@ -1728,6 +1895,9 @@ class AotPropertiesSelectionContractTest {
                 return shape == Shape.RAW_FACTORY ? new RawPropertiesFactory(products) : new PropertiesFactory(products);
             });
             definition.setLazyInit(true);
+            if (shape == Shape.RAW_FACTORY) {
+                definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ReactiveHttpClientProperties.class);
+            }
             if (shape == Shape.PROTOTYPE_FACTORY) definition.setScope(BeanDefinition.SCOPE_PROTOTYPE);
             factory.registerBeanDefinition("properties", definition);
         }

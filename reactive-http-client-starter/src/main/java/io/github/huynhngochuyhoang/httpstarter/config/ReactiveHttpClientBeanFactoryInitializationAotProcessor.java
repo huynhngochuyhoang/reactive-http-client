@@ -73,9 +73,9 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     }
                     bindings.put(factory, binding);
                     var processors = factory.getBeanPostProcessors();
-                    Map<Object, String> processorBeans = existingProcessorBeans(factory);
                     List<String> registrationOrder = Arrays.asList(
                             configurable.getBeanNamesForType(BeanPostProcessor.class, true, false));
+                    Map<Object, String> processorBeans = existingProcessorBeans(factory, configurable, registrationOrder);
                     processorBeans.entrySet().removeIf(entry -> !registrationOrder.contains(entry.getValue()));
                     int bindingRegistrationIndex = registrationOrder.indexOf(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
                     int index = 0;
@@ -102,7 +102,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     processors.add(index, binding);
                 }
             }
-            metadataCache = beanFactory.getBeanProvider(MethodMetadataCache.class)
+            metadataCache = new NonEagerSelectionFactory(beanFactory).getBeanProvider(MethodMetadataCache.class)
                     .getIfAvailable(MethodMetadataCache::new);
             properties = properties(beanFactory, bindings);
         } finally {
@@ -149,7 +149,8 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         });
     }
 
-    private static Map<Object, String> existingProcessorBeans(AbstractBeanFactory factory) {
+    private static Map<Object, String> existingProcessorBeans(AbstractBeanFactory factory,
+            ConfigurableListableBeanFactory configurable, List<String> registrationOrder) {
         Map<Object, String> processors = new IdentityHashMap<>();
         var cachedProduct = ReflectionUtils.findMethod(
                 FactoryBeanRegistrySupport.class, "getCachedObjectForFactoryBean", String.class);
@@ -166,14 +167,62 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 if (product instanceof BeanPostProcessor) processors.put(product, name);
             }
         }
+        // Non-singleton processors have no singleton/product-cache identity to inspect.
+        // Recover only an unambiguous concrete-type association; never create a new instance.
+        for (String name : registrationOrder) {
+            String definitionName = BeanFactoryUtils.transformedBeanName(name);
+            Object singleton = factory.getSingleton(definitionName);
+            boolean nonSingleton = configurable.containsBeanDefinition(definitionName)
+                    && !configurable.getMergedBeanDefinition(definitionName).isSingleton();
+            nonSingleton |= !BeanFactoryUtils.isFactoryDereference(name)
+                    && singleton instanceof FactoryBean<?> producer && !producer.isSingleton();
+            if (!nonSingleton) continue;
+            Class<?> predictedType = factory.getType(name, false);
+            if (predictedType == null || predictedType.isInterface()) continue;
+            var matches = factory.getBeanPostProcessors().stream()
+                    .filter(processor -> !processors.containsKey(processor)
+                            && ClassUtils.getUserClass(processor) == predictedType).toList();
+            long matchingNames = registrationOrder.stream()
+                    .filter(candidate -> factory.getType(candidate, false) == predictedType).count();
+            if (matches.size() == 1 && matchingNames == 1) processors.put(matches.getFirst(), name);
+            else if (!matches.isEmpty()) {
+                throw new IllegalStateException("Cannot identify installed non-singleton processor: " + name);
+            }
+        }
         return processors;
+    }
+
+    // Spring's named selection has no allowEagerInit overload. Keep its candidate
+    // rules, but delegate non-eager discovery and all instance creation to the owner.
+    private static final class NonEagerSelectionFactory extends DefaultListableBeanFactory {
+        private final ConfigurableListableBeanFactory owner;
+
+        private NonEagerSelectionFactory(ConfigurableListableBeanFactory owner) {
+            super(owner.getParentBeanFactory() instanceof ConfigurableListableBeanFactory parent
+                    ? new NonEagerSelectionFactory(parent) : owner.getParentBeanFactory());
+            this.owner = owner;
+            setBeanClassLoader(owner.getBeanClassLoader());
+            if (owner instanceof DefaultListableBeanFactory listable) {
+                setDependencyComparator(listable.getDependencyComparator());
+            }
+        }
+
+        @Override public String[] getBeanNamesForType(ResolvableType type) {
+            return owner.getBeanNamesForType(type, true, false);
+        }
+        @Override public boolean containsBeanDefinition(String name) { return owner.containsBeanDefinition(name); }
+        @Override public BeanDefinition getBeanDefinition(String name) { return owner.getBeanDefinition(name); }
+        @Override public boolean containsSingleton(String name) { return owner.containsSingleton(name); }
+        @Override public Class<?> getType(String name) { return owner.getType(name, false); }
+        @Override public Object getBean(String name) { return owner.getBean(name); }
+        @Override public <T> T getBean(String name, Class<T> type) { return owner.getBean(name, type); }
     }
 
     private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory,
                                                      Map<AbstractBeanFactory, PropertiesBinding> bindings) {
         NamedBeanHolder<ReactiveHttpClientProperties> selected;
         try {
-            selected = beanFactory.resolveNamedBean(ReactiveHttpClientProperties.class);
+            selected = new NonEagerSelectionFactory(beanFactory).resolveNamedBean(ReactiveHttpClientProperties.class);
         } catch (NoUniqueBeanDefinitionException ex) {
             throw ex;
         } catch (NoSuchBeanDefinitionException ex) {

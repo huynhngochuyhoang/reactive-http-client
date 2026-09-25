@@ -487,6 +487,18 @@ cases** passing, zero failures/errors/skips, explicit GC disabled. Ownership and
 processor-restoration checks remain active; consumer/API/matrix/native and release
 gates are unchanged.
 
+Non-singleton/non-eager correction, 2026-09-25: uniquely typed non-singleton
+processors retain discovery ordering without replacement creation; ambiguous type
+matches fail explicitly. Properties and metadata selection use a short-lived
+non-eager Spring selection view with owner-delegated creation. Raw properties
+factories need predictable product-type metadata or prior initialization. Fourteen
+added cases include explicit Spring dependency/Boot advisor discovery boundaries,
+which this correction does not suppress. Evidence in
+`target/release-evidence/v33/priority5-non-eager-selection/` records ten initial
+failing cases and intermediate boundary probes, then **394 focused / 73 documentation
+cases** passing, zero failures/errors/skips, explicit GC disabled. The companion
+record qualifies the limits; consumer/API/matrix/native and release gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points
