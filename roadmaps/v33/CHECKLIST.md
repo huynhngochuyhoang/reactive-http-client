@@ -305,13 +305,13 @@ pre-F002 status.
 
 Conditional on **V32-F003** approval.
 
-### [ ] 5.1 Select the effective properties
+### [x] 5.1 Select the effective properties
 
 - [x] Turn the paired runtime/AOT drift cases into desired-behavior regressions
       while preserving their baseline provenance.
 - [x] Prefer supported Spring candidate resolution at the properties boundary;
       remove registration-order fallback rather than duplicating precedence rules.
-- [ ] Preserve environment binding lifecycle, primary programmatic properties and
+- [x] Preserve environment binding lifecycle, primary programmatic properties and
       foreign-factory behavior; do not select an unbound configuration object.
 
 ### [x] 5.2 Cover selection and failure semantics
@@ -334,8 +334,9 @@ Conditional on **V32-F003** approval.
 - [x] Run environment-only, replacement-properties and foreign-factory controls;
       record focused results, remaining constraints and rollback assessment.
 
-Initially completed on 2026-09-24; binding-lifecycle provenance reopened on
-2026-09-26. [AOT-PROPERTIES-SELECTION.md](AOT-PROPERTIES-SELECTION.md)
+Initially completed on 2026-09-24; binding-lifecycle provenance reopened and repaired
+within the documented lifecycle boundaries on 2026-09-26.
+[AOT-PROPERTIES-SELECTION.md](AOT-PROPERTIES-SELECTION.md)
 records Spring-owned selection, Boot binding, creation counts, failure semantics,
 commands and remaining gates. Evidence is under
 `target/release-evidence/v33/priority5/`, against the reviewed patch on reachable
@@ -538,9 +539,29 @@ failures and eight errors among twenty pre-fix cases**, then **440 focused /
 The companion record explicitly leaves arbitrary installation-history inference
 unresolved; consumer/API/matrix/native and release gates remain pending.
 
-- [ ] Resolve lifecycle provenance when another AOT processor instantiates the
+- [x] Resolve lifecycle provenance when another AOT processor instantiates the
       binder before properties but installs it afterward; do not treat singleton
       registration order as proof of binding or close this gap from the rerun above.
+
+Installed non-singleton/scoped-history correction, 2026-09-26: resolve an installed
+binder's discovered name before requesting another instance. The internal
+auto-configured lifecycle observer tracks properties and delegate identities weakly
+from AOT refresh, so early custom-scoped targets and delegates created before their
+installation no longer depend on singleton registration order. Repeated inspection
+does not rebind an existing target or its final wrapper. Twenty added selection and
+three tracker cases
+cover non-singleton scopes/aliases, real custom scopes, auto-configuration wiring,
+identity/replacement tracking and deterministic weak-reference cleanup. Evidence in
+`target/release-evidence/v33/priority5-binding-lifecycle-tracker/` records **six
+failures and two errors among ten pre-fix cases**, then **463 focused cases** passing,
+zero failures/errors/skips, explicit GC disabled. The companion record qualifies
+manual contexts without the observer, earlier callbacks and arbitrary chain mutation;
+shared consumer/API/matrix/native and release gates remain pending.
+The final full starter rerun passes **2,062 cases** (including **73 documentation
+cases**), zero failures/errors/skips, with explicit GC disabled. The bundle's
+XML-derived audit and `SHA256SUMS` retain the final patch, including new source
+files; focused/full/documentation counts overlap. No later checklist priority or
+release gate is closed by this correction.
 
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 

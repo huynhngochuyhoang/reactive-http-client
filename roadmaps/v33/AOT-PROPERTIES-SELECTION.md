@@ -2,7 +2,7 @@
 
 > **Recorded:** 2026-09-24
 > **Source base:** `a81447c85739d375d8b1b32fffeae8c2df37dcc3` plus the reviewed Priority 5 patch
-> **Implementation:** V32-F003 partially implemented; lifecycle provenance open; shared verification pending
+> **Implementation:** V32-F003 implemented within documented lifecycle boundaries; shared verification pending
 > **Published / development:** `4.4.1` / `4.5.0-SNAPSHOT`
 > **Release scope:** unselected
 
@@ -684,7 +684,7 @@ with zero failures/errors/skips and explicit GC disabled (**513 passing cases** 
 Evidence under `target/release-evidence/v33/priority5-installed-binder-lifecycle/`
 retains source base, reviewed patch, commands, logs, XML and `SHA256SUMS`.
 
-**Remaining provenance limitation:** singleton registration order does not record
+**Provenance limitation at this revision (creation tracking added below):** singleton registration order does not record
 when an already-created delegate entered the processor chain. A delegate created
 before properties but installed afterward is not covered by this early-singleton
 repair; neither are already-created custom-scoped targets absent from the singleton
@@ -693,20 +693,66 @@ on retaining Spring's merged-definition registration boundary; it is not a gener
 reordering by other AOT processors. Full support needs lifecycle tracking before
 those operations, not more inference from the final chain. Earlier processors
 should install the binder before resolving properties and leave the discovery
-boundary intact. This limitation remains open; the rerun does not certify arbitrary
+boundary intact. This historical rerun did not close that limitation or certify arbitrary
 AOT processor ordering. Consumer/API/matrix/native and release gates are unchanged.
+
+## Installed Non-Singleton Binders and Scoped Creation History
+
+The 2026-09-26 correction on reachable source base `0fd38789` plus the reviewed
+patch reuses an installed binding processor by its discovered bean name before
+requesting a delegate. This includes prototype definitions, non-singleton products,
+prototype factories and aliases of Boot's standard name. The existing unique
+concrete-type association rule applies; ambiguous non-singleton provenance still
+fails explicitly instead of creating another product or guessing its owner.
+
+The auto-configuration now registers the internal `PropertiesBindingLifecycle`
+merged-definition processor. Spring installs it during AOT refresh, before earlier
+initialization AOT processors can create properties. It records instance identity
+and installed binding-delegate identities through weak references, including
+custom-scoped targets absent from the singleton registry. A delegate created before
+the target but installed afterward is no longer mistaken for a completed binding
+pass. Fallback records its successful binding so repeat inspection of the same
+target does not bind again; newly created targets still follow creation callbacks.
+Fallback also records a final wrapper whose underlying creation was already bound.
+Tests verify identity rather than equality and cleared-reference pruning without
+requiring garbage collection. No public API or per-request processing is added.
+
+The initial ten-case run records **six failures and two errors**, with two passing
+controls. The custom-scope regression no longer changes its target to singleton
+scope. Twenty added selection cases cover installed binder scopes/aliases,
+creation before installation, repeated inspection and actual auto-configuration
+registration, including final scoped wrappers; three tracker cases cover identity,
+replacements and weak ownership. A two-case repeat-wrapper probe exposed one
+rebinding error before final-wrapper tracking was added; its control passes.
+After correcting alias fixture setup to run after configuration parsing, the
+ten-class final focused rerun passes **463 cases**, including **223 selection cases**
+and **three tracker cases**, zero failures/errors/skips, with explicit GC disabled.
+Evidence is under `target/release-evidence/v33/priority5-binding-lifecycle-tracker/`;
+it retains the pre-fix runs, fixture iteration, commands, logs, XML and source patch.
+The final full starter suite passes **2,062 cases**, including **73 documentation
+cases**, zero failures/errors/skips, with explicit GC disabled. The final
+documentation-only rerun is recorded separately; these counts overlap rather than
+representing distinct cases. `SHA256SUMS` covers the reviewed files (including new
+sources), complete final patch and XML-derived audit. Earlier bundles remain unchanged.
+
+This closes the previously recorded early-singleton/custom-scope provenance gap
+for contexts using the starter lifecycle infrastructure. Low-level contexts that
+omit it retain only the older singleton-order fallback. The tracker observes the
+chain during creation; it does not certify arbitrary mid-initialization processor
+reordering, replay callbacks already run before binding, or activate unavailable
+scopes. The earlier ordering/discovery and non-eager lookup qualifications remain.
+Consumer/API/matrix/native evidence is not replaced by these JVM tests.
 
 ## Rollback and Remaining Gates
 
-Rollback this processor-only selection/binding correction with its desired-behavior
+Rollback this selection/binding correction and its internal lifecycle observer with its desired-behavior
 tests if valid prepared values are overwritten, configuration is created twice,
 ambiguity is hidden, or business assembly is introduced at this boundary. Do not
 restore registration-order selection as a new supported precedence rule. The
 published `4.4.1` primary-bean workaround remains available on that release.
 
-F001-F003 corrections are implemented within the qualified coverage above; the
-remaining lifecycle provenance gap is not closed. Shared composed regressions,
-full module suites, assembled programmatic non-primary selection across supported
+F001-F003 corrections are implemented within the qualified coverage above. Shared composed regressions,
+remaining module suites, assembled programmatic non-primary selection across supported
 Boot rows, strict source/binary API checks, clean-source native execution and
 the Priority 8 cost decision remain in Priorities 6-8. AOT-only changes do not
 justify a steady-state speed/memory claim. Release selection, signing and

@@ -275,11 +275,19 @@ on inferred registration provenance; rejection does not request another product.
 The callback is removed after lookup, including failures.
 Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
-An installed delegate no longer prevents repairing a singleton registered before
-the delegate's canonical singleton name (including scoped targets). Registration
-order is not installation history: a delegate instantiated early but installed
-later cannot be distinguished reliably here. Earlier AOT processors should install
-the binder before resolving properties; that broader provenance gap remains open.
+The starter auto-configuration registers an internal merged-definition processor
+that observes properties creation before initialization AOT processors run. Its
+weak instance/delegate references distinguish an already-bound object from an
+early unbound singleton or custom-scoped target, even when the delegate was created
+before that object but installed afterward. Fallback binds the same target once;
+it does not recreate scoped targets or repeat binding on later AOT inspection.
+Installed prototype binders and non-singleton binding products are associated with
+their discovered name (including aliases) and reused without requesting a second
+product. The unique concrete-type restriction above also applies to these binders.
+Low-level contexts that omit this lifecycle infrastructure retain only the older
+singleton-order fallback, not the creation-history guarantee. Earlier AOT
+processors should still install binding before resolving properties if their
+initialization callbacks depend on bound values.
 When Spring selects an annotated properties FactoryBean itself as `&name`, binding
 uses the canonical `name` definition and the selected factory instance, not its product.
 Fallback uses a binder-returned replacement for validation without replacing an

@@ -67,7 +67,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                  current = configurable.getParentBeanFactory()) {
                 if (current instanceof AbstractBeanFactory factory
                         && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)) {
-                    var binding = new PropertiesBinding(factory);
+                    var binding = new PropertiesBinding(factory, configurable);
                     bindings.put(factory, binding);
                     if (binding.delegateInstalled) {
                         continue;
@@ -349,18 +349,29 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         private final ConfigurationPropertiesBindingPostProcessor delegate;
         private final List<BeanPostProcessor> originalProcessors;
         private final boolean delegateInstalled;
+        private final PropertiesBindingLifecycle lifecycle;
         private final Set<String> singletonsBeforeDelegate = new HashSet<>();
         private final Map<Object, Object> bound = new IdentityHashMap<>();
         private final Set<String> boundBeanNames = new HashSet<>();
 
-        private PropertiesBinding(AbstractBeanFactory factory) {
+        private PropertiesBinding(AbstractBeanFactory factory, ConfigurableListableBeanFactory configurable) {
             this.factory = factory;
-            this.delegate = factory.getBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
-                    ConfigurationPropertiesBindingPostProcessor.class);
+            var bindingNames = Arrays.asList(configurable.getBeanNamesForType(
+                    ConfigurationPropertiesBindingPostProcessor.class, true, false));
+            var processorBeans = existingProcessorBeans(factory, configurable, bindingNames);
+            String delegateName = factory.canonicalName(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
+            this.delegate = factory.getBeanPostProcessors().stream()
+                    .filter(processor -> processor instanceof ConfigurationPropertiesBindingPostProcessor
+                            && processorBeans.containsKey(processor)
+                            && delegateName.equals(factory.canonicalName(processorBeans.get(processor))))
+                    .map(ConfigurationPropertiesBindingPostProcessor.class::cast).findFirst()
+                    .orElseGet(() -> factory.getBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                            ConfigurationPropertiesBindingPostProcessor.class));
             this.originalProcessors = List.copyOf(factory.getBeanPostProcessors());
             this.delegateInstalled = originalProcessors.stream().anyMatch(processor -> processor == delegate);
+            this.lifecycle = originalProcessors.stream().filter(PropertiesBindingLifecycle.class::isInstance)
+                    .map(PropertiesBindingLifecycle.class::cast).findFirst().orElse(null);
             if (delegateInstalled) {
-                String delegateName = factory.canonicalName(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
                 for (String name : factory.getSingletonNames()) {
                     if (name.equals(delegateName)) break;
                     singletonsBeforeDelegate.add(name);
@@ -382,7 +393,10 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         }
 
         private Object bindExisting(Object bean, String beanName) {
-            if (delegateInstalled && !singletonsBeforeDelegate.contains(factory.canonicalName(beanName))) {
+            Boolean previouslyBound = lifecycle != null ? lifecycle.wasBound(bean, delegate) : null;
+            if (Boolean.TRUE.equals(previouslyBound)
+                    || (previouslyBound == null && delegateInstalled
+                    && !singletonsBeforeDelegate.contains(factory.canonicalName(beanName)))) {
                 return bean;
             }
             // A later post-processor may replace the bound instance. This name guard
@@ -391,6 +405,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 Object result = postProcessBeforeInitialization(bean, beanName);
                 return result != null ? result : bean;
             }
+            if (lifecycle != null) lifecycle.bound(bean, delegate);
             return bean;
         }
 
@@ -399,6 +414,10 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             if (bean instanceof ReactiveHttpClientProperties && !isScopedProxy(bean, beanName)) {
                 if (bound.containsKey(bean)) return bound.get(bean);
                 Object result = delegate.postProcessBeforeInitialization(bean, beanName);
+                if (lifecycle != null) {
+                    lifecycle.bound(bean, delegate);
+                    lifecycle.bound(result, delegate);
+                }
                 bound.put(bean, result);
                 if (result != null && result != bean) bound.put(result, result);
                 boundBeanNames.add(factory.canonicalName(beanName));

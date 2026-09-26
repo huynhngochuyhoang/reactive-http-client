@@ -25,6 +25,7 @@ import io.micrometer.core.instrument.binder.MeterBinder;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.aot.BeanFactoryInitializationAotProcessor;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
+import org.springframework.beans.factory.support.AbstractBeanFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.*;
@@ -63,6 +64,11 @@ import org.springframework.web.reactive.function.client.WebClient;
         BootJsonCodecAutoConfiguration.class
 })
 public class ReactiveHttpClientAutoConfiguration {
+
+    @Bean
+    static PropertiesBindingLifecycle reactiveHttpClientPropertiesBindingLifecycle(AbstractBeanFactory beanFactory) {
+        return new PropertiesBindingLifecycle(beanFactory);
+    }
 
     @Bean
     public static BeanFactoryInitializationAotProcessor reactiveHttpClientBeanFactoryInitializationAotProcessor(

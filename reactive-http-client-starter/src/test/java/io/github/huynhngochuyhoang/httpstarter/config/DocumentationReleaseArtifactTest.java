@@ -246,11 +246,12 @@ class DocumentationReleaseArtifactTest {
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         String priority = checklist.split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0];
         assertThat(priority).contains("(AOT-PROPERTIES-SELECTION.md)",
-                "### [ ] 5.1 Select the effective properties",
-                "- [ ] Preserve environment binding lifecycle",
-                "- [ ] Resolve lifecycle provenance", "### [x] 5.2", "### [x] 5.3");
+                "### [x] 5.1 Select the effective properties",
+                "- [x] Preserve environment binding lifecycle",
+                "- [x] Resolve lifecycle provenance", "### [x] 5.2", "### [x] 5.3");
         String evidence = Files.readString(directory.resolve("AOT-PROPERTIES-SELECTION.md"));
-        assertThat(evidence).contains("V32-F003 partially implemented; lifecycle provenance open", "resolveNamedBean", "FactoryBean",
+        assertThat(evidence).contains("V32-F003 implemented within documented lifecycle boundaries", "resolveNamedBean", "FactoryBean",
+                "PropertiesBindingLifecycle", "weak references", "Low-level contexts",
                 "opaque parent", "Boot binding", "No public API", "not a native binary",
                 "## Rollback and Remaining Gates", "SHA256SUMS", "> **Release scope:** unselected");
         assertThat(checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0])

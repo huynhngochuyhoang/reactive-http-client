@@ -50,6 +50,106 @@ class AotPropertiesSelectionContractTest {
     enum ProcessorRemoval { NONE, SELF, ORIGINAL }
 
     @ParameterizedTest
+    @CsvSource({"ORDINARY,PROTOTYPE,false", "ORDINARY,NON_SINGLETON_PRODUCT,false", "ORDINARY,PROTOTYPE_FACTORY,false",
+            "OPAQUE_SUPPLIER_PROXY,PROTOTYPE,false", "OPAQUE_SUPPLIER_PROXY,NON_SINGLETON_PRODUCT,false", "OPAQUE_SUPPLIER_PROXY,PROTOTYPE_FACTORY,false",
+            "ORDINARY,PROTOTYPE,true", "ORDINARY,NON_SINGLETON_PRODUCT,true", "ORDINARY,PROTOTYPE_FACTORY,true",
+            "OPAQUE_SUPPLIER_PROXY,PROTOTYPE,true", "OPAQUE_SUPPLIER_PROXY,NON_SINGLETON_PRODUCT,true", "OPAQUE_SUPPLIER_PROXY,PROTOTYPE_FACTORY,true"})
+    void installedNonSingletonBinderIsReusedWithoutDuplicateBinding(LifecycleShape shape, ProcessorScope scope, boolean alias) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        var aotProducts = new AtomicInteger();
+        var runtimeProducts = new AtomicInteger();
+        var aotBindings = new AtomicInteger();
+        var runtimeBindings = new AtomicInteger();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            registerNonSingletonBinder(aot, scope, aotProducts, aotBindings);
+            registerNonSingletonBinder(runtime, scope, runtimeProducts, runtimeBindings);
+            if (alias) {
+                for (var context : java.util.List.of(aot, runtime)) {
+                    context.addBeanFactoryPostProcessor(factory -> {
+                        String standard = org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME;
+                        var definition = context.getBeanDefinition(standard);
+                        context.removeBeanDefinition(standard);
+                        context.registerBeanDefinition("customBinder", definition);
+                        context.registerAlias("customBinder", standard);
+                    });
+                }
+            }
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var installed = aot.getBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                    CountingBindingProcessor.class);
+            var internal = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            factory.addBeanPostProcessor(installed);
+            factory.addBeanPostProcessors(internal);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeProducts).hasValue(1);
+            assertThat(runtimeBindings).hasValue(1);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotProducts).hasValue(1);
+            assertThat(aotBindings).hasValue(1);
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    private static void registerNonSingletonBinder(AnnotationConfigApplicationContext context,
+            ProcessorScope scope, AtomicInteger products, AtomicInteger bindings) {
+        String name = org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME;
+        if (scope == ProcessorScope.PROTOTYPE) {
+            context.registerBean(name, CountingBindingProcessor.class, () -> {
+                products.incrementAndGet();
+                return new CountingBindingProcessor(bindings);
+            }, definition -> definition.setScope(BeanDefinition.SCOPE_PROTOTYPE));
+        } else {
+            context.registerBean(name, BindingProcessorFactory.class, () -> new BindingProcessorFactory(context, products, bindings),
+                    definition -> {
+                        definition.setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, CountingBindingProcessor.class);
+                        if (scope == ProcessorScope.PROTOTYPE_FACTORY) definition.setScope(BeanDefinition.SCOPE_PROTOTYPE);
+                    });
+        }
+    }
+
+    static class CountingBindingProcessor extends org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor {
+        final AtomicInteger bindings;
+        CountingBindingProcessor(AtomicInteger bindings) { this.bindings = bindings; }
+        @Override public Object postProcessBeforeInitialization(Object bean, String name) {
+            if (bean instanceof LifecycleProperties && !(bean instanceof org.springframework.aop.scope.ScopedObject)) {
+                bindings.incrementAndGet();
+            }
+            return super.postProcessBeforeInitialization(bean, name);
+        }
+    }
+
+    static class BindingProcessorFactory implements FactoryBean<CountingBindingProcessor> {
+        final ApplicationContext context;
+        final AtomicInteger products;
+        final AtomicInteger bindings;
+        BindingProcessorFactory(ApplicationContext context, AtomicInteger products, AtomicInteger bindings) {
+            this.context = context;
+            this.products = products;
+            this.bindings = bindings;
+        }
+        @Override public CountingBindingProcessor getObject() throws Exception {
+            products.incrementAndGet();
+            var processor = new CountingBindingProcessor(bindings);
+            processor.setApplicationContext(context);
+            processor.afterPropertiesSet();
+            return processor;
+        }
+        @Override public Class<?> getObjectType() { return CountingBindingProcessor.class; }
+        @Override public boolean isSingleton() { return false; }
+    }
+
+    @ParameterizedTest
     @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
     void processorsAppendedAfterRefreshStayAfterBinding(LifecycleShape shape, boolean priorityOrdered) {
         var aotCalls = new java.util.ArrayList<String>();
@@ -1283,6 +1383,45 @@ class AotPropertiesSelectionContractTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void scopedWrapperRetainsItsBindingHistoryAcrossAotLookups(boolean installedDelegate) {
+        var creations = new AtomicInteger();
+        var wrappers = new AtomicInteger();
+        try (var context = scopedBindingContext(false, creations)) {
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            if (installedDelegate) factory.addBeanPostProcessor(context.getBean(
+                    org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                    org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.class));
+            factory.addBeanPostProcessor(new org.springframework.beans.factory.config.BeanPostProcessor() {
+                @Override public Object postProcessAfterInitialization(Object bean, String name) {
+                    if (!name.equals("scopedTarget.selected")) return bean;
+                    var proxy = new org.springframework.aop.framework.ProxyFactory(bean);
+                    proxy.setProxyTargetClass(true);
+                    wrappers.incrementAndGet();
+                    return proxy.getProxy();
+                }
+            });
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            var processor = new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment());
+            assertThat(processor.processAheadOfTime(factory)).isNotNull();
+            var selected = witness.config;
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("later-scoped", Map.of(
+                    "scoped.clients.selection.cache.policies.chosen.ttl-ms", "0")));
+
+            assertThat(processor.processAheadOfTime(factory)).isNotNull();
+
+            assertThat(witness.config).isSameAs(selected);
+            assertThat(selected.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            assertThat(creations).hasValue(1);
+            assertThat(wrappers).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
     static class PropertiesWrappingProcessor implements org.springframework.beans.factory.config.BeanPostProcessor {
         final AtomicInteger wrappers = new AtomicInteger();
         @Override public Object postProcessAfterInitialization(Object bean, String beanName) {
@@ -1831,17 +1970,16 @@ class AotPropertiesSelectionContractTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"false,false", "true,false", "false,true", "true,true"})
-    void earlyCreatedScopedTargetIsBoundWithoutRecreation(boolean opaque, boolean installedDelegate) {
+    @CsvSource({"false,false,false", "true,false,false", "false,true,false", "true,true,false",
+            "false,false,true", "true,false,true", "false,true,true", "true,true,true"})
+    void earlyCreatedScopedTargetIsBoundWithoutRecreation(boolean opaque, boolean installedDelegate, boolean createBinderFirst) {
         var creations = new AtomicInteger();
         try (var context = scopedBindingContext(false, creations)) {
             if (opaque) useOpaqueProgrammaticScopedProxy(context);
-            if (installedDelegate) {
-                context.addBeanFactoryPostProcessor(factory -> factory.getBeanDefinition("scopedTarget.selected")
-                        .setScope(BeanDefinition.SCOPE_SINGLETON));
-            }
             var witness = witness(context.getDefaultListableBeanFactory(), Client.class);
             context.refreshForAotProcessing(new RuntimeHints());
+            String binderName = org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME;
+            if (createBinderFirst) context.getBean(binderName);
             var proxy = context.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
             var target = (ReactiveHttpClientProperties) ((org.springframework.aop.scope.ScopedObject) proxy).getTargetObject();
             assertThat(target.getClients()).isEmpty();
@@ -1858,9 +1996,44 @@ class AotPropertiesSelectionContractTest {
 
             assertThat(witness.config).isSameAs(target.getClients().get("selection"));
             assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
+            context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("later-scoped", Map.of(
+                    "scoped.clients.selection.cache.policies.chosen.ttl-ms", "0")));
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(context.getDefaultListableBeanFactory())).isNotNull();
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(7000);
             assertThat(creations).hasValue(1);
             assertThat(context.getDefaultListableBeanFactory().getBeanPostProcessors()).containsExactlyElementsOf(processors);
             witness.assertNoBusinessResources(context.getDefaultListableBeanFactory());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void autoConfigurationObservesTargetsCreatedBeforeDelegateInstallation(boolean scoped) {
+        var creations = new AtomicInteger();
+        try (var context = scoped ? scopedBindingContext(false, creations) : bindingContext(false)) {
+            context.removeBeanDefinition("reactiveHttpClientPropertiesBindingLifecycle");
+            context.register(ReactiveHttpClientAutoConfiguration.class);
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            assertThat(factory.getBeanPostProcessors()).anyMatch(PropertiesBindingLifecycle.class::isInstance);
+            var binder = context.getBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                    org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.class);
+            var selected = context.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+            if (selected instanceof org.springframework.aop.scope.ScopedObject proxy) {
+                selected = (ReactiveHttpClientProperties) proxy.getTargetObject();
+            }
+            assertThat(selected.getClients()).isEmpty();
+            factory.addBeanPostProcessor(binder);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(witness.config).isSameAs(selected.getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(scoped ? 7000 : 5000);
+            assertThat(creations).hasValue(scoped ? 1 : 0);
+            witness.assertNoBusinessResources(factory);
         }
     }
 
@@ -2070,6 +2243,9 @@ class AotPropertiesSelectionContractTest {
 
     private static AnnotationConfigApplicationContext bindingContext(boolean replacement) {
         var context = new AnnotationConfigApplicationContext();
+        context.registerBean("reactiveHttpClientPropertiesBindingLifecycle", PropertiesBindingLifecycle.class,
+                () -> ReactiveHttpClientAutoConfiguration.reactiveHttpClientPropertiesBindingLifecycle(
+                        context.getDefaultListableBeanFactory()));
         context.register(replacement ? ReplacementBinding.class : DefaultBinding.class);
         context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("binding", Map.of(
                 "reactive.http.clients.selection.cache.policies.chosen.ttl-ms", "5000",
