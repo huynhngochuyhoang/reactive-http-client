@@ -620,6 +620,40 @@ base, reviewed patch, commands, logs, XML and `SHA256SUMS`. Earlier bundles are
 unchanged. Consumer/API/matrix/native checks were not rerun; remaining release
 gates stay pending.
 
+## Mixed Direct Chains and Selected-Creation Failures
+
+The 2026-09-26 correction on `860f89f7` identifies direct-only registrations across
+the installed chain. Stable grouping places them before rediscovered processor
+beans, including when a bean-backed processor was installed before a definition-less
+preparer. The existing predictive groups, comparator and binder-alias tie rules
+then place the temporary binder. The original chain order is restored on success
+or failure; processors registered during lookup are retained afterward.
+
+The non-eager selection view now wraps named bean lookup failures in
+`BeanCreationException`, retaining their original cause. A selected bean's required
+same-type dependency lookup can no longer be mistaken for an absent outer candidate
+and silently replaced by environment configuration. Scoped bean/factory creation
+can expose this exception directly; ordinary supplier and FactoryBean product
+failures already wrapped by Spring remain propagation controls. Existing absence,
+ambiguity and opaque-parent selection cases remain covered.
+
+Eighteen added cases include six paired mixed-chain cases (ordinary, ordered and
+priority-ordered processor beans with ordinary/opaque-scoped properties), eight
+paired creation-failure cases across local/parent owners, and four chain-restoration
+cases covering success/failure and processors added during lookup. The pre-fix
+twenty-case run has **four failures and six errors**; ten controls pass. No business
+resources are created, each failed selected materialization is attempted once, and
+the failure paths never reach configuration validation.
+
+Final verification passes **422 focused cases**, including **185** selection-contract
+cases, plus **73 documentation cases**, with zero failures/errors/skips and explicit
+GC disabled (**495 passing cases** total). Evidence under
+`target/release-evidence/v33/priority5-direct-chain-failures/` retains source base,
+reviewed patch, commands, logs, XML and `SHA256SUMS`. Earlier evidence is unchanged.
+Consumer/API/matrix/native checks were not rerun, and remaining release gates stay
+pending. This correction does not expand the documented non-singleton type support
+or change Spring/Boot's separate eager creation/advisor-discovery boundaries.
+
 ## Rollback and Remaining Gates
 
 Rollback this processor-only selection/binding correction with its desired-behavior

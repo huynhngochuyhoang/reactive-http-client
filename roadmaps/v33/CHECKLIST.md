@@ -512,6 +512,19 @@ iteration, **eight pre-fix failures among fourteen cases**, then **404 focused /
 disabled. Product/resource ownership and processor-chain restoration are checked;
 consumer/API/matrix/native and release gates are unchanged.
 
+Mixed-chain/creation-failure correction, 2026-09-26: direct-only processors across
+the whole installed chain precede rediscovered instances. Temporary ordering is
+restored after successful/failed lookup while retaining processors registered
+during it. Selected named-bean lookup failures retain their original cause and do
+not trigger the environment fallback, including required same-type lookups.
+Eighteen new cases cover runtime/AOT ordering, local/parent creation failures and
+restoration. Evidence in
+`target/release-evidence/v33/priority5-direct-chain-failures/` records **four failures
+and six errors among twenty pre-fix cases**, then **422 focused / 73 documentation
+cases** passing, zero failures/errors/skips, explicit GC disabled. Existing
+non-singleton restrictions and framework discovery boundaries remain documented;
+consumer/API/matrix/native and release gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

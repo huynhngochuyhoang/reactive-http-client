@@ -46,6 +46,7 @@ class AotPropertiesSelectionContractTest {
     enum DirectProcessorKind { ORDINARY, ORDERED, PRIORITY_ORDERED }
     enum ProcessorScope { PROTOTYPE, NON_SINGLETON_PRODUCT, PROTOTYPE_FACTORY }
     enum ProcessorPrediction { ORDINARY_INTERFACE, ORDERED_INTERFACE, ORDERED_BASE }
+    enum SelectedFailure { SUPPLIER, FACTORY_PRODUCT, SCOPED_BEAN, SCOPED_FACTORY }
 
     @ParameterizedTest
     @CsvSource({"ORDINARY,ORDINARY_INTERFACE", "ORDINARY,ORDERED_INTERFACE", "ORDINARY,ORDERED_BASE",
@@ -877,9 +878,11 @@ class AotPropertiesSelectionContractTest {
     }
 
     @ParameterizedTest
-    @CsvSource({"ORDINARY,ORDINARY", "ORDINARY,ORDERED", "ORDINARY,PRIORITY_ORDERED",
-            "OPAQUE_SUPPLIER_PROXY,ORDINARY", "OPAQUE_SUPPLIER_PROXY,ORDERED", "OPAQUE_SUPPLIER_PROXY,PRIORITY_ORDERED"})
-    void beanBackedDirectProcessorIsRediscoveredAtRuntime(LifecycleShape shape, DirectProcessorKind kind) {
+    @CsvSource({"ORDINARY,ORDINARY,false", "ORDINARY,ORDERED,false", "ORDINARY,PRIORITY_ORDERED,false",
+            "OPAQUE_SUPPLIER_PROXY,ORDINARY,false", "OPAQUE_SUPPLIER_PROXY,ORDERED,false", "OPAQUE_SUPPLIER_PROXY,PRIORITY_ORDERED,false",
+            "ORDINARY,ORDINARY,true", "ORDINARY,ORDERED,true", "ORDINARY,PRIORITY_ORDERED,true",
+            "OPAQUE_SUPPLIER_PROXY,ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,ORDERED,true", "OPAQUE_SUPPLIER_PROXY,PRIORITY_ORDERED,true"})
+    void beanBackedDirectProcessorIsRediscoveredAtRuntime(LifecycleShape shape, DirectProcessorKind kind, boolean followingDirect) {
         var aotCalls = new java.util.ArrayList<String>();
         var runtimeCalls = new java.util.ArrayList<String>();
         try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
@@ -890,8 +893,10 @@ class AotPropertiesSelectionContractTest {
                     case PRIORITY_ORDERED -> LowPriorityPropertiesPostProcessor.class;
                 };
                 context.registerBean("preparer", processorType);
-                context.addBeanFactoryPostProcessor(factory -> factory.addBeanPostProcessor(
-                        factory.getBean("preparer", org.springframework.beans.factory.config.BeanPostProcessor.class)));
+                context.addBeanFactoryPostProcessor(factory -> {
+                    factory.addBeanPostProcessor(factory.getBean("preparer", org.springframework.beans.factory.config.BeanPostProcessor.class));
+                    if (followingDirect) factory.addBeanPostProcessor(new DirectPreparingProcessor());
+                });
             }
             var factory = aot.getDefaultListableBeanFactory();
             var witness = witness(factory, Client.class);
@@ -904,8 +909,10 @@ class AotPropertiesSelectionContractTest {
             Object binder = runtime.getBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
             assertThat(runtimeProcessors.stream().filter(value -> value == preparer).count()).isEqualTo(1);
             assertThat(runtimeProcessors.indexOf(preparer)).isGreaterThan(runtimeProcessors.indexOf(binder));
-            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
-                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+            var expectedCalls = new java.util.ArrayList<>(java.util.List.of("construct", "environment", "applicationContext"));
+            if (followingDirect) expectedCalls.add("direct");
+            expectedCalls.addAll(java.util.List.of("bind", "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000"));
+            assertThat(runtimeCalls).containsExactlyElementsOf(expectedCalls);
 
             assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
                     .processAheadOfTime(factory)).isNotNull();
@@ -923,6 +930,46 @@ class AotPropertiesSelectionContractTest {
     }
 
     static class LowPriorityPropertiesPostProcessor extends OrderedPropertiesPostProcessor implements org.springframework.core.PriorityOrdered { }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
+    void mixedDirectChainRestorationPreservesProcessorsAddedDuringLookup(LifecycleShape shape, boolean failInitialization) {
+        var calls = new java.util.ArrayList<String>();
+        try (var context = lifecycleContext(shape, calls, failInitialization)) {
+            var added = new org.springframework.beans.factory.config.BeanPostProcessor() { };
+            context.registerBean("rediscovered", OrdinaryPropertiesPostProcessor.class);
+            context.addBeanFactoryPostProcessor(factory -> {
+                factory.addBeanPostProcessor(factory.getBean("rediscovered", OrdinaryPropertiesPostProcessor.class));
+                factory.addBeanPostProcessor(new DirectPreparingProcessor());
+                factory.addBeanPostProcessor(new org.springframework.beans.factory.config.BeanPostProcessor() {
+                    @Override public Object postProcessBeforeInitialization(Object bean, String name) {
+                        if (bean instanceof LifecycleProperties) factory.addBeanPostProcessor(added);
+                        return bean;
+                    }
+                });
+            });
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            var processors = new java.util.ArrayList<>(factory.getBeanPostProcessors());
+            assertThat(processors).doesNotContain(added);
+            var processor = new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment());
+
+            if (failInitialization) {
+                assertThatThrownBy(() -> processor.processAheadOfTime(factory))
+                        .hasStackTraceContaining("initialization rejected");
+                assertThat(witness.config).isNull();
+            } else {
+                assertThat(processor.processAheadOfTime(factory)).isNotNull();
+            }
+
+            assertThat(calls).containsExactly("construct", "environment", "applicationContext", "direct", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+            processors.add(added);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
 
     @ParameterizedTest
     @CsvSource({"ORDINARY,true,false", "ORDINARY,false,false", "OPAQUE_SUPPLIER_PROXY,true,false", "OPAQUE_SUPPLIER_PROXY,false,false",
@@ -1557,6 +1604,63 @@ class AotPropertiesSelectionContractTest {
                 .hasRootCauseInstanceOf(org.springframework.beans.factory.NoSuchBeanDefinitionException.class);
         assertThat(witness.config).isNull();
         witness.assertNoBusinessResources(factory);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"SUPPLIER,false", "FACTORY_PRODUCT,false", "SCOPED_BEAN,false", "SCOPED_FACTORY,false",
+            "SUPPLIER,true", "FACTORY_PRODUCT,true", "SCOPED_BEAN,true", "SCOPED_FACTORY,true"})
+    void selectedSameTypeLookupFailureDoesNotFallBackToEnvironment(SelectedFailure kind, boolean parent) {
+        var failure = new org.springframework.beans.factory.NoSuchBeanDefinitionException(
+                ReactiveHttpClientProperties.class, "required selected-properties dependency");
+        var aotAttempts = new AtomicInteger();
+        var runtimeAttempts = new AtomicInteger();
+        var aotOwner = selectedFailureFactory(kind, failure, aotAttempts);
+        var runtimeOwner = selectedFailureFactory(kind, failure, runtimeAttempts);
+        var factory = parent ? new DefaultListableBeanFactory(aotOwner) : aotOwner;
+        var runtime = parent ? new DefaultListableBeanFactory(runtimeOwner) : runtimeOwner;
+        var witness = witness(factory, Client.class);
+
+        assertThatThrownBy(() -> runtime.getBeanProvider(ReactiveHttpClientProperties.class).getIfAvailable())
+                .satisfies(error -> assertThat(org.springframework.core.NestedExceptionUtils.getMostSpecificCause(error))
+                        .isSameAs(failure));
+        assertThatThrownBy(() -> processor().processAheadOfTime(factory))
+                .satisfies(error -> assertThat(org.springframework.core.NestedExceptionUtils.getMostSpecificCause(error))
+                        .isSameAs(failure));
+
+        assertThat(aotAttempts).hasValue(1);
+        assertThat(runtimeAttempts).hasValue(1);
+        assertThat(witness.config).isNull();
+        witness.assertNoBusinessResources(factory);
+    }
+
+    private static DefaultListableBeanFactory selectedFailureFactory(SelectedFailure kind,
+            org.springframework.beans.factory.NoSuchBeanDefinitionException failure, AtomicInteger attempts) {
+        var factory = new DefaultListableBeanFactory();
+        RootBeanDefinition definition;
+        if (kind == SelectedFailure.FACTORY_PRODUCT || kind == SelectedFailure.SCOPED_FACTORY) {
+            definition = new RootBeanDefinition(PropertiesFactory.class, () -> new PropertiesFactory(attempts) {
+                @Override public ReactiveHttpClientProperties getObject() {
+                    attempts.incrementAndGet();
+                    throw failure;
+                }
+            });
+        } else {
+            definition = new RootBeanDefinition(ReactiveHttpClientProperties.class, () -> {
+                attempts.incrementAndGet();
+                throw failure;
+            });
+        }
+        if (kind == SelectedFailure.SCOPED_BEAN || kind == SelectedFailure.SCOPED_FACTORY) {
+            definition.setScope("requiredScope");
+            factory.registerScope("requiredScope", new org.springframework.context.support.SimpleThreadScope() {
+                @Override public Object get(String name, org.springframework.beans.factory.ObjectFactory<?> objectFactory) {
+                    attempts.incrementAndGet();
+                    throw failure;
+                }
+            });
+        }
+        factory.registerBeanDefinition("selectedProperties", definition);
+        return factory;
     }
 
     @ParameterizedTest

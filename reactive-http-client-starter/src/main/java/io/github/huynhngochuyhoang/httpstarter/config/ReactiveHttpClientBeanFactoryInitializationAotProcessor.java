@@ -82,7 +82,9 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     Comparator<Object> comparator = configurable instanceof DefaultListableBeanFactory listable
                             && listable.getDependencyComparator() != null
                             ? listable.getDependencyComparator() : OrderComparator.INSTANCE;
-                    // Direct-only registrations precede auto-detected processors regardless of order.
+                    // Rediscovery moves bean-backed registrations behind all direct-only ones,
+                    // including direct processors originally installed after a bean-backed instance.
+                    processors.sort(Comparator.comparing(processorBeans::containsKey));
                     while (index < processors.size() && !processorBeans.containsKey(processors.get(index))) {
                         index++;
                     }
@@ -106,7 +108,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     .getIfAvailable(MethodMetadataCache::new);
             properties = properties(beanFactory, bindings);
         } finally {
-            bindings.forEach((factory, binding) -> factory.getBeanPostProcessors().remove(binding));
+            bindings.values().forEach(PropertiesBinding::restoreProcessors);
         }
         Map<Class<?>, ReactiveHttpClientProperties.ClientConfig> clientConfigs = new HashMap<>();
         clientInterfaces.forEach(clientInterface -> {
@@ -220,8 +222,21 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         @Override public BeanDefinition getBeanDefinition(String name) { return owner.getBeanDefinition(name); }
         @Override public boolean containsSingleton(String name) { return owner.containsSingleton(name); }
         @Override public Class<?> getType(String name) { return owner.getType(name, false); }
-        @Override public Object getBean(String name) { return owner.getBean(name); }
-        @Override public <T> T getBean(String name, Class<T> type) { return owner.getBean(name, type); }
+        @Override public Object getBean(String name) {
+            try {
+                return owner.getBean(name);
+            } catch (NoSuchBeanDefinitionException ex) {
+                throw new BeanCreationException(name, "Selected bean lookup failed", ex);
+            }
+        }
+        @Override public <T> T getBean(String name, Class<T> type) {
+            try {
+                return owner.getBean(name, type);
+            } catch (NoSuchBeanDefinitionException ex) {
+                // A dependency lookup during creation is not an absent selection candidate.
+                throw new BeanCreationException(name, "Selected bean lookup failed", ex);
+            }
+        }
     }
 
     private ReactiveHttpClientProperties properties(ConfigurableListableBeanFactory beanFactory,
@@ -326,6 +341,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
     private static final class PropertiesBinding implements BeanPostProcessor {
         private final AbstractBeanFactory factory;
         private final ConfigurationPropertiesBindingPostProcessor delegate;
+        private final List<BeanPostProcessor> originalProcessors;
         private final Map<Object, Object> bound = new IdentityHashMap<>();
         private final Set<String> boundBeanNames = new HashSet<>();
 
@@ -333,6 +349,18 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             this.factory = factory;
             this.delegate = factory.getBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
                     ConfigurationPropertiesBindingPostProcessor.class);
+            this.originalProcessors = List.copyOf(factory.getBeanPostProcessors());
+        }
+
+        private void restoreProcessors() {
+            var processors = factory.getBeanPostProcessors();
+            processors.remove(this);
+            // Restore the borrowed order without dropping processors registered during lookup.
+            var additions = new ArrayList<>(processors);
+            additions.removeAll(originalProcessors);
+            processors.clear();
+            processors.addAll(originalProcessors);
+            processors.addAll(additions);
         }
 
         private Object bindExisting(Object bean, String beanName) {

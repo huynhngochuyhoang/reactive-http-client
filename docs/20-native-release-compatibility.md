@@ -225,6 +225,9 @@ properties bean primary on that version. In `4.5.0-SNAPSHOT`,
 [AOT selection](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) delegates to Spring
 instead of choosing the first initialized bean. Ambiguity and invalid selected
 configuration fail; they do not select an inactive bean or environment fallback.
+Failures from materializing a selected bean also propagate, including a required
+lookup for the properties type itself. Named lookup failures retain their original
+cause in a `BeanCreationException`; only an absent candidate permits fallback.
 Properties and metadata selection now use non-eager type discovery through a
 short-lived Spring selection view; actual beans are still created by their owning
 factory. Raw properties FactoryBeans must expose their product type through generics,
@@ -239,7 +242,10 @@ post-processors, `@PostConstruct`, `InitializingBean` and custom init methods.
 Direct-only registrations retain their prefix position regardless of `Ordered`.
 When Spring also discovers that same singleton as a processor bean, normal refresh
 removes the earlier occurrence and registers it in auto-detected order; AOT follows
-that order. Predictive type checks determine the processor registration group,
+that order. Direct-only processors are identified across the installed chain, not
+just before its first bean-backed instance. The temporary ordering is restored
+after lookup, including failure, without dropping processors registered during it.
+Predictive type checks determine the processor registration group,
 including FactoryBean products. A product advertising only an ordinary or ordered
 processor stays after the priority-ordered binder even if its actual class implements
 `PriorityOrdered`. Within the priority-ordered group, the factory's dependency
