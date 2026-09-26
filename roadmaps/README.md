@@ -17,8 +17,9 @@ Public/API/consumer/benchmark baselines are verified `4.4.1`.
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.
 The [Priority 2.3 decision](v33/FIX-DECISION.md) approves all three bounded
 corrections. [Priority 3](v33/BUILDER-OWNERSHIP.md) implements F001 and
-[Priority 4](v33/STATIC-METADATA.md) implements F002. F003 remains pending in
-Priority 5. No release is selected.
+[Priority 4](v33/STATIC-METADATA.md) implements F002 and
+[Priority 5](v33/AOT-PROPERTIES-SELECTION.md) implements F003. Shared verification
+remains pending. No release is selected.
 
 [V32 publication and closure](v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.

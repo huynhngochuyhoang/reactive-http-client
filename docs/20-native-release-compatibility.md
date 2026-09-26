@@ -182,8 +182,9 @@ Fresh Maven Central artifact and assembled-consumer verification establish
 published `4.4.1` as the public, strict API and benchmark baseline. Reactor-only
 coordinates are `4.5.0-SNAPSHOT`. [V33](../roadmaps/v33/CHECKLIST.md) is active
 with [F001/F002/F003 approved for correction](../roadmaps/v33/FIX-DECISION.md);
-[F001](../roadmaps/v33/BUILDER-OWNERSHIP.md) and
-[F002](../roadmaps/v33/STATIC-METADATA.md) are implemented, F003 is pending,
+[F001](../roadmaps/v33/BUILDER-OWNERSHIP.md),
+[F002](../roadmaps/v33/STATIC-METADATA.md) and
+[F003](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) are implemented,
 and next release scope remains unselected.
 V1-V32 are completed release records.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
@@ -191,7 +192,7 @@ records the release tag, successful signing/staging/packaging/deployment workflo
 13 verified signed Central artifacts and published-consumer results.
 The historical [architecture decision](../roadmaps/v32/ARCHITECTURE-DECISION.md)
 records F004/F005 implemented and F001-F003 deferred with their workarounds;
-the V33 decision selects those three, with F001 now corrected in development.
+the V33 decision selects those three, now corrected in development.
 [Priority 10](../roadmaps/v32/COMPATIBILITY-VERIFICATION.md) retains its original
 snapshot API, supported-Boot, JVM/AOT/native results and earlier failures.
 Publication does not relabel them as a new final-coordinate native build.
@@ -218,11 +219,111 @@ retained, and API-ref configuration still wins routing; keep all metadata
 consistent and do not mutate it after plan consumption. No internal type needs
 to be exposed or accessed reflectively.
 
-AOT properties selection can still differ from runtime for
+In published `4.4.1`, AOT properties selection can still differ from runtime for
 initialized non-primary candidates (F003); designate the intended programmatic
-properties bean primary. This remains pending, not a universal replacement
-or native guarantee. See the linked decision record for evidence gaps and
-reconsideration triggers; no reflective internal API workaround is supported.
+properties bean primary on that version. In `4.5.0-SNAPSHOT`,
+[AOT selection](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) delegates to Spring
+instead of choosing the first initialized bean. Ambiguity and invalid selected
+configuration fail; they do not select an inactive bean or environment fallback.
+Failures from materializing a selected bean also propagate, including a required
+lookup for the properties type itself. Named lookup failures retain their original
+cause in a `BeanCreationException`; only an absent candidate permits fallback.
+Properties and metadata selection now use non-eager type discovery through a
+short-lived Spring selection view; actual beans are still created by their owning
+factory. Raw properties FactoryBeans must expose their product type through generics,
+definition metadata (`FactoryBean.OBJECT_TYPE_ATTRIBUTE`), or an already initialized
+factory. An uninitialized factory with no predictable product type is not probed;
+if no visible properties candidate remains, the documented environment fallback applies.
+When Boot's standard registered binding processor instance is not installed, a temporary properties-only
+callback binds newly created properties after the directly registered processor
+prefix, including context-awareness callbacks (`EnvironmentAware` and
+`ApplicationContextAware`), but before auto-detected ordinary application
+post-processors, `@PostConstruct`, `InitializingBean` and custom init methods.
+Direct-only registrations retain their prefix position regardless of `Ordered`.
+When Spring also discovers that same singleton as a processor bean, normal refresh
+removes the earlier occurrence and registers it in auto-detected order; AOT follows
+that order. Direct-only processors before Spring's discovered merged-definition
+processor group retain their prefix position, including those following a
+bean-backed instance. Definition-less processors appended after that group during
+AOT stay late. The temporary ordering is restored after lookup, including failure,
+without dropping new processors or resurrecting processors removed during lookup.
+Predictive type checks determine the processor registration group,
+including FactoryBean products. A product advertising only an ordinary or ordered
+processor stays after the priority-ordered binder even if its actual class implements
+`PriorityOrdered`. Within the priority-ordered group, the factory's dependency
+comparator determines placement; `OrderComparator` is the fallback when none is
+configured, and comparator ties retain type-discovery order.
+Tie-breaking uses the registered binder's discovered definition name, including
+when Boot's standard bean name is an alias for that definition.
+The actual registered binding processor participates in that comparison and supplies
+the binding callback, including application subclass overrides. An unrelated directly
+installed or separately named binder subclass does not suppress this callback.
+Its returned replacement or proxy continues through creation-time processing;
+a null return stops later before-initialization processors, as at runtime.
+Cached FactoryBean products count as auto-detected processors only when their
+factory exposes a matching processor type. Directly added products whose type is
+null or non-processor remain in the direct prefix.
+A directly installed factory that also implements `BeanPostProcessor` remains
+in that prefix when Spring discovers only its distinct processor product, not
+the factory's `&beanName` identity.
+Installed non-singleton processors with a unique concrete predicted type are
+associated without requesting another prototype or FactoryBean product. Ambiguous
+type associations fail explicitly, including non-singleton products advertised
+only as processor interfaces or a base class rather than their concrete type.
+Use a singleton processor or distinct concrete processor types rather than relying
+on inferred registration provenance; rejection does not request another product.
+The callback is removed after lookup, including failures.
+Definition-backed singletons resolved earlier still receive the fallback binding
+pass, but callbacks already run by another processor cannot be undone or replayed.
+The starter auto-configuration registers an internal merged-definition processor
+that observes properties creation before initialization AOT processors run. Its
+weak instance/delegate references distinguish an already-bound object from an
+early unbound singleton or custom-scoped target, even when the delegate was created
+before that object but installed afterward. Fallback binds the same target once;
+it does not recreate scoped targets or repeat binding on later AOT inspection.
+Installed prototype binders and non-singleton binding products are associated with
+their discovered name (including aliases) and reused without requesting a second
+product. The unique concrete-type restriction above also applies to these binders.
+Low-level contexts that omit this lifecycle infrastructure retain only the older
+singleton-order fallback, not the creation-history guarantee. Earlier AOT
+processors should still install binding before resolving properties if their
+initialization callbacks depend on bound values.
+When Spring selects an annotated properties FactoryBean itself as `&name`, binding
+uses the canonical `name` definition and the selected factory instance, not its product.
+Fallback uses a binder-returned replacement for validation without replacing an
+already registered singleton or replaying initialization on the replacement.
+Creation-time binding is tracked by bean name as well as instance identity, so
+a later post-processor wrapping the properties does not trigger a second pass.
+This fallback guard does not suppress binding of separate prototype instances.
+For Spring scoped proxies, AOT uses the initialized proxy's target source or its
+definition metadata to resolve one target, including proxies configured through
+an `@Bean` method or instance supplier. When an opaque proxy exposes neither,
+a build-time reflective read of the already-cached singleton factory supplies
+the target name; the proxy is not rebuilt or made non-opaque. A non-cached opaque
+factory must supply target-name definition metadata instead. Binding uses the
+target definition's configuration metadata and validates that same target.
+Only the scoped proxy product is skipped, based on its factory type; ordinary
+properties and target classes implementing `ScopedObject` still receive binding.
+Scoped targets follow the same by-name alias traversal as their typed `getBean`
+lookup, including parent-owned targets. Binding uses that resolved instance and
+the owner's definition even when target-type prediction remains broad; it does
+not infer a usable proxy type from an arbitrary `Object`-returning bean.
+A descendant's unrelated alias does not rewrite an inherited selected bean name.
+The scope must be available during AOT processing;
+the starter does not activate request/session scopes. Definition-less direct
+registrations and ordinary FactoryBean products are not rebound, and a normal
+runtime binding pass is not repeated.
+A direct singleton registered under an existing properties definition still
+follows that definition's binding contract; singleton presence alone does not
+establish that configuration binding has already run.
+The starter's selection does not create unrelated unknown factories to discover
+types. This does not suppress Spring's earlier AOT refresh, dependency resolution
+inside selected bean creation, or Boot's binding-advisor discovery; those framework
+paths can still initialize raw FactoryBeans. Expose predictable product types and
+avoid allocating business resources in configuration/factory construction.
+This is not an eager diagnostics path or
+a universal replacement/native guarantee; final native and supported-Boot
+evidence remains pending. No application-side reflective workaround is required.
 
 ### V31 additive surface freeze
 

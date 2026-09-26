@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.1`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001/F002 implemented, F003 pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending
 > **Release scope:** unselected
 > **Adopted:** 2026-09-19
 
@@ -305,34 +305,263 @@ pre-F002 status.
 
 Conditional on **V32-F003** approval.
 
-### [ ] 5.1 Select the effective properties
+### [x] 5.1 Select the effective properties
 
-- [ ] Turn the paired runtime/AOT drift cases into desired-behavior regressions
+- [x] Turn the paired runtime/AOT drift cases into desired-behavior regressions
       while preserving their baseline provenance.
-- [ ] Prefer supported Spring candidate resolution at the properties boundary;
+- [x] Prefer supported Spring candidate resolution at the properties boundary;
       remove registration-order fallback rather than duplicating precedence rules.
-- [ ] Preserve environment binding lifecycle, primary programmatic properties and
+- [x] Preserve environment binding lifecycle, primary programmatic properties and
       foreign-factory behavior; do not select an unbound configuration object.
 
-### [ ] 5.2 Cover selection and failure semantics
+### [x] 5.2 Cover selection and failure semantics
 
-- [ ] Cover primary, non-fallback, priority, default candidate, absence and ambiguity
+- [x] Cover primary, non-fallback, priority, default candidate, absence and ambiguity
       against the runtime selection oracle.
-- [ ] Exercise parent/child shadowing, lazy/prototype and FactoryBean shapes touched
+- [x] Exercise parent/child shadowing, lazy/prototype and FactoryBean shapes touched
       by the actual lookup; label untested shapes explicitly.
-- [ ] Prove invalid selected configuration fails instead of choosing a valid inactive
+- [x] Prove invalid selected configuration fails instead of choosing a valid inactive
       bean or falling back to environment/default values.
-- [ ] Count prototype/product materializations to detect duplicate creation and
+- [x] Count prototype/product materializations to detect duplicate creation and
       discarded configuration instances.
 
-### [ ] 5.3 Preserve build-time ownership
+### [x] 5.3 Preserve build-time ownership
 
-- [ ] Assert properties/metadata creation permissions separately from zero business
+- [x] Assert properties/metadata creation permissions separately from zero business
       client, transport, cache-manager and signer creation during selection.
-- [ ] Retain non-instantiating diagnostics and supported unknown values; do not
+- [x] Retain non-instantiating diagnostics and supported unknown values; do not
       reuse the eager AOT path for inspection.
-- [ ] Run environment-only, replacement-properties and foreign-factory controls;
+- [x] Run environment-only, replacement-properties and foreign-factory controls;
       record focused results, remaining constraints and rollback assessment.
+
+Initially completed on 2026-09-24; binding-lifecycle provenance reopened and repaired
+within the documented lifecycle boundaries on 2026-09-26.
+[AOT-PROPERTIES-SELECTION.md](AOT-PROPERTIES-SELECTION.md)
+records Spring-owned selection, Boot binding, creation counts, failure semantics,
+commands and remaining gates. Evidence is under
+`target/release-evidence/v33/priority5/`, against the reviewed patch on reachable
+`a81447c85739d375d8b1b32fffeae8c2df37dcc3` (the committed Priority 4), not a clean
+release revision.
+The pre-fix four-case desired-behavior run had three expected selection errors;
+the original V32 and V33 Priority 2 records remain historical provenance.
+Initial completion runs: 264 focused starter cases (including 27 new cases), 18 assembled
+consumer cases and 73 documentation/archive/readiness cases; **355 passed**,
+zero failures/errors/skips, with explicit GC disabled. The companion record
+labels prior fixture failures, binding constraints and consumer coverage; the
+sealed bundle records consumed artifact hashes and actual classpath provenance.
+Diagnostics, public APIs, runtime routing, dependencies and coordinates are
+unchanged. Shared cross-path, full-suite/API/matrix/native/cost gates in
+Priorities 6-8 and release selection remain pending.
+
+Binding-order review correction, 2026-09-24: the selected definition-backed
+properties bean is bound even when an earlier AOT processor resolved its
+singleton. Definition-less direct registrations, FactoryBean products and the
+normal runtime binding pass remain excluded. A direct registration sharing a
+properties definition's name follows that definition's binding contract.
+The companion record supersedes the original singleton-presence assumption.
+Follow-up evidence is under `target/release-evidence/v33/priority5-binding-order/`;
+the pre-fix four-case run failed in both cache-selected and ordinary-client forms.
+The nine-class focused rerun passes **271 cases**, including 34 selection cases;
+the documentation rerun passes **73 cases**, all with zero failures/errors/skips
+and explicit GC disabled. Original assembled/native scope is unchanged.
+
+Scoped-proxy review correction, 2026-09-24: Spring scoped proxies now resolve and
+bind their target using its definition metadata, and AOT validates that same
+instance (including prototype targets). Ordinary FactoryBean products remain
+excluded. Nine new cases cover scoped/prototype targets, alternate binding
+prefixes, invalid configuration, early creation, runtime binding and parent
+ownership, with counted creation and zero business-resource assembly.
+Follow-up evidence: `target/release-evidence/v33/priority5-scoped-binding/`;
+**280 focused cases** and **73 documentation cases** pass, zero failures/errors/
+skips, explicit GC disabled. Four pre-fix errors and the initial fixture compile
+error are retained. The companion record states scope availability and remaining
+consumer/API/matrix/native limitations; no release gate is closed by this rerun.
+
+Creation-time binding review correction, 2026-09-24: initialized scoped-proxy
+target-source metadata supports `@Bean` and supplier-configured targets without
+a definition property. A temporary properties-only callback binds new beans
+before initialization and is removed on success or failure; fallback binding
+of earlier-created objects does not replay their initialization. Nine new cases
+cover one binding pass, three initialization callbacks, programmatic proxy forms
+and cleanup after binding/init errors. Follow-up evidence under
+`target/release-evidence/v33/priority5-creation-binding/` records three pre-fix
+errors, **289 focused cases** (52 selection cases) and **73 documentation cases**
+passing with explicit GC disabled, zero failures/errors/skips. The companion
+record retains earlier provenance and the pending consumer/API/matrix/native gates.
+
+Awareness-order review correction, 2026-09-24: temporary binding follows context
+awareness and precedes AOT's merged-definition/init processors. Existing lifecycle
+cases now require injected environment and application context during binding,
+matching normal refresh for ordinary and programmatic scoped-proxy properties.
+Evidence under `target/release-evidence/v33/priority5-awareness-binding/` retains
+three pre-fix errors and **289 focused / 73 documentation cases** passing, zero
+failures/errors/skips, explicit GC disabled. Cleanup, earlier provenance and
+pending consumer/API/matrix/native gates remain unchanged.
+
+Ordinary-processor review correction, 2026-09-24: the temporary binder now precedes
+ordinary application post-processors as well as init callbacks, while preserving
+Spring awareness infrastructure and higher-priority regular processors. Six new
+runtime/AOT ordering cases cover ordinary properties and both programmatic proxy
+forms. Evidence under `target/release-evidence/v33/priority5-ordinary-processors/`
+retains three pre-fix errors and **295 focused / 73 documentation cases** passing,
+zero failures/errors/skips, explicit GC disabled. The companion record explains
+the insertion boundary and retains prior evidence and pending release gates.
+
+Opaque scoped-proxy review correction, 2026-09-24: when public proxy/definition
+metadata is unavailable, AOT reads the target name from the already-initialized
+singleton scoped factory without recreating it or changing proxy opacity. The
+companion record documents this build-time Spring field dependency and the
+definition-metadata requirement for non-cached opaque factories. Thirteen added
+cases cover opaque registration forms, target/binding counts, callback ordering,
+failure cleanup, early/normal targets and parent ownership. Separate evidence in
+`target/release-evidence/v33/priority5-opaque-scoped-binding/` records two pre-fix
+errors among five cases, then **308 focused / 73 documentation cases** passing,
+zero failures/errors/skips, explicit GC disabled. Remaining release gates are unchanged.
+
+Direct-registration/target-alias correction, 2026-09-25: temporary binding now
+preserves the directly installed processor prefix regardless of ordering interfaces,
+while remaining before auto-detected ordinary processor beans. Cache-only identity
+inspection includes singleton FactoryBean products without creating them. Scoped
+target aliases are canonicalized before definition lookup and binding, so early
+targets retain their binding metadata without recreation. Twelve runtime/AOT
+ordering cases and two alias-chain cases cover the correction. Evidence under
+`target/release-evidence/v33/priority5-registration-alias/` preserves eight initial
+pre-fix errors and **322 focused / 73 documentation cases** passing, zero
+failures/errors/skips, explicit GC disabled. The companion record documents the
+build-time cached-product accessor dependency; release gates remain unchanged.
+
+Product/owner/wrapper correction, 2026-09-25: cached processor products with null
+or non-processor exposed types retain direct-registration ordering; unrelated
+child aliases no longer rewrite parent-selected names. Creation-time binding is
+tracked by canonical name for fallback decisions so later wrappers are not
+rebound, while separate prototypes still bind individually. Thirteen added cases
+cover these paths. Evidence under
+`target/release-evidence/v33/priority5-product-owner-binding/` retains the initial
+13-case run (five failures, five errors, three controls) and **335 focused / 73
+documentation cases** passing, zero failures/errors/skips, explicit GC disabled.
+Earlier bundles and remaining release gates are unchanged.
+
+Stable processor ordering review, 2026-09-25: equal-priority regular processor
+beans now retain their type-discovery registration order relative to Boot's binder.
+Six paired runtime/AOT controls do not reproduce the ordinary bean-backed direct
+prefix finding: Spring removes the earlier singleton occurrence and re-registers
+it in auto-detected order. Four tie-order cases cover definitions registered before
+and after the binder. Evidence in
+`target/release-evidence/v33/priority5-stable-processor-order/` records two initial
+failures among ten cases, followed by **345 focused / 73 documentation cases**
+passing, zero failures/errors/skips, explicit GC disabled. The companion record
+qualifies the tested runtime baseline; remaining release gates are unchanged.
+
+Registered-binder/dual-role/scoped-target correction, 2026-09-25: insertion uses
+the actual registered binding processor's order and binding callback. Only names
+returned by Spring's processor discovery classify cached identities as auto-detected,
+preserving a directly installed factory when only its separate product is discovered.
+Resolved scoped targets use by-name ownership, including broad predictions and
+parent aliases. Twelve added cases retain lifecycle/creation/ownership controls.
+Evidence in `target/release-evidence/v33/priority5-custom-binding-targets/` separates
+fixture setup iterations from the corrected ten-case pre-fix run (six errors),
+then records **357 focused / 73 documentation cases** passing, zero failures/errors/
+skips, explicit GC disabled. The companion record qualifies the broad-target fixture;
+remaining release gates are unchanged.
+
+Factory-identity/binder-result correction, 2026-09-25: dereferenced properties
+factories retain their selected instance while definition/binding metadata uses
+the canonical name without `&`. Ordinary properties and scoped targets implementing
+`ScopedObject` bind; only scoped proxy products are excluded. Binder replacements,
+proxies and null results propagate through the creation callback; early fallback
+uses returned replacements for validation without registry replacement or init replay.
+Thirteen added cases retain paired runtime checks and ownership controls. Evidence
+in `target/release-evidence/v33/priority5-binding-identity/` records the initial ten
+cases (two failures, seven errors, one control), then **370 focused / 73 documentation
+cases** passing, zero failures/errors/skips, explicit GC disabled. Remaining
+consumer/API/matrix/native and release gates are unchanged.
+
+Binder-discovery/comparator correction, 2026-09-25: installation is skipped only
+for the exact standard registered binding processor, not an unrelated binder
+subclass. Predictive type checks preserve FactoryBean processor registration groups;
+the configured dependency comparator orders the priority group, with standard
+fallback ordering and stable discovery-order ties. Ten new paired runtime/AOT cases
+cover direct/named observer binders, custom comparator precedence, and ordinary/
+ordered predictions for priority-ordered products. Evidence in
+`target/release-evidence/v33/priority5-processor-discovery/` records ten initial
+AOT errors after passing runtime checks, then **380 focused / 73 documentation
+cases** passing, zero failures/errors/skips, explicit GC disabled. Ownership and
+processor-restoration checks remain active; consumer/API/matrix/native and release
+gates are unchanged.
+
+Non-singleton/non-eager correction, 2026-09-25: uniquely typed non-singleton
+processors retain discovery ordering without replacement creation; ambiguous type
+matches fail explicitly. Properties and metadata selection use a short-lived
+non-eager Spring selection view with owner-delegated creation. Raw properties
+factories need predictable product-type metadata or prior initialization. Fourteen
+added cases include explicit Spring dependency/Boot advisor discovery boundaries,
+which this correction does not suppress. Evidence in
+`target/release-evidence/v33/priority5-non-eager-selection/` records ten initial
+failing cases and intermediate boundary probes, then **394 focused / 73 documentation
+cases** passing, zero failures/errors/skips, explicit GC disabled. The companion
+record qualifies the limits; consumer/API/matrix/native and release gates are unchanged.
+
+Aliased-binder/broad-product correction, 2026-09-26: comparator ties use the
+registered delegate's discovered definition name even when Boot's standard name
+is an alias. Broad non-singleton processor predictions now fail explicitly before
+binding rather than being misclassified as direct registrations; use a singleton
+or unique concrete product type. Ten added paired runtime/AOT cases cover alias
+order and ordinary/ordered interface/base predictions with ordinary/opaque-scoped
+properties. Evidence in
+`target/release-evidence/v33/priority5-aliased-binder-products/` retains the fixture
+iteration, **eight pre-fix failures among fourteen cases**, then **404 focused /
+73 documentation cases** passing with zero failures/errors/skips and explicit GC
+disabled. Product/resource ownership and processor-chain restoration are checked;
+consumer/API/matrix/native and release gates are unchanged.
+
+Mixed-chain/creation-failure correction, 2026-09-26: direct-only processors across
+the whole installed chain precede rediscovered instances. Temporary ordering is
+restored after successful/failed lookup while retaining processors registered
+during it. Selected named-bean lookup failures retain their original cause and do
+not trigger the environment fallback, including required same-type lookups.
+Eighteen new cases cover runtime/AOT ordering, local/parent creation failures and
+restoration. Evidence in
+`target/release-evidence/v33/priority5-direct-chain-failures/` records **four failures
+and six errors among twenty pre-fix cases**, then **422 focused / 73 documentation
+cases** passing, zero failures/errors/skips, explicit GC disabled. Existing
+non-singleton restrictions and framework discovery boundaries remain documented;
+consumer/API/matrix/native and release gates are unchanged.
+
+Installed-delegate/lifetime correction, 2026-09-26: fallback state is retained for
+definition-backed singletons older than the delegate's canonical singleton entry.
+Definition-less processors after Spring's merged-definition registration boundary
+stay late. Restoration retains additions and does not resurrect removed callbacks.
+Eighteen added cases extend local/parent/scoped binding, late-processing and removal
+coverage. Evidence in
+`target/release-evidence/v33/priority5-installed-binder-lifecycle/` records **eight
+failures and eight errors among twenty pre-fix cases**, then **440 focused /
+73 documentation cases** passing, zero failures/errors/skips, explicit GC disabled.
+The companion record explicitly leaves arbitrary installation-history inference
+unresolved; consumer/API/matrix/native and release gates remain pending.
+
+- [x] Resolve lifecycle provenance when another AOT processor instantiates the
+      binder before properties but installs it afterward; do not treat singleton
+      registration order as proof of binding or close this gap from the rerun above.
+
+Installed non-singleton/scoped-history correction, 2026-09-26: resolve an installed
+binder's discovered name before requesting another instance. The internal
+auto-configured lifecycle observer tracks properties and delegate identities weakly
+from AOT refresh, so early custom-scoped targets and delegates created before their
+installation no longer depend on singleton registration order. Repeated inspection
+does not rebind an existing target or its final wrapper. Twenty added selection and
+three tracker cases
+cover non-singleton scopes/aliases, real custom scopes, auto-configuration wiring,
+identity/replacement tracking and deterministic weak-reference cleanup. Evidence in
+`target/release-evidence/v33/priority5-binding-lifecycle-tracker/` records **six
+failures and two errors among ten pre-fix cases**, then **463 focused cases** passing,
+zero failures/errors/skips, explicit GC disabled. The companion record qualifies
+manual contexts without the observer, earlier callbacks and arbitrary chain mutation;
+shared consumer/API/matrix/native and release gates remain pending.
+The final full starter rerun passes **2,062 cases** (including **73 documentation
+cases**), zero failures/errors/skips, with explicit GC disabled. The bundle's
+XML-derived audit and `SHA256SUMS` retain the final patch, including new source
+files; focused/full/documentation counts overlap. No later checklist priority or
+release gate is closed by this correction.
 
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 

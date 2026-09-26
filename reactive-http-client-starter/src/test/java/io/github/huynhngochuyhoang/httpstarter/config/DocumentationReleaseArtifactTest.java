@@ -175,7 +175,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
         assertThat(checklist)
-                .contains("> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001/F002 implemented, F003 pending",
+                .contains("> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending",
                         "> **Release scope:** unselected", "V32-F001", "V32-F002", "V32-F003",
                         "target/release-evidence/v33/priority<N>/")
                 .containsPattern("(?m)^### \\[[ x]\\] 2\\.3 Record the maintainer scope decision$")
@@ -191,7 +191,7 @@ class DocumentationReleaseArtifactTest {
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         String priority = checklist.split("## Priority 3 - ", 2)[1].split("## Priority 4 - ", 2)[0];
         assertThat(priority).contains("(BUILDER-OWNERSHIP.md)").doesNotContain("[ ]");
-        for (int pending : List.of(5)) {
+        for (int pending : List.of(6)) {
             assertThat(checklist.split("## Priority " + pending + " - ", 2)[1]
                     .split("## Priority " + (pending + 1) + " - ", 2)[0])
                     .contains("[ ]").doesNotContain("[x]");
@@ -225,7 +225,7 @@ class DocumentationReleaseArtifactTest {
                 "Existing supplied derived value", "API-ref metadata", "not a logical-call",
                 "argument-only", "Legacy handlers", "No public constructor", "Priority 8",
                 "not a native binary", "SHA256SUMS", "> **Release scope:** unselected");
-        assertThat(checklist.split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0])
+        assertThat(checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("limits remain in published `4.4.1`", "(../roadmaps/v33/STATIC-METADATA.md)",
@@ -240,10 +240,39 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v33AotSelectionEvidencePreservesLifecycleAndReleaseBoundaries() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v33");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0];
+        assertThat(priority).contains("(AOT-PROPERTIES-SELECTION.md)",
+                "### [x] 5.1 Select the effective properties",
+                "- [x] Preserve environment binding lifecycle",
+                "- [x] Resolve lifecycle provenance", "### [x] 5.2", "### [x] 5.3");
+        String evidence = Files.readString(directory.resolve("AOT-PROPERTIES-SELECTION.md"));
+        assertThat(evidence).contains("V32-F003 implemented within documented lifecycle boundaries", "resolveNamedBean", "FactoryBean",
+                "PropertiesBindingLifecycle", "weak references", "Low-level contexts",
+                "opaque parent", "Boot binding", "No public API", "not a native binary",
+                "## Rollback and Remaining Gates", "SHA256SUMS", "> **Release scope:** unselected");
+        assertThat(checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0])
+                .contains("[ ]").doesNotContain("[x]");
+        assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
+                .contains("In published `4.4.1`, AOT properties selection can still differ",
+                        "(../roadmaps/v33/AOT-PROPERTIES-SELECTION.md)", "not an eager diagnostics path");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(evidence);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) {
+                assertThat(directory.resolve(target).normalize()).as("V33 AOT link to %s", target).exists();
+            }
+        }
+    }
+
+    @Test
     void v33FixDecisionSeparatesApprovalImplementationAndRelease() throws IOException {
         Path root = projectRoot();
         Path directory = root.resolve("roadmaps/v33");
-        String scope = "> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001/F002 implemented, F003 pending";
+        String scope = "> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending";
         for (String name : List.of("ROADMAP.md", "CHECKLIST.md", "FIX-DECISION.md")) {
             String document = Files.readString(directory.resolve(name));
             assertThat(document.lines().filter(line -> line.startsWith("> **Implementation scope:**")).toList())
@@ -507,7 +536,11 @@ class DocumentationReleaseArtifactTest {
             String source = Files.readString(root.resolve("reactive-http-client-starter/src/test/java/"
                     + "io/github/huynhngochuyhoang/httpstarter/" + fixtures.get(methods.group(1))
                     + "/" + methods.group(1) + ".java"));
-            assertThat(source).contains(methods.group(2) + "(");
+            String method = methods.group(2);
+            if (method.equals("aotFirstSingletonFallbackDiffersFromRuntimeNonPrimarySelection")) {
+                method = "aotPropertiesSelectionMatchesRuntimePreference";
+            }
+            assertThat(source).contains(method + "(");
             references.add(methods.group());
         }
         assertThat(references).hasSize(3);
