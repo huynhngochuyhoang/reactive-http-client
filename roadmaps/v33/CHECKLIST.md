@@ -499,6 +499,19 @@ failing cases and intermediate boundary probes, then **394 focused / 73 document
 cases** passing, zero failures/errors/skips, explicit GC disabled. The companion
 record qualifies the limits; consumer/API/matrix/native and release gates are unchanged.
 
+Aliased-binder/broad-product correction, 2026-09-26: comparator ties use the
+registered delegate's discovered definition name even when Boot's standard name
+is an alias. Broad non-singleton processor predictions now fail explicitly before
+binding rather than being misclassified as direct registrations; use a singleton
+or unique concrete product type. Ten added paired runtime/AOT cases cover alias
+order and ordinary/ordered interface/base predictions with ordinary/opaque-scoped
+properties. Evidence in
+`target/release-evidence/v33/priority5-aliased-binder-products/` retains the fixture
+iteration, **eight pre-fix failures among fourteen cases**, then **404 focused /
+73 documentation cases** passing with zero failures/errors/skips and explicit GC
+disabled. Product/resource ownership and processor-chain restoration are checked;
+consumer/API/matrix/native and release gates are unchanged.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

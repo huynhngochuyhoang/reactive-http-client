@@ -45,6 +45,74 @@ class AotPropertiesSelectionContractTest {
     enum LifecycleShape { ORDINARY, BEAN_PROXY, SUPPLIER_PROXY, OPAQUE_BEAN_PROXY, OPAQUE_SUPPLIER_PROXY }
     enum DirectProcessorKind { ORDINARY, ORDERED, PRIORITY_ORDERED }
     enum ProcessorScope { PROTOTYPE, NON_SINGLETON_PRODUCT, PROTOTYPE_FACTORY }
+    enum ProcessorPrediction { ORDINARY_INTERFACE, ORDERED_INTERFACE, ORDERED_BASE }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,ORDINARY_INTERFACE", "ORDINARY,ORDERED_INTERFACE", "ORDINARY,ORDERED_BASE",
+            "OPAQUE_SUPPLIER_PROXY,ORDINARY_INTERFACE", "OPAQUE_SUPPLIER_PROXY,ORDERED_INTERFACE",
+            "OPAQUE_SUPPLIER_PROXY,ORDERED_BASE"})
+    void broadNonSingletonProcessorProductsFailBeforeBindingWithoutRecreation(
+            LifecycleShape shape, ProcessorPrediction prediction) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        var aotProducer = new BroadNonSingletonProcessorFactory(prediction);
+        var runtimeProducer = new BroadNonSingletonProcessorFactory(prediction);
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            aot.registerBean("broadProcessor", BroadNonSingletonProcessorFactory.class, () -> aotProducer);
+            runtime.registerBean("broadProcessor", BroadNonSingletonProcessorFactory.class, () -> runtimeProducer);
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internal = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            var product = aot.getBean("broadProcessor", org.springframework.beans.factory.config.BeanPostProcessor.class);
+            factory.addBeanPostProcessor(product);
+            factory.addBeanPostProcessors(internal);
+            assertThat(factory.isTypeMatch("broadProcessor", org.springframework.core.PriorityOrdered.class)).isFalse();
+            assertThat(factory.isTypeMatch("broadProcessor", org.springframework.core.Ordered.class))
+                    .isEqualTo(prediction != ProcessorPrediction.ORDINARY_INTERFACE);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("Cannot identify installed non-singleton processor: broadProcessor");
+
+            assertThat(aotCalls).isEmpty();
+            assertThat(aotProducer.products).hasValue(1);
+            assertThat(runtimeProducer.products).hasValue(1);
+            assertThat(witness.metadataCreations).hasValue(0);
+            assertThat(witness.businessCreations).hasValue(0);
+            assertThat(factory.containsSingleton("business")).isFalse();
+            assertThat(witness.registry.getMeters()).isEmpty();
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+        }
+    }
+
+    interface OrderedProcessor extends org.springframework.beans.factory.config.BeanPostProcessor, org.springframework.core.Ordered { }
+
+    static class BroadPriorityProcessor extends HighestPriorityObservingProcessor implements OrderedProcessor { }
+
+    static class BroadNonSingletonProcessorFactory implements FactoryBean<org.springframework.beans.factory.config.BeanPostProcessor> {
+        final AtomicInteger products = new AtomicInteger();
+        final ProcessorPrediction prediction;
+        BroadNonSingletonProcessorFactory(ProcessorPrediction prediction) { this.prediction = prediction; }
+        @Override public org.springframework.beans.factory.config.BeanPostProcessor getObject() {
+            products.incrementAndGet();
+            return new BroadPriorityProcessor();
+        }
+        @Override public Class<?> getObjectType() {
+            return switch (prediction) {
+                case ORDINARY_INTERFACE -> org.springframework.beans.factory.config.BeanPostProcessor.class;
+                case ORDERED_INTERFACE -> OrderedProcessor.class;
+                case ORDERED_BASE -> OrderedPropertiesPostProcessor.class;
+            };
+        }
+        @Override public boolean isSingleton() { return false; }
+    }
 
     @ParameterizedTest
     @CsvSource({"ORDINARY,PROTOTYPE", "ORDINARY,NON_SINGLETON_PRODUCT", "ORDINARY,PROTOTYPE_FACTORY",
@@ -857,8 +925,9 @@ class AotPropertiesSelectionContractTest {
     static class LowPriorityPropertiesPostProcessor extends OrderedPropertiesPostProcessor implements org.springframework.core.PriorityOrdered { }
 
     @ParameterizedTest
-    @CsvSource({"ORDINARY,true", "ORDINARY,false", "OPAQUE_SUPPLIER_PROXY,true", "OPAQUE_SUPPLIER_PROXY,false"})
-    void equalPriorityProcessorsRetainDefinitionRegistrationOrder(LifecycleShape shape, boolean registeredFirst) {
+    @CsvSource({"ORDINARY,true,false", "ORDINARY,false,false", "OPAQUE_SUPPLIER_PROXY,true,false", "OPAQUE_SUPPLIER_PROXY,false,false",
+            "ORDINARY,true,true", "ORDINARY,false,true", "OPAQUE_SUPPLIER_PROXY,true,true", "OPAQUE_SUPPLIER_PROXY,false,true"})
+    void equalPriorityProcessorsRetainDefinitionRegistrationOrder(LifecycleShape shape, boolean registeredFirst, boolean aliased) {
         var aotCalls = new java.util.ArrayList<String>();
         var runtimeCalls = new java.util.ArrayList<String>();
         try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
@@ -867,10 +936,29 @@ class AotPropertiesSelectionContractTest {
                     org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.register(context);
                 }
                 context.registerBean("equalProcessor", EqualPriorityPropertiesPostProcessor.class);
+                if (aliased) {
+                    // Rename after configuration parsing, before processor discovery.
+                    context.addBeanFactoryPostProcessor(ignored -> {
+                        String standardName = org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME;
+                        var definition = context.getBeanDefinition(standardName);
+                        var equalDefinition = context.getBeanDefinition("equalProcessor");
+                        context.removeBeanDefinition(standardName);
+                        context.removeBeanDefinition("equalProcessor");
+                        if (registeredFirst) context.registerBeanDefinition("equalProcessor", equalDefinition);
+                        context.registerBeanDefinition("applicationBinder", definition);
+                        if (!registeredFirst) context.registerBeanDefinition("equalProcessor", equalDefinition);
+                        context.registerAlias("applicationBinder", standardName);
+                    });
+                }
             }
             var factory = aot.getDefaultListableBeanFactory();
             var witness = witness(factory, Client.class);
             aot.refreshForAotProcessing(new RuntimeHints());
+            if (aliased) {
+                assertThat(factory.getBeanNamesForType(org.springframework.beans.factory.config.BeanPostProcessor.class, true, false))
+                        .contains("applicationBinder")
+                        .doesNotContain(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
+            }
             var internalProcessors = factory.getBeanPostProcessors().stream()
                     .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance)
                     .toList();

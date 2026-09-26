@@ -588,6 +588,38 @@ reviewed patch, commands, logs, XML, intermediate failures and `SHA256SUMS`.
 Earlier bundles are unchanged. Consumer/API/matrix/native checks were not rerun;
 remaining release gates stay pending.
 
+## Aliased Binder and Broad Non-Singleton Review
+
+The 2026-09-26 correction on `54bf6ffc` derives the binding processor's discovery
+index from the registered delegate's identity. Boot's standard bean name may be
+an alias for a differently named definition; equal-priority processors retain the
+definition discovery order on either side of that binder.
+
+Non-singleton products advertised only through a processor interface or a broader
+base class cannot be reliably associated with an installed object. AOT now fails
+explicitly before properties creation instead of treating them as direct-only
+registrations. The error names the processor and recommends a singleton or unique
+concrete product type. No replacement prototype or factory product is requested.
+Existing uniquely typed non-singletons and cached broad singleton products retain
+their tested support. This is an explicit AOT limitation, not broad-product parity.
+
+Ten added cases cover both alias registration orders and ordinary/opaque-scoped
+properties, plus non-singleton products advertising ordinary/ordered interfaces
+or an ordered base class despite an actual priority-ordered product. Runtime
+binding succeeds in all paired fixtures. After correcting the alias fixture to
+rename the binder after configuration parsing, the pre-fix run records **eight
+failures among fourteen cases** (six existing/control cases pass). The initial
+fixture iteration is retained separately, not counted as production evidence.
+
+Final verification passes **404 focused cases**, including **167** selection-contract
+cases, and **73 documentation cases**, with zero failures/errors/skips and explicit
+GC disabled (**477 passing cases** total). Tests assert no extra product creation,
+no business resources, and restoration of the processor chain. Evidence under
+`target/release-evidence/v33/priority5-aliased-binder-products/` preserves the source
+base, reviewed patch, commands, logs, XML and `SHA256SUMS`. Earlier bundles are
+unchanged. Consumer/API/matrix/native checks were not rerun; remaining release
+gates stay pending.
+
 ## Rollback and Remaining Gates
 
 Rollback this processor-only selection/binding correction with its desired-behavior

@@ -77,7 +77,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                             configurable.getBeanNamesForType(BeanPostProcessor.class, true, false));
                     Map<Object, String> processorBeans = existingProcessorBeans(factory, configurable, registrationOrder);
                     processorBeans.entrySet().removeIf(entry -> !registrationOrder.contains(entry.getValue()));
-                    int bindingRegistrationIndex = registrationOrder.indexOf(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
+                    int bindingRegistrationIndex = registrationOrder.indexOf(processorBeans.get(binding.delegate));
                     int index = 0;
                     Comparator<Object> comparator = configurable instanceof DefaultListableBeanFactory listable
                             && listable.getDependencyComparator() != null
@@ -178,15 +178,21 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     && singleton instanceof FactoryBean<?> producer && !producer.isSingleton();
             if (!nonSingleton) continue;
             Class<?> predictedType = factory.getType(name, false);
-            if (predictedType == null || predictedType.isInterface()) continue;
+            if (predictedType == null || predictedType.isInterface()) {
+                throw new IllegalStateException("Cannot identify installed non-singleton processor: " + name
+                        + "; use a singleton processor or expose a unique concrete product type");
+            }
             var matches = factory.getBeanPostProcessors().stream()
                     .filter(processor -> !processors.containsKey(processor)
-                            && ClassUtils.getUserClass(processor) == predictedType).toList();
+                            && predictedType.isInstance(processor)).toList();
             long matchingNames = registrationOrder.stream()
                     .filter(candidate -> factory.getType(candidate, false) == predictedType).count();
-            if (matches.size() == 1 && matchingNames == 1) processors.put(matches.getFirst(), name);
-            else if (!matches.isEmpty()) {
-                throw new IllegalStateException("Cannot identify installed non-singleton processor: " + name);
+            if (matches.size() == 1 && matchingNames == 1
+                    && ClassUtils.getUserClass(matches.getFirst()) == predictedType) {
+                processors.put(matches.getFirst(), name);
+            } else if (!matches.isEmpty()) {
+                throw new IllegalStateException("Cannot identify installed non-singleton processor: " + name
+                        + "; use a singleton processor or expose a unique concrete product type");
             }
         }
         return processors;

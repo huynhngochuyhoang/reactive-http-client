@@ -245,6 +245,8 @@ processor stays after the priority-ordered binder even if its actual class imple
 `PriorityOrdered`. Within the priority-ordered group, the factory's dependency
 comparator determines placement; `OrderComparator` is the fallback when none is
 configured, and comparator ties retain type-discovery order.
+Tie-breaking uses the registered binder's discovered definition name, including
+when Boot's standard bean name is an alias for that definition.
 The actual registered binding processor participates in that comparison and supplies
 the binding callback, including application subclass overrides. An unrelated directly
 installed or separately named binder subclass does not suppress this callback.
@@ -258,8 +260,10 @@ in that prefix when Spring discovers only its distinct processor product, not
 the factory's `&beanName` identity.
 Installed non-singleton processors with a unique concrete predicted type are
 associated without requesting another prototype or FactoryBean product. Ambiguous
-type associations fail explicitly; use a singleton processor or distinct concrete
-processor types rather than relying on inferred registration provenance.
+type associations fail explicitly, including non-singleton products advertised
+only as processor interfaces or a base class rather than their concrete type.
+Use a singleton processor or distinct concrete processor types rather than relying
+on inferred registration provenance; rejection does not request another product.
 The callback is removed after lookup, including failures.
 Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
