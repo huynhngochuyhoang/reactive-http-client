@@ -68,10 +68,10 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 if (current instanceof AbstractBeanFactory factory
                         && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)) {
                     var binding = new PropertiesBinding(factory);
-                    if (factory.getBeanPostProcessors().stream().anyMatch(processor -> processor == binding.delegate)) {
+                    bindings.put(factory, binding);
+                    if (binding.delegateInstalled) {
                         continue;
                     }
-                    bindings.put(factory, binding);
                     var processors = factory.getBeanPostProcessors();
                     List<String> registrationOrder = Arrays.asList(
                             configurable.getBeanNamesForType(BeanPostProcessor.class, true, false));
@@ -82,10 +82,16 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     Comparator<Object> comparator = configurable instanceof DefaultListableBeanFactory listable
                             && listable.getDependencyComparator() != null
                             ? listable.getDependencyComparator() : OrderComparator.INSTANCE;
-                    // Rediscovery moves bean-backed registrations behind all direct-only ones,
-                    // including direct processors originally installed after a bean-backed instance.
-                    processors.sort(Comparator.comparing(processorBeans::containsKey));
-                    while (index < processors.size() && !processorBeans.containsKey(processors.get(index))) {
+                    // AOT refresh appends discovered merged-definition processors after the
+                    // original direct registrations. Later AOT additions must stay after binding.
+                    int discoveryBoundary = 0;
+                    while (discoveryBoundary < processors.size()
+                            && !(processors.get(discoveryBoundary) instanceof MergedBeanDefinitionPostProcessor
+                            && processorBeans.containsKey(processors.get(discoveryBoundary)))) {
+                        discoveryBoundary++;
+                    }
+                    processors.subList(0, discoveryBoundary).sort(Comparator.comparing(processorBeans::containsKey));
+                    while (index < discoveryBoundary && !processorBeans.containsKey(processors.get(index))) {
                         index++;
                     }
                     // Spring moves merged-definition processors into the trailing internal group.
@@ -342,6 +348,8 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         private final AbstractBeanFactory factory;
         private final ConfigurationPropertiesBindingPostProcessor delegate;
         private final List<BeanPostProcessor> originalProcessors;
+        private final boolean delegateInstalled;
+        private final Set<String> singletonsBeforeDelegate = new HashSet<>();
         private final Map<Object, Object> bound = new IdentityHashMap<>();
         private final Set<String> boundBeanNames = new HashSet<>();
 
@@ -350,20 +358,33 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             this.delegate = factory.getBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
                     ConfigurationPropertiesBindingPostProcessor.class);
             this.originalProcessors = List.copyOf(factory.getBeanPostProcessors());
+            this.delegateInstalled = originalProcessors.stream().anyMatch(processor -> processor == delegate);
+            if (delegateInstalled) {
+                String delegateName = factory.canonicalName(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME);
+                for (String name : factory.getSingletonNames()) {
+                    if (name.equals(delegateName)) break;
+                    singletonsBeforeDelegate.add(name);
+                }
+            }
         }
 
         private void restoreProcessors() {
+            if (delegateInstalled) return;
             var processors = factory.getBeanPostProcessors();
             processors.remove(this);
-            // Restore the borrowed order without dropping processors registered during lookup.
+            // Restore surviving originals only; removals and new registrations belong to the owner.
+            var surviving = originalProcessors.stream().filter(processors::contains).toList();
             var additions = new ArrayList<>(processors);
             additions.removeAll(originalProcessors);
             processors.clear();
-            processors.addAll(originalProcessors);
+            processors.addAll(surviving);
             processors.addAll(additions);
         }
 
         private Object bindExisting(Object bean, String beanName) {
+            if (delegateInstalled && !singletonsBeforeDelegate.contains(factory.canonicalName(beanName))) {
+                return bean;
+            }
             // A later post-processor may replace the bound instance. This name guard
             // applies only to fallback; each new prototype still takes the creation callback.
             if (!boundBeanNames.contains(factory.canonicalName(beanName))) {

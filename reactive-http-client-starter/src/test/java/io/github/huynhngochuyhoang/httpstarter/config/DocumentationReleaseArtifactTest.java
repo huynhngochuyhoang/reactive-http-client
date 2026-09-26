@@ -245,9 +245,12 @@ class DocumentationReleaseArtifactTest {
         Path directory = root.resolve("roadmaps/v33");
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         String priority = checklist.split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0];
-        assertThat(priority).contains("(AOT-PROPERTIES-SELECTION.md)").doesNotContain("[ ]");
+        assertThat(priority).contains("(AOT-PROPERTIES-SELECTION.md)",
+                "### [ ] 5.1 Select the effective properties",
+                "- [ ] Preserve environment binding lifecycle",
+                "- [ ] Resolve lifecycle provenance", "### [x] 5.2", "### [x] 5.3");
         String evidence = Files.readString(directory.resolve("AOT-PROPERTIES-SELECTION.md"));
-        assertThat(evidence).contains("V32-F003 implemented", "resolveNamedBean", "FactoryBean",
+        assertThat(evidence).contains("V32-F003 partially implemented; lifecycle provenance open", "resolveNamedBean", "FactoryBean",
                 "opaque parent", "Boot binding", "No public API", "not a native binary",
                 "## Rollback and Remaining Gates", "SHA256SUMS", "> **Release scope:** unselected");
         assertThat(checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0])

@@ -2,7 +2,7 @@
 
 > **Recorded:** 2026-09-24
 > **Source base:** `a81447c85739d375d8b1b32fffeae8c2df37dcc3` plus the reviewed Priority 5 patch
-> **Implementation:** V32-F003 implemented; shared verification pending
+> **Implementation:** V32-F003 partially implemented; lifecycle provenance open; shared verification pending
 > **Published / development:** `4.4.1` / `4.5.0-SNAPSHOT`
 > **Release scope:** unselected
 
@@ -654,6 +654,48 @@ Consumer/API/matrix/native checks were not rerun, and remaining release gates st
 pending. This correction does not expand the documented non-singleton type support
 or change Spring/Boot's separate eager creation/advisor-discovery boundaries.
 
+## Installed Delegates and Processor Lifetime Review
+
+The 2026-09-26 correction on `557b7c95` retains fallback binding state even when the
+standard registered delegate is already installed. Definition-backed singletons
+registered before the delegate's canonical singleton name can receive the missing
+binding pass. Local/parent selections and ordinary/opaque-scoped singleton targets
+retain instance identity. Normal bound instances and newly created beans continue
+to use the installed delegate without an additional temporary binding callback.
+
+Prefix regrouping now stops at the first discovered merged-definition processor,
+the registration boundary used by Spring 7.0.1's AOT refresh. Definition-less
+processors appended after that boundary by an earlier AOT processor remain late,
+even when their concrete class implements `PriorityOrdered`. Restoration keeps
+the relative order of surviving original processors and retains new registrations;
+removed original processors, including a self-removing callback, are not restored.
+
+Eighteen added cases cover four local/parent early-singleton scenarios, two installed
+binder/scoped-target scenarios, four paired late-processor scenarios, and eight
+self/other-removal scenarios across ordinary/opaque-scoped properties and successful/
+failed initialization. The initial twenty-case run has **eight failures and eight
+errors**; four existing controls pass. An additional probe of early custom-scoped
+targets with an installed delegate failed twice: those targets are not in the
+singleton registry. The final added target cases explicitly use singleton scope,
+and the unsupported custom-scope variant is not claimed as repaired.
+Final verification passes **440 focused cases**, including **203** selection-contract
+cases, plus **73 documentation cases**
+with zero failures/errors/skips and explicit GC disabled (**513 passing cases** total).
+Evidence under `target/release-evidence/v33/priority5-installed-binder-lifecycle/`
+retains source base, reviewed patch, commands, logs, XML and `SHA256SUMS`.
+
+**Remaining provenance limitation:** singleton registration order does not record
+when an already-created delegate entered the processor chain. A delegate created
+before properties but installed afterward is not covered by this early-singleton
+repair; neither are already-created custom-scoped targets absent from the singleton
+registry once the delegate is installed. Likewise, the prefix distinction relies
+on retaining Spring's merged-definition registration boundary; it is not a general history of arbitrary chain
+reordering by other AOT processors. Full support needs lifecycle tracking before
+those operations, not more inference from the final chain. Earlier processors
+should install the binder before resolving properties and leave the discovery
+boundary intact. This limitation remains open; the rerun does not certify arbitrary
+AOT processor ordering. Consumer/API/matrix/native and release gates are unchanged.
+
 ## Rollback and Remaining Gates
 
 Rollback this processor-only selection/binding correction with its desired-behavior
@@ -662,7 +704,8 @@ ambiguity is hidden, or business assembly is introduced at this boundary. Do not
 restore registration-order selection as a new supported precedence rule. The
 published `4.4.1` primary-bean workaround remains available on that release.
 
-F001-F003 implementation is now complete, but shared composed regressions,
+F001-F003 corrections are implemented within the qualified coverage above; the
+remaining lifecycle provenance gap is not closed. Shared composed regressions,
 full module suites, assembled programmatic non-primary selection across supported
 Boot rows, strict source/binary API checks, clean-source native execution and
 the Priority 8 cost decision remain in Priorities 6-8. AOT-only changes do not

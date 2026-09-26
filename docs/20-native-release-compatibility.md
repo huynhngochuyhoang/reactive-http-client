@@ -242,9 +242,11 @@ post-processors, `@PostConstruct`, `InitializingBean` and custom init methods.
 Direct-only registrations retain their prefix position regardless of `Ordered`.
 When Spring also discovers that same singleton as a processor bean, normal refresh
 removes the earlier occurrence and registers it in auto-detected order; AOT follows
-that order. Direct-only processors are identified across the installed chain, not
-just before its first bean-backed instance. The temporary ordering is restored
-after lookup, including failure, without dropping processors registered during it.
+that order. Direct-only processors before Spring's discovered merged-definition
+processor group retain their prefix position, including those following a
+bean-backed instance. Definition-less processors appended after that group during
+AOT stay late. The temporary ordering is restored after lookup, including failure,
+without dropping new processors or resurrecting processors removed during lookup.
 Predictive type checks determine the processor registration group,
 including FactoryBean products. A product advertising only an ordinary or ordered
 processor stays after the priority-ordered binder even if its actual class implements
@@ -273,6 +275,11 @@ on inferred registration provenance; rejection does not request another product.
 The callback is removed after lookup, including failures.
 Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
+An installed delegate no longer prevents repairing a singleton registered before
+the delegate's canonical singleton name (including scoped targets). Registration
+order is not installation history: a delegate instantiated early but installed
+later cannot be distinguished reliably here. Earlier AOT processors should install
+the binder before resolving properties; that broader provenance gap remains open.
 When Spring selects an annotated properties FactoryBean itself as `&name`, binding
 uses the canonical `name` definition and the selected factory instance, not its product.
 Fallback uses a binder-returned replacement for validation without replacing an

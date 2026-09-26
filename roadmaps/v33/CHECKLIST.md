@@ -305,13 +305,13 @@ pre-F002 status.
 
 Conditional on **V32-F003** approval.
 
-### [x] 5.1 Select the effective properties
+### [ ] 5.1 Select the effective properties
 
 - [x] Turn the paired runtime/AOT drift cases into desired-behavior regressions
       while preserving their baseline provenance.
 - [x] Prefer supported Spring candidate resolution at the properties boundary;
       remove registration-order fallback rather than duplicating precedence rules.
-- [x] Preserve environment binding lifecycle, primary programmatic properties and
+- [ ] Preserve environment binding lifecycle, primary programmatic properties and
       foreign-factory behavior; do not select an unbound configuration object.
 
 ### [x] 5.2 Cover selection and failure semantics
@@ -334,7 +334,8 @@ Conditional on **V32-F003** approval.
 - [x] Run environment-only, replacement-properties and foreign-factory controls;
       record focused results, remaining constraints and rollback assessment.
 
-Completed on 2026-09-24. [AOT-PROPERTIES-SELECTION.md](AOT-PROPERTIES-SELECTION.md)
+Initially completed on 2026-09-24; binding-lifecycle provenance reopened on
+2026-09-26. [AOT-PROPERTIES-SELECTION.md](AOT-PROPERTIES-SELECTION.md)
 records Spring-owned selection, Boot binding, creation counts, failure semantics,
 commands and remaining gates. Evidence is under
 `target/release-evidence/v33/priority5/`, against the reviewed patch on reachable
@@ -524,6 +525,22 @@ and six errors among twenty pre-fix cases**, then **422 focused / 73 documentati
 cases** passing, zero failures/errors/skips, explicit GC disabled. Existing
 non-singleton restrictions and framework discovery boundaries remain documented;
 consumer/API/matrix/native and release gates are unchanged.
+
+Installed-delegate/lifetime correction, 2026-09-26: fallback state is retained for
+definition-backed singletons older than the delegate's canonical singleton entry.
+Definition-less processors after Spring's merged-definition registration boundary
+stay late. Restoration retains additions and does not resurrect removed callbacks.
+Eighteen added cases extend local/parent/scoped binding, late-processing and removal
+coverage. Evidence in
+`target/release-evidence/v33/priority5-installed-binder-lifecycle/` records **eight
+failures and eight errors among twenty pre-fix cases**, then **440 focused /
+73 documentation cases** passing, zero failures/errors/skips, explicit GC disabled.
+The companion record explicitly leaves arbitrary installation-history inference
+unresolved; consumer/API/matrix/native and release gates remain pending.
+
+- [ ] Resolve lifecycle provenance when another AOT processor instantiates the
+      binder before properties but installs it afterward; do not treat singleton
+      registration order as proof of binding or close this gap from the rerun above.
 
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
