@@ -14,14 +14,13 @@ import org.springframework.core.OrderComparator;
 import reactor.core.publisher.Mono;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class EffectiveSelectionAotReviewTest {
     enum Preference { PRIMARY, NON_FALLBACK, PRIORITY, DEFAULT }
 
     @ParameterizedTest
     @EnumSource(Preference.class)
-    void aotFirstSingletonFallbackDiffersFromRuntimeNonPrimarySelection(Preference preference) {
+    void aotPropertiesSelectionMatchesRuntimePreference(Preference preference) {
         try (var context = new GenericApplicationContext()) {
             var secondary = new ReactiveHttpClientProperties();
             var preferred = new ReactiveHttpClientProperties();
@@ -55,14 +54,7 @@ class EffectiveSelectionAotReviewTest {
             assertThat(context.getBeanProvider(ReactiveHttpClientProperties.class).getIfAvailable()).isSameAs(preferred);
             new MethodMetadataCache().validateDeclarativeCachePolicies(Client.class, "selection", config);
             var processor = new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment());
-            if (preference == Preference.PRIMARY) {
-                assertThat(processor.processAheadOfTime(context.getDefaultListableBeanFactory())).isNotNull();
-            } else {
-                // V32-F003 records current drift, not behavior to preserve after an approved correction.
-                assertThatThrownBy(() -> processor.processAheadOfTime(context.getDefaultListableBeanFactory()))
-                        .isInstanceOf(IllegalStateException.class)
-                        .hasMessageContaining("the selected policy is not declared under cache.policies");
-            }
+            assertThat(processor.processAheadOfTime(context.getDefaultListableBeanFactory())).isNotNull();
             assertThat(context.getBeanFactory().containsSingleton("client")).isFalse();
             assertThat(context.getBean(Client.class)).isNotNull();
         }

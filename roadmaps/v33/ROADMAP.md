@@ -4,7 +4,7 @@
 > **Theme:** supported extension and AOT selection parity
 > **Published baseline:** `4.4.1`
 > **Development reactor:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved; F001/F002 implemented, F003 pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending
 > **Release scope:** unselected
 > **Draft date:** 2026-09-19
 > **Adopted:** 2026-09-19
@@ -24,7 +24,8 @@ valid history. On 2026-09-23 the maintainer explicitly selected all three with
 the bounded acceptance and verification requirements in [FIX-DECISION.md](FIX-DECISION.md).
 Priority 2 completes reproduction and selection, not implementation or release
 approval. [Priority 3](BUILDER-OWNERSHIP.md) implements F001 and
-[Priority 4](STATIC-METADATA.md) implements F002. F003 remains pending in Priority 5.
+[Priority 4](STATIC-METADATA.md) implements F002 and
+[Priority 5](AOT-PROPERTIES-SELECTION.md) implements F003. Shared verification remains pending.
 
 ## Intent
 
