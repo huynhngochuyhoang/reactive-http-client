@@ -674,35 +674,52 @@ pending/unselected; no native, API, matrix or performance result is claimed.
 
 ## Priority 7 - Mock, Assembled-Consumer, AOT and Native Evidence
 
-### [ ] 7.1 Verify mock and assembled consumers
+### [x] 7.1 Verify mock and assembled consumers
 
-- [ ] Exercise accepted extensions through the mock/public helper where supported;
+- [x] Exercise accepted extensions through the mock/public helper where supported;
       distinguish helper behavior from Spring selection and transport evidence.
-- [ ] Run external consumers against assembled artifacts with counted method/target
+- [x] Run external consumers against assembled artifacts with counted method/target
       and decoded-result witnesses for selected corrections.
-- [ ] Keep optional-dependency absence physical: cache-disabled without Caffeine and
+- [x] Keep optional-dependency absence physical: cache-disabled without Caffeine and
       enabled-only resilience without selected operators/registry classes.
-- [ ] Preserve artifact-only classpaths, effective POMs, dependency trees and actual
+- [x] Preserve artifact-only classpaths, effective POMs, dependency trees and actual
       counts; do not relabel installed reactor results as Central consumption.
 
-### [ ] 7.2 Verify supported Boot and JVM AOT paths
+### [x] 7.2 Verify supported Boot and JVM AOT paths
 
-- [ ] Run both supported Boot rows, including genuine matching consumer parents.
+- [x] Run both supported Boot rows, including genuine matching consumer parents.
       Track overlays or exact generator commands required to reproduce them.
-- [ ] Add/run JVM AOT witnesses for the selected builder, metadata and properties
+- [x] Add/run JVM AOT witnesses for the selected builder, metadata and properties
       cases with invalid-selected and non-instantiation controls.
-- [ ] Confirm actual selected programmatic policy and applicable reflection hints;
+- [x] Confirm actual selected programmatic policy and applicable reflection hints;
       retain environment and optional-integration absence cases.
 
-### [ ] 7.3 Compile and run native evidence
+Evidence: [mock, consumer and AOT parity](PARITY-EVIDENCE.md), measured on
+2026-09-27 against the installed current reactor, not Central: mock 76 cases;
+assembled consumers 29 per Boot row; physically minimal consumers one per row;
+AOT/selection/cross-path regressions 283 per row. Both Boot 4.0.0 and 4.1.0
+smoke packages passed six fixture tests, ordinary JVM execution, AOT generation
+and AOT-enabled JVM execution. The first JVM fixture failure remains recorded.
+Priority 7 completed on 2026-09-27 with the tracked, non-root
+[native runner](../../scripts/verify-v33-native.py). A clean detached checkout of
+`08e386097f39e577349f6a4e382f424233058b17` passed native compilation and executable
+verification (both exit 0); the native build also passed all six fixture tests.
+Binary SHA-256:
+`1312b2fc6269b14093f5acae302494274aeef0dd2543fdfdff629979450b2842`.
+The sealed bundle is `target/v33-native-runs/native-g0ynw95x/evidence/`.
+Retired failures, actual witnesses, resources and reproduction commands remain
+in [parity evidence](PARITY-EVIDENCE.md). No production or fixture source changed
+after the successful run. Priority 8 and release selection remain pending.
 
-- [ ] Commit the final fixture and implementation before release-quality native
+### [x] 7.3 Compile and run native evidence
+
+- [x] Commit the final fixture and implementation before release-quality native
       measurement; record the clean reachable source and toolchain/resources.
-- [ ] Compile and execute native witnesses for selected corrections, counting all
+- [x] Compile and execute native witnesses for selected corrections, counting all
       relevant dispatches and checking method/target/result and lifecycle behavior.
-- [ ] Retain command, exit status, binary hash, actual assertions and prior failures;
+- [x] Retain command, exit status, binary hash, actual assertions and prior failures;
       JVM processor passes or stale native binaries cannot satisfy this gate.
-- [ ] Rerun after relevant source changes. Resource failures leave required native
+- [x] Rerun after relevant source changes. Resource failures leave required native
       work pending; do not weaken assertions to close the priority.
 
 ## Priority 8 - Compatibility and Targeted Cost Evidence

@@ -3,6 +3,8 @@ package io.github.huynhngochuyhoang.httpstarter.nativesmoke;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
 import io.github.huynhngochuyhoang.httpstarter.core.ProblemDetailErrorResponseMapper;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadata;
+import io.github.huynhngochuyhoang.httpstarter.core.MethodMetadataCache;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.github.huynhngochuyhoang.httpstarter.filter.InboundHeadersWebFilter;
 import io.github.huynhngochuyhoang.httpstarter.observability.ReactiveHttpClientDiagnosticsEndpoint;
@@ -23,6 +25,11 @@ import org.springframework.aot.hint.annotation.RegisterReflectionForBinding;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.core.env.Environment;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import reactor.core.publisher.Mono;
@@ -33,6 +40,7 @@ import reactor.netty.resources.LoopResources;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -93,6 +101,10 @@ public class NativeSmokeApplication {
         ConfigurableApplicationContext context = null;
         try {
             context = application.run(args);
+            require(context.getBean(ReactiveHttpClientProperties.class) == context.getBean("nativeProperties"),
+                    "non-primary programmatic properties were not selected");
+            require(!context.getBeanFactory().getBeanDefinition("nativeProperties").isPrimary(),
+                    "native properties must exercise non-primary selection");
             NativeInboundContextScenario.run(context.getBean(InboundHeadersWebFilter.class));
             ReactiveHttpClientDiagnosticsEndpoint diagnosticsEndpoint =
                     context.getBean(ReactiveHttpClientDiagnosticsEndpoint.class);
@@ -430,6 +442,52 @@ public class NativeSmokeApplication {
         var config = new ReactiveHttpClientProperties.InboundHeadersConfig();
         config.setAllowList(Set.of("x-scope", "x-empty", "x-many", "authorization"));
         return new InboundHeadersWebFilter(config);
+    }
+
+    @Bean
+    @ConfigurationProperties("native-programmatic")
+    ReactiveHttpClientProperties nativeProperties(Environment environment) {
+        var properties = Binder.get(environment).bind("reactive.http", ReactiveHttpClientProperties.class)
+                .orElseGet(ReactiveHttpClientProperties::new);
+        var client = properties.getClients().computeIfAbsent("native-smoke",
+                ignored -> new ReactiveHttpClientProperties.ClientConfig());
+        var policy = new ReactiveHttpClientProperties.CachePolicyConfig();
+        policy.setTtlMs(5000L);
+        policy.setMaximumSize(10L);
+        policy.setMaximumTotalDecodedResponseBytes(2048L);
+        policy.setSharedResponse(true);
+        policy.setRefreshAfterMs(100L);
+        policy.setRefreshTimeoutMs(1000L);
+        client.getCache().getPolicies().put("native-cache", policy);
+        properties.getClients().put("native-smoke", client);
+        return properties;
+    }
+
+    @Bean
+    static BeanFactoryPostProcessor preferNativeProperties() {
+        return factory -> {
+            for (String name : factory.getBeanNamesForType(ReactiveHttpClientProperties.class, true, false)) {
+                ((AbstractBeanDefinition) factory.getBeanDefinition(name)).setFallback(!name.equals("nativeProperties"));
+            }
+        };
+    }
+
+    @Bean
+    MethodMetadataCache nativeMetadata() {
+        return new MethodMetadataCache() {
+            @Override public MethodMetadata get(Method method) {
+                if (!method.getName().equals("getCachedOrder")) { return super.get(method); }
+                var metadata = new MethodMetadata();
+                metadata.setMethod(method);
+                metadata.setApiName("getCachedOrder");
+                metadata.setHttpMethod("GET");
+                metadata.setPathTemplate("/api/cached-order");
+                metadata.setReturnsMono(true);
+                metadata.setResponseType(NativeOrderResponse.class);
+                metadata.setCachePolicyName("native-cache");
+                return metadata;
+            }
+        };
     }
 
     @Bean

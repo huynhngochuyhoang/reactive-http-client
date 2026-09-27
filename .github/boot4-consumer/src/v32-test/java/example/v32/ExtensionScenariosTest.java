@@ -43,7 +43,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.boot.webclient.WebClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
+import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.context.annotation.Scope;
 import org.springframework.core.annotation.Order;
 import org.springframework.http.HttpStatus;
@@ -255,8 +256,12 @@ class ExtensionScenariosTest {
         try (Scenario s = new Scenario()) {
             s.metadataViaApiRef = false;
             s.runner().run(context -> {
+                assertThat(context.getBeanProvider(ReactiveHttpClientProperties.class).getObject())
+                        .isSameAs(s.properties);
+                assertThat(context.getBeanFactory().getBeanDefinition("properties").isPrimary()).isFalse();
                 assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor()
                         .processAheadOfTime(context.getBeanFactory())).isNotNull();
+                assertThat(s.requests).isEmpty();
                 Client client = context.getBean(Client.class);
                 Mono<String> call = client.mapped();
                 int metadataLookups = s.mappedMetadataCalls.get();
@@ -417,7 +422,15 @@ class ExtensionScenariosTest {
     @Configuration(proxyBeanMethods = false)
     @EnableReactiveHttpClients(basePackageClasses = Client.class)
     static class Application {
-        @Bean @Primary ReactiveHttpClientProperties properties(Scenario s) { return s.properties; }
+        @Bean ReactiveHttpClientProperties properties(Scenario s) { return s.properties; }
+
+        @Bean static BeanFactoryPostProcessor preferProgrammaticProperties() {
+            return factory -> {
+                for (String name : factory.getBeanNamesForType(ReactiveHttpClientProperties.class, true, false)) {
+                    ((AbstractBeanDefinition) factory.getBeanDefinition(name)).setFallback(!name.equals("properties"));
+                }
+            };
+        }
 
         @Bean @Order(1) AuthProviderFactory firstFactory(Scenario s) { return s.factory(s.firstFactoryCreates); }
         @Bean @Order(2) AuthProviderFactory secondFactory(Scenario s) { return s.factory(s.secondFactoryCreates); }
