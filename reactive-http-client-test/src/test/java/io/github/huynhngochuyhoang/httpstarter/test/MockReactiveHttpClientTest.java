@@ -1957,6 +1957,41 @@ class MockReactiveHttpClientTest {
     }
 
     @Test
+    void freshStaticMetadataRetainsSelectedCacheAndPathIdentity() {
+        MethodMetadataCache metadata = new MethodMetadataCache() {
+            @Override public MethodMetadata get(Method method) {
+                if (!method.getName().equals("getUser")) return super.get(method);
+                var value = new MethodMetadata();
+                value.setMethod(method);
+                value.setApiName("custom-user");
+                value.setHttpMethod("GET");
+                value.setPathTemplate("/custom/{id}");
+                value.getPathVars().put(0, "id");
+                value.setReturnsMono(true);
+                value.setResponseType(String.class);
+                value.setCachePolicyName("selected");
+                return value;
+            }
+        };
+        try (var mock = MockReactiveHttpClient.forClient(SampleClient.class)
+                .methodMetadataCache(metadata)
+                .cachePolicy("selected", java.time.Duration.ofSeconds(60), 8)
+                .withDeterministicCacheTime()
+                .respondTo(HttpMethod.GET, "/custom/42", exchange -> MockReactiveHttpClient.json(200, "first"))
+                .respondTo(HttpMethod.GET, "/custom/43", exchange -> MockReactiveHttpClient.json(200, "second"))
+                .build()) {
+            Mono<String> cold = mock.proxy().getUser(42);
+            assertThat(mock.exchanges()).isEmpty();
+            assertThat(cold.block()).isEqualTo("first");
+            assertThat(cold.block()).isEqualTo("first");
+            assertThat(mock.proxy().getUser(43).block()).isEqualTo("second");
+            assertThat(cold.block()).isEqualTo("first");
+            assertThat(mock.exchanges()).hasSize(2);
+            assertThat(mock.cacheSnapshot().entryCount()).isEqualTo(2);
+        }
+    }
+
+    @Test
     void unmatchedRequestFallsThroughToFallbackResponse() {
         MockReactiveHttpClient<SampleClient> mock = MockReactiveHttpClient.forClient(SampleClient.class).build();
 

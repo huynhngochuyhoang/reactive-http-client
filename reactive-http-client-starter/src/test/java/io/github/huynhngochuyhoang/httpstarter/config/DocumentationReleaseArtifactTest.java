@@ -191,7 +191,7 @@ class DocumentationReleaseArtifactTest {
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         String priority = checklist.split("## Priority 3 - ", 2)[1].split("## Priority 4 - ", 2)[0];
         assertThat(priority).contains("(BUILDER-OWNERSHIP.md)").doesNotContain("[ ]");
-        for (int pending : List.of(6)) {
+        for (int pending : List.of(7)) {
             assertThat(checklist.split("## Priority " + pending + " - ", 2)[1]
                     .split("## Priority " + (pending + 1) + " - ", 2)[0])
                     .contains("[ ]").doesNotContain("[x]");
@@ -225,7 +225,7 @@ class DocumentationReleaseArtifactTest {
                 "Existing supplied derived value", "API-ref metadata", "not a logical-call",
                 "argument-only", "Legacy handlers", "No public constructor", "Priority 8",
                 "not a native binary", "SHA256SUMS", "> **Release scope:** unselected");
-        assertThat(checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0])
+        assertThat(checklist.split("## Priority 7 - ", 2)[1].split("## Priority 8 - ", 2)[0])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("limits remain in published `4.4.1`", "(../roadmaps/v33/STATIC-METADATA.md)",
@@ -254,7 +254,7 @@ class DocumentationReleaseArtifactTest {
                 "PropertiesBindingLifecycle", "weak references", "Low-level contexts",
                 "opaque parent", "Boot binding", "No public API", "not a native binary",
                 "## Rollback and Remaining Gates", "SHA256SUMS", "> **Release scope:** unselected");
-        assertThat(checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0])
+        assertThat(checklist.split("## Priority 7 - ", 2)[1].split("## Priority 8 - ", 2)[0])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("In published `4.4.1`, AOT properties selection can still differ",
@@ -266,6 +266,32 @@ class DocumentationReleaseArtifactTest {
                 assertThat(directory.resolve(target).normalize()).as("V33 AOT link to %s", target).exists();
             }
         }
+    }
+
+    @Test
+    void v33CrossPathEvidenceKeepsRuntimeOwnershipAndLaterGatesDistinct() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v33");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0];
+        assertThat(priority).contains("(CROSS-PATH-REGRESSIONS.md)", "### [x] 6.1", "### [x] 6.2", "### [x] 6.3")
+                .doesNotContain("[ ]");
+        String evidence = Files.readString(directory.resolve("CROSS-PATH-REGRESSIONS.md"));
+        assertThat(evidence).contains("## Affected-Path Matrix", "## Ownership and Reachability",
+                "Public concrete handler", "Foreign implementations", "Mock helper", "JVM AOT processor",
+                "-XX:+DisableExplicitGC", "v32-cache-reachability", "registry lease owners",
+                "not Central consumption", "No native executable was run", "> **Release scope:** unselected",
+                "SHA256SUMS", "## Remaining Gates");
+        for (String target : List.of("ROADMAP.md", "CHECKLIST.md", "FIX-DECISION.md", "BUILDER-OWNERSHIP.md",
+                "STATIC-METADATA.md", "AOT-PROPERTIES-SELECTION.md")) {
+            assertThat(directory.resolve(target)).exists();
+        }
+        Matcher links = Pattern.compile("(?:\\]\\(|(?m)^\\[[^]]+\\]: )([^\\s)#]+)").matcher(evidence);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+        assertThat(checklist.split("## Priority 7 - ", 2)[1].split("## Priority 8 - ", 2)[0])
+                .contains("[ ]").doesNotContain("[x]");
     }
 
     @Test

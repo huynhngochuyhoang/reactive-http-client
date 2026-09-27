@@ -210,6 +210,9 @@ as limitations until tested, not as assumed Spring compatibility.
 Deliver an affected-path matrix with both agreement and intentional differences.
 Do not expand this into another whole-engine rewrite or reopen unrelated races.
 
+Priority 6 records the [cross-path matrix and regression evidence](CROSS-PATH-REGRESSIONS.md).
+It does not close the assembled-consumer, native, compatibility or release gates below.
+
 ## 7. Mock, Assembled-Consumer, AOT and Native Evidence
 
 - Prove the accepted extension scenarios from outside starter packages against
