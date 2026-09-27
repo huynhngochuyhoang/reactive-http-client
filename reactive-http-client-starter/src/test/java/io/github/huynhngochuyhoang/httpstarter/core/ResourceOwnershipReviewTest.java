@@ -303,6 +303,61 @@ class ResourceOwnershipReviewTest {
     }
 
     @Test
+    void destroyAndRecreateFactoryPreservesLiveSameTagOwnersAndApplicationResources() throws Exception {
+        var registry = new SimpleMeterRegistry();
+        try (var context = new GenericApplicationContext()) {
+            var properties = properties(true);
+            var config = properties.getClients().get(NAME);
+            config.getCache().getCustomizations().put("applicationBuilder", ReactiveHttpClientProperties.CacheCustomizationSafety.SAFE);
+            AtomicInteger dispatches = new AtomicInteger();
+            WebClient supplied = WebClient.builder().baseUrl("http://localhost").exchangeFunction(request -> {
+                dispatches.incrementAndGet();
+                return Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build());
+            }).build();
+            context.getBeanFactory().registerSingleton("registry", registry);
+            context.registerBean(ReactiveHttpClientProperties.class, () -> properties);
+            context.registerBean("applicationBuilder", WebClient.Builder.class, supplied::mutate);
+            context.refresh();
+            var live = handler(context, config, properties);
+            try {
+                var baselineMeters = List.copyOf(registry.getMeters());
+                var baselineOwners = metricOwners(registry);
+                assertThat(baselineOwners).hasSize(1);
+                for (int cycle = 1; cycle <= 2; cycle++) {
+                    var factory = new ReactiveHttpClientFactoryBean<Client>();
+                    factory.setType(Client.class);
+                    factory.setApplicationContext(context);
+                    try {
+                        Client client = factory.getObject();
+                        assertThat(client.get().block(WAIT)).isEqualTo("ok");
+                        assertThat(client.get().block(WAIT)).isEqualTo("ok");
+                        assertThat(dispatches).hasValue(cycle);
+                        assertThat(metricOwners(registry)).hasSize(2).containsAll(baselineOwners);
+                        assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.entries").gauge().value()).isEqualTo(32);
+                        assertThat(factory.responseCacheSnapshot().currentSize()).isEqualTo(1);
+                    } finally {
+                        factory.destroy();
+                    }
+                    assertThat(metricOwners(registry)).containsExactlyInAnyOrderElementsOf(baselineOwners);
+                    assertThat(registry.getMeters()).containsAll(baselineMeters);
+                    assertThat(registry.get(LocalResponseCacheMetrics.PREFIX + ".maximum.entries").gauge().value()).isEqualTo(16);
+                    assertThat(live.responseCacheManager().snapshot().closed()).isFalse();
+                }
+                assertThat(supplied.get().uri("/application-owned").retrieve().bodyToMono(String.class).block(WAIT)).isEqualTo("ok");
+                assertThat(dispatches).hasValue(3);
+                assertThat(registry.counter("application.counter").count()).isZero();
+            } finally {
+                live.responseCacheManager().close();
+                metricOwners(registry).forEach(LocalResponseCacheMetrics::close);
+            }
+            assertThat(metricOwners(registry)).isEmpty();
+            assertThat(registry.getMeters()).noneMatch(meter -> meter.getId().getName().startsWith(LocalResponseCacheMetrics.PREFIX));
+        } finally {
+            registry.close();
+        }
+    }
+
+    @Test
     void replacementConnectorStaysApplicationOwnedAfterFactoryDestroy() throws Exception {
         AtomicInteger dispatches = new AtomicInteger();
         var server = HttpServer.create().host("127.0.0.1").port(0)

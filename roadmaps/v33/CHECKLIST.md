@@ -618,33 +618,59 @@ passes. No consumer/API/matrix/native verification is claimed by this correction
 
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
-### [ ] 6.1 Compare effective decisions across entry points
+### [x] 6.1 Compare effective decisions across entry points
 
-- [ ] Build an affected-path matrix for factory/public handler, metadata/plan,
+- [x] Build an affected-path matrix for factory/public handler, metadata/plan,
       contract export, diagnostics, mocks and AOT for selected corrections.
-- [ ] Record agreement on known facts and intentional validation/creation differences;
+- [x] Record agreement on known facts and intentional validation/creation differences;
       keep foreign client implementations outside starter-only grammar.
-- [ ] Exercise a composed cache-selected extension scenario using applicable selected
+- [x] Exercise a composed cache-selected extension scenario using applicable selected
       fixes and existing workarounds for deferred IDs; do not implicitly fix them.
 
-### [ ] 6.2 Preserve request and caller boundaries
+### [x] 6.2 Preserve request and caller boundaries
 
-- [ ] Assert finalized method/target, selected policy, key/wire identity and cache
+- [x] Assert finalized method/target, selected policy, key/wire identity and cache
       result for the composed case with properly classified customizers.
-- [ ] Verify per-caller auth/gates still run on hits and probes do not dispatch.
-- [ ] Run affected retry/auth-replay/redirect/deadline/terminal regressions; preserve
+- [x] Verify per-caller auth/gates still run on hits and probes do not dispatch.
+- [x] Run affected retry/auth-replay/redirect/deadline/terminal regressions; preserve
       published semantics without reopening unrelated engine implementation.
 
-### [ ] 6.3 Retain construction and cleanup safeguards
+### [x] 6.3 Retain construction and cleanup safeguards
 
-- [ ] Recheck failed construction and successful ownership transfer using registry
+- [x] Recheck failed construction and successful ownership transfer using registry
       leases/owners, not only an unassigned factory field.
-- [ ] Verify destroy/recreate beside a live same-tag meter owner and application-owned
+- [x] Verify destroy/recreate beside a live same-tag meter owner and application-owned
       resources remaining usable.
-- [ ] Run deterministic F004/F005 ordinary safeguards with explicit GC disabled;
+- [x] Run deterministic F004/F005 ordinary safeguards with explicit GC disabled;
       use and report the controlled lane separately for reachability claims.
-- [ ] Record cross-path outcomes and scope limits without claiming universal
+- [x] Record cross-path outcomes and scope limits without claiming universal
       shutdown, collectability, memory or concurrency guarantees.
+
+Implemented 2026-09-27: [cross-path matrix and ownership evidence](CROSS-PATH-REGRESSIONS.md)
+on reachable base `2abc5fdc` plus the reviewed test/documentation patch. Two new
+loopback cases combine F001-F003 across factory/public handler, planning, export,
+diagnostics and JVM AOT; a mock case verifies selected fresh-metadata caching.
+One added ownership case verifies destroy/recreate beside a same-tag live owner,
+including lease counts, gauge capacity, cold replacement caches and application
+resource usability. Existing foreign-factory, retry/replay/redirect/deadline and
+F004/F005 safeguards remain unchanged. No production code or new API is added.
+
+The 21-class focused starter run passes **613 cases**, the four-class helper run
+passes **77 cases**, both with explicit GC disabled. The separate controlled
+reachability lane passes **16 cases** in a fresh Serial GC / 128 MiB fork with
+explicit GC enabled. All have zero failures/errors/skips. Evidence under
+`target/release-evidence/v33/priority6/` preserves commands, XML/logs, source/patch,
+artifact hashes and the initial fixture compilation failure; it is reviewed-patch
+JVM evidence, not native or Central-consumer evidence. The first full starter run
+had two stale documentation assertions requiring Priority 6 to stay open; their
+failure records remain separate from the corrected final run.
+The complete starter rerun passes **2,097 cases**, including **74 documentation
+cases**, zero failures/errors/skips, explicit GC disabled. The final documentation
+rerun passes **74 cases**; these totals overlap with the focused/full suites.
+`git diff --check` and bundle hash verification pass. The XML-derived audit and
+`SHA256SUMS` cover reviewed sources, commands, failures and the actual rebuilt
+starter JAR used by helper tests. Later verification and release scope remain
+pending/unselected; no native, API, matrix or performance result is claimed.
 
 ## Priority 7 - Mock, Assembled-Consumer, AOT and Native Evidence
 
