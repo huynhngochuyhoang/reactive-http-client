@@ -230,10 +230,16 @@ lookup for the properties type itself. Named lookup failures retain their origin
 cause in a `BeanCreationException`; only an absent candidate permits fallback.
 Properties and metadata selection now use non-eager type discovery through a
 short-lived Spring selection view; actual beans are still created by their owning
-factory. Raw properties FactoryBeans must expose their product type through generics,
+factory. Raw properties and metadata FactoryBeans must expose their product type through generics,
 definition metadata (`FactoryBean.OBJECT_TYPE_ATTRIBUTE`), or an already initialized
-factory. An uninitialized factory with no predictable product type is not probed;
-if no visible properties candidate remains, the documented environment fallback applies.
+factory. An uninitialized factory with no predictable product type is not probed.
+Metadata selection fails explicitly if an unresolved FactoryBean exists in a factory
+being searched: it could be a replacement even when a default cache is visible.
+Supply product-type metadata or initialize that factory before AOT selection; this
+also applies to unrelated raw factories whose product type cannot be ruled out.
+An unused parent is not searched when local metadata candidates exist. Once metadata
+selection is unambiguous, absence of a visible properties candidate permits the
+documented environment fallback.
 When Boot's standard registered binding processor instance is not installed, a temporary properties-only
 callback binds newly created properties after the directly registered processor
 prefix, including context-awareness callbacks (`EnvironmentAware` and
@@ -244,8 +250,9 @@ When Spring also discovers that same singleton as a processor bean, normal refre
 removes the earlier occurrence and registers it in auto-detected order; AOT follows
 that order. Direct-only processors before Spring's discovered merged-definition
 processor group retain their prefix position, including those following a
-bean-backed instance. Definition-less processors appended after that group during
-AOT stay late. The temporary ordering is restored after lookup, including failure,
+bean-backed instance. Processors appended or re-added after that group during AOT
+stay late, including bean-backed `PriorityOrdered` processors. Priority-group
+comparisons stop at the discovery boundary. The temporary ordering is restored after lookup, including failure,
 without dropping new processors or resurrecting processors removed during lookup.
 Predictive type checks determine the processor registration group,
 including FactoryBean products. A product advertising only an ordinary or ordered
@@ -281,6 +288,11 @@ weak instance/delegate references distinguish an already-bound object from an
 early unbound singleton or custom-scoped target, even when the delegate was created
 before that object but installed afterward. Fallback binds the same target once;
 it does not recreate scoped targets or repeat binding on later AOT inspection.
+Normal refresh clears and disables this observation when singleton initialization
+finishes, so runtime prototype/custom-scope creation does not accumulate records
+or scan past instances. An AOT context keeps observation active until context
+destruction, which also clears the records and backing storage. Already-bound
+runtime beans continue to use the installed binding processor without tracking.
 Installed prototype binders and non-singleton binding products are associated with
 their discovered name (including aliases) and reused without requesting a second
 product. The unique concrete-type restriction above also applies to these binders.

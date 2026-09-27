@@ -578,6 +578,24 @@ counts overlap with the focused and final documentation reruns; the bundle's
 XML-derived audit and `SHA256SUMS` preserve final evidence. See the companion
 record for scope and verification details.
 
+Runtime/discovery correction, 2026-09-27: lifecycle observation clears and stops
+after normal singleton initialization and on context destruction; runtime prototype
+or custom-scope instances no longer accumulate observation records. Bean-backed
+priority processors appended after the discovery boundary remain after binding.
+Unresolved FactoryBean product types in a searched metadata scope now fail with
+an actionable hint requirement instead of silently choosing a default cache;
+unused parents remain untouched. Fourteen new cases cover these boundaries, with
+**seven failures and four errors among 17 pre-fix cases**, then **481 focused cases**
+passing, zero failures/errors/skips, explicit GC disabled. Evidence under
+`target/release-evidence/v33/priority5-runtime-discovery/` retains fixture iterations,
+logs and XML counts. The companion record documents the conservative raw-factory
+constraint and remaining framework-creation limits; no release gate is closed.
+The full starter rerun passes **2,080 cases**, including **73 documentation cases**,
+zero failures/errors/skips, with explicit GC disabled. The final documentation
+rerun and focused totals overlap with this suite. The bundle's XML-derived audit,
+reviewed patch and `SHA256SUMS` preserve final evidence without replacing earlier
+bundles or claiming native/consumer/API/matrix verification.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

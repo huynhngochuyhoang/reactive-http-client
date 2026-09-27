@@ -176,6 +176,41 @@ class AotPropertiesSelectionContractTest {
     }
 
     @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
+    void lateBeanBackedPriorityProcessorsStayAfterBinding(LifecycleShape shape, boolean readded) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            runtime.refresh();
+            for (var context : java.util.List.of(aot, runtime)) {
+                context.registerBean("lateProcessor", HighestPriorityObservingProcessor.class);
+                var late = context.getBean("lateProcessor", HighestPriorityObservingProcessor.class);
+                if (readded) {
+                    var internal = context.getDefaultListableBeanFactory().getBeanPostProcessors().stream()
+                            .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+                    context.getBeanFactory().addBeanPostProcessor(late);
+                    context.getDefaultListableBeanFactory().addBeanPostProcessors(internal);
+                }
+                context.getBeanFactory().addBeanPostProcessor(late);
+            }
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
+                    "postConstruct:9000", "ordinary:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource({"false,false", "false,true", "true,false", "true,true"})
     void singletonCreatedBeforeInstalledDelegateStillReceivesBinding(boolean replacement, boolean parent) {
         try (var aot = bindingContext(replacement); var runtime = bindingContext(replacement)) {
@@ -336,7 +371,7 @@ class AotPropertiesSelectionContractTest {
 
     @ParameterizedTest
     @CsvSource({"false,false", "false,true", "true,false", "true,true"})
-    void unknownUnrelatedFactoryRemainsUninitialized(boolean parent, boolean propertiesPresent) {
+    void unknownUnrelatedFactoryRequiresAHintOnlyInTheMetadataLookupScope(boolean parent, boolean propertiesPresent) {
         var owner = new DefaultListableBeanFactory();
         var factory = parent ? new DefaultListableBeanFactory(owner) : owner;
         var creations = new AtomicInteger();
@@ -349,6 +384,14 @@ class AotPropertiesSelectionContractTest {
         if (propertiesPresent) owner.registerSingleton("selectedProperties", properties(7000));
         var witness = witness(factory, Client.class);
 
+        if (!parent) {
+            assertThatThrownBy(() -> processor().processAheadOfTime(factory))
+                    .isInstanceOf(IllegalStateException.class).hasMessageContaining("MethodMetadataCache")
+                    .hasMessageContaining("unrelatedBusinessFactory");
+            assertThat(creations).hasValue(0);
+            owner.getBeanDefinition("unrelatedBusinessFactory").setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, Object.class);
+            owner.clearMetadataCache();
+        }
         assertThat(processor().processAheadOfTime(factory)).isNotNull();
 
         assertThat(creations).hasValue(0);
@@ -366,20 +409,24 @@ class AotPropertiesSelectionContractTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
-    void frameworkCreationRetainsItsOwnEagerDiscoveryBoundaries(boolean scoped) {
+    void frameworkCreationCanDiscoverFactoriesRegisteredDuringMetadataCreation(boolean scoped) {
         var creations = new AtomicInteger();
         var creationSite = new java.util.concurrent.atomic.AtomicReference<java.util.List<String>>();
         try (var context = scoped ? scopedBindingContext(false, new AtomicInteger()) : bindingContext(false)) {
             var factory = context.getDefaultListableBeanFactory();
             var witness = witness(factory, Client.class);
+            // Creation delegated to application code can register factories after type validation.
+            ((RootBeanDefinition) factory.getBeanDefinition("metadata")).setInstanceSupplier(() -> {
+                witness.metadataCreations.incrementAndGet();
+                context.registerBean("unknownBusiness", UnpredictableBusinessFactory.class, () -> {
+                    creations.incrementAndGet();
+                    creationSite.set(StackWalker.getInstance().walk(frames -> frames.limit(24)
+                            .map(frame -> frame.getClassName() + "#" + frame.getMethodName()).toList()));
+                    return new UnpredictableBusinessFactory();
+                }, definition -> definition.setLazyInit(true));
+                return witness;
+            });
             context.refreshForAotProcessing(new RuntimeHints());
-            // Model an earlier AOT processor registering an as-yet uninitialized business factory.
-            context.registerBean("unknownBusiness", UnpredictableBusinessFactory.class, () -> {
-                creations.incrementAndGet();
-                creationSite.set(StackWalker.getInstance().walk(frames -> frames.limit(24)
-                        .map(frame -> frame.getClassName() + "#" + frame.getMethodName()).toList()));
-                return new UnpredictableBusinessFactory();
-            }, definition -> definition.setLazyInit(true));
             assertThat(creations).hasValue(0);
 
             assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
@@ -396,18 +443,23 @@ class AotPropertiesSelectionContractTest {
     }
 
     @Test
-    void unknownPropertiesFactoryRequiresNonEagerProductTypeMetadata() {
+    void unknownPropertiesFactoryNeedsATypeHintBeforeMetadataSelection() {
         var products = new AtomicInteger();
         var factories = new AtomicInteger();
         var factory = propertiesFactory(Shape.RAW_FACTORY, products, factories);
         factory.getBeanDefinition("properties").removeAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE);
         var witness = witness(factory, Client.class);
 
-        assertThat(processor().processAheadOfTime(factory)).isNotNull();
+        assertThatThrownBy(() -> processor().processAheadOfTime(factory))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("MethodMetadataCache")
+                .hasMessageContaining("properties");
 
         assertThat(products).hasValue(0);
         assertThat(factories).hasValue(0);
-        assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(1000);
+        factory.getBeanDefinition("properties").setAttribute(FactoryBean.OBJECT_TYPE_ATTRIBUTE, ReactiveHttpClientProperties.class);
+        factory.clearMetadataCache();
+        assertThat(processor().processAheadOfTime(factory)).isNotNull();
+        assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(4000);
         witness.assertNoBusinessResources(factory);
     }
 

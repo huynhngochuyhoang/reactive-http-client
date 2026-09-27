@@ -95,7 +95,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                         index++;
                     }
                     // Spring moves merged-definition processors into the trailing internal group.
-                    for (int i = index; i < processors.size(); i++) {
+                    for (int i = index; i < discoveryBoundary; i++) {
                         var processor = processors.get(i);
                         int registrationIndex = registrationOrder.indexOf(processorBeans.get(processor));
                         if (!(processor instanceof MergedBeanDefinitionPostProcessor)
@@ -110,6 +110,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     processors.add(index, binding);
                 }
             }
+            validateMetadataFactoryTypes(beanFactory);
             metadataCache = new NonEagerSelectionFactory(beanFactory).getBeanProvider(MethodMetadataCache.class)
                     .getIfAvailable(MethodMetadataCache::new);
             properties = properties(beanFactory, bindings);
@@ -155,6 +156,25 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 }
             });
         });
+    }
+
+    private static void validateMetadataFactoryTypes(ConfigurableListableBeanFactory beanFactory) {
+        for (BeanFactory current = beanFactory; current instanceof ConfigurableListableBeanFactory owner;
+             current = owner.getParentBeanFactory()) {
+            // An unknown product could be the metadata replacement, even beside a known
+            // default. Reject that uncertainty without initializing unrelated factories.
+            for (String name : owner.getBeanDefinitionNames()) {
+                if (!owner.getMergedBeanDefinition(name).isAbstract() && !owner.containsSingleton(name)
+                        && owner.isFactoryBean(name) && owner.getType(name, false) == null) {
+                    throw new IllegalStateException("Cannot resolve MethodMetadataCache non-eagerly: FactoryBean '"
+                            + name + "' has no predictable product type; declare FactoryBean generics or "
+                            + "the '" + FactoryBean.OBJECT_TYPE_ATTRIBUTE + "' bean-definition attribute, "
+                            + "or initialize the factory before AOT selection");
+                }
+            }
+            // Spring only delegates to the parent when there are no local candidates.
+            if (owner.getBeanNamesForType(MethodMetadataCache.class, true, false).length > 0) return;
+        }
     }
 
     private static Map<Object, String> existingProcessorBeans(AbstractBeanFactory factory,

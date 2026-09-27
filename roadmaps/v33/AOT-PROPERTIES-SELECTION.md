@@ -767,6 +767,54 @@ focused/full/documentation counts overlap. The XML-derived audit, reviewed patch
 and `SHA256SUMS` retain the final evidence. Consumer/API/matrix/native and release
 gates remain pending; this does not certify arbitrary processor-chain mutation.
 
+## Runtime Tracking and Discovery Boundaries
+
+The 2026-09-27 correction on reachable base `fec12b69` plus the reviewed patch
+limits lifecycle observations to initialization/AOT work. Normal singleton
+initialization clears and disables the observer; later runtime callbacks do not
+scan or append records, even when prototype/custom-scoped properties remain live.
+AOT refresh omits that normal-startup callback and retains creation history until
+its context is destroyed. Destruction clears records and the backing array and
+prevents subsequent callbacks from recording again. These tests require no GC.
+
+Priority comparisons now stop at the discovered merged-definition boundary.
+Bean-backed priority processors appended or re-added after refresh remain late,
+just like definition-less late processors. Existing predictive group/comparator
+and equal-priority ordering inside the pre-boundary group remain covered.
+
+Metadata lookup now rejects unresolved, uninitialized FactoryBean product types
+in the scope Spring would search instead of silently choosing the default cache.
+Such a factory could provide the replacement, including beside a known fallback;
+the starter cannot identify it safely by name or initialize every unknown factory.
+The actionable error requires generics/product-type definition metadata or prior
+factory initialization. This conservative requirement also applies to an unrelated
+raw factory in the searched scope. A parent is not inspected when local metadata
+candidates exist. Previously initialized and explicitly hinted replacement products
+remain selected, and failed checks create neither factory nor product.
+
+This supersedes the earlier permissive raw-factory fallback controls in searched
+metadata scopes. Existing tests now require a type hint for that scope, while
+retaining untouched-parent controls. Separate framework-boundary tests register
+an unknown factory during application metadata creation, after type validation;
+Spring dependency resolution/Boot advisor discovery can still initialize it. This
+is not a promise to suppress side effects of delegated application/framework code.
+
+Fourteen added cases cover runtime/AOT observation lifetime, four paired late
+bean-backed processor scenarios, and seven metadata-selection scenarios. The
+initial 17-case run records **seven failures and four errors**, with six passing
+controls. After correcting cached-definition fixture setup and the prior permissive
+expectations, the eleven-class focused run passes **481 cases**, including **231
+properties-selection, seven metadata-selection and six lifecycle cases**, zero
+failures/errors/skips, with explicit GC disabled. Evidence is under
+`target/release-evidence/v33/priority5-runtime-discovery/`. Earlier records and
+bundles remain unchanged; consumer/API/matrix/native and release gates stay pending.
+The full starter suite passes **2,080 cases**, including **73 documentation cases**,
+zero failures/errors/skips, with explicit GC disabled. The documentation-only
+rerun is recorded separately; these totals overlap. The XML-derived audit,
+reviewed sources/patch and `SHA256SUMS` preserve final evidence, including the new
+metadata contract suite. This is reviewed-patch JVM evidence, not a native binary
+or clean-release compatibility record.
+
 ## Rollback and Remaining Gates
 
 Rollback this selection/binding correction and its internal lifecycle observer with its desired-behavior
