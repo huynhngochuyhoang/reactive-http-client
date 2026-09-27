@@ -50,6 +50,143 @@ class AotPropertiesSelectionContractTest {
     enum ProcessorRemoval { NONE, SELF, ORIGINAL }
 
     @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
+    void appendedStandardBinderIsMovedAheadOfOrdinaryProcessors(LifecycleShape shape, boolean nonSingleton) {
+        var aotCalls = new java.util.ArrayList<String>();
+        var runtimeCalls = new java.util.ArrayList<String>();
+        var products = new AtomicInteger();
+        var bindings = new AtomicInteger();
+        try (var aot = lifecycleContext(shape, aotCalls); var runtime = lifecycleContext(shape, runtimeCalls)) {
+            if (nonSingleton) registerNonSingletonBinder(aot, ProcessorScope.NON_SINGLETON_PRODUCT, products, bindings);
+            else aot.registerBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                    CountingBindingProcessor.class, () -> {
+                        products.incrementAndGet();
+                        return new CountingBindingProcessor(bindings);
+                    });
+            aot.registerBean("applicationProcessor", OrdinaryPropertiesPostProcessor.class);
+            runtime.registerBean("applicationProcessor", OrdinaryPropertiesPostProcessor.class);
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            var internal = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            factory.addBeanPostProcessor(aot.getBean(OrdinaryPropertiesPostProcessor.class));
+            factory.addBeanPostProcessors(internal);
+            var binder = aot.getBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                    CountingBindingProcessor.class);
+            factory.addBeanPostProcessor(binder);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            runtime.refresh();
+            runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject().getClients();
+            assertThat(runtimeCalls).containsExactly("construct", "environment", "applicationContext", "bind",
+                    "ordinary:9000", "postConstruct:9000", "afterPropertiesSet:9000", "init:9000");
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            assertThat(aotCalls).containsExactlyElementsOf(runtimeCalls);
+            assertThat(products).hasValue(1);
+            assertThat(bindings).hasValue(1);
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void failedPlacementLeavesInstalledBinderAndChainIntact(boolean installed) {
+        try (var context = lifecycleContext(LifecycleShape.ORDINARY, new java.util.ArrayList<>())) {
+            context.registerBean("priorityProcessor", BeforeBindingPostProcessor.class);
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            var internal = factory.getBeanPostProcessors().stream()
+                    .filter(org.springframework.beans.factory.support.MergedBeanDefinitionPostProcessor.class::isInstance).toList();
+            factory.addBeanPostProcessor(context.getBean(BeforeBindingPostProcessor.class));
+            factory.addBeanPostProcessors(internal);
+            var binder = context.getBean(org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
+                    org.springframework.boot.context.properties.ConfigurationPropertiesBindingPostProcessor.class);
+            if (installed) factory.addBeanPostProcessor(binder);
+            var processors = java.util.List.copyOf(factory.getBeanPostProcessors());
+            factory.setDependencyComparator((left, right) -> {
+                if (left == binder || right == binder) throw new IllegalStateException("placement rejected");
+                return OrderComparator.INSTANCE.compare(left, right);
+            });
+
+            assertThatThrownBy(() -> new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment())
+                    .processAheadOfTime(factory)).hasMessage("placement rejected");
+
+            assertThat(factory.getBeanPostProcessors()).containsExactlyElementsOf(processors);
+            assertThat(witness.metadataCreations).hasValue(0);
+            assertThat(witness.businessCreations).hasValue(0);
+            assertThat(factory.containsSingleton("business")).isFalse();
+            assertThat(witness.registry.getMeters()).isEmpty();
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void sharedPropertiesIdentityIsBoundForEachBeanName(boolean alias) {
+        try (var aot = sharedIdentityContext(alias); var runtime = sharedIdentityContext(alias)) {
+            var factory = aot.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            aot.refreshForAotProcessing(new RuntimeHints());
+            runtime.refresh();
+            var expected = runtime.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+            assertThat(expected).isSameAs(runtime.getBean("first"));
+            assertThat(((SharedProperties) expected).boundTtls).containsExactly(7000L, 11000L);
+
+            assertThat(new ReactiveHttpClientBeanFactoryInitializationAotProcessor(aot.getEnvironment())
+                    .processAheadOfTime(factory)).isNotNull();
+
+            var selected = (SharedProperties) aot.getBeanProvider(ReactiveHttpClientProperties.class).getObject();
+            assertThat(selected).isSameAs(aot.getBean("first"));
+            assertThat(selected.boundTtls).containsExactly(7000L, 11000L);
+            assertThat(witness.config).isSameAs(selected.getClients().get("selection"));
+            assertThat(witness.config.getCache().getPolicies().get("chosen").getTtlMs()).isEqualTo(11000);
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    private static AnnotationConfigApplicationContext sharedIdentityContext(boolean alias) {
+        var context = new AnnotationConfigApplicationContext();
+        context.register(SharedIdentityBinding.class);
+        context.registerBean("reactiveHttpClientPropertiesBindingLifecycle", PropertiesBindingLifecycle.class,
+                () -> new PropertiesBindingLifecycle(context.getDefaultListableBeanFactory()));
+        context.getEnvironment().getPropertySources().addFirst(new MapPropertySource("shared", Map.of(
+                "first.clients.selection.cache.policies.chosen.ttl-ms", "7000",
+                "first.clients.selection.cache.policies.chosen.maximum-size", "16",
+                "first.clients.selection.cache.policies.chosen.shared-response", "true",
+                "first.clients.selection.cache.customizations.Builder", "SAFE",
+                "second.clients.selection.cache.policies.chosen.ttl-ms", "11000",
+                "second.clients.selection.cache.policies.chosen.maximum-size", "16",
+                "second.clients.selection.cache.policies.chosen.shared-response", "true",
+                "second.clients.selection.cache.customizations.Builder", "SAFE")));
+        if (alias) context.registerAlias("first", "firstAlias");
+        context.getBeanFactory().registerSingleton("firstName", alias ? "firstAlias" : "first");
+        return context;
+    }
+
+    @Configuration(proxyBeanMethods = false)
+    @EnableConfigurationProperties
+    static class SharedIdentityBinding {
+        @Bean @Lazy @ConfigurationProperties("first")
+        SharedProperties first() { return new SharedProperties(); }
+        @Bean @Lazy @Primary @ConfigurationProperties("second")
+        SharedProperties second(ApplicationContext context, String firstName) {
+            return context.getBean(firstName, SharedProperties.class);
+        }
+    }
+
+    static class SharedProperties extends ReactiveHttpClientProperties {
+        final java.util.List<Long> boundTtls = new java.util.ArrayList<>();
+        @Override public void setClients(Map<String, ClientConfig> clients) {
+            boundTtls.add(clients.get("selection").getCache().getPolicies().get("chosen").getTtlMs());
+            super.setClients(clients);
+        }
+    }
+
+    @ParameterizedTest
     @CsvSource({"ORDINARY,PROTOTYPE,false", "ORDINARY,NON_SINGLETON_PRODUCT,false", "ORDINARY,PROTOTYPE_FACTORY,false",
             "OPAQUE_SUPPLIER_PROXY,PROTOTYPE,false", "OPAQUE_SUPPLIER_PROXY,NON_SINGLETON_PRODUCT,false", "OPAQUE_SUPPLIER_PROXY,PROTOTYPE_FACTORY,false",
             "ORDINARY,PROTOTYPE,true", "ORDINARY,NON_SINGLETON_PRODUCT,true", "ORDINARY,PROTOTYPE_FACTORY,true",
@@ -1241,6 +1378,52 @@ class AotPropertiesSelectionContractTest {
             for (int i = 0; i < expected.size(); i++) {
                 assertThat(actual.get(i)).as("processor at index %s", i).isSameAs(expected.get(i));
             }
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
+    void restorationPreservesProcessorsReaddedDuringLookup(LifecycleShape shape, boolean failInitialization) {
+        try (var context = lifecycleContext(shape, new java.util.ArrayList<>(), failInitialization)) {
+            var afterCalls = new java.util.ArrayList<String>();
+            org.springframework.beans.factory.config.BeanPostProcessor moved = new org.springframework.beans.factory.config.BeanPostProcessor() {
+                @Override public Object postProcessBeforeInitialization(Object bean, String name) {
+                    if (name.equals("afterLookup")) afterCalls.add("moved");
+                    return bean;
+                }
+            };
+            context.registerBean("rediscovered", OrdinaryPropertiesPostProcessor.class);
+            context.registerBean("afterLookup", Object.class, Object::new);
+            context.addBeanFactoryPostProcessor(factory -> {
+                factory.addBeanPostProcessor(factory.getBean("rediscovered", OrdinaryPropertiesPostProcessor.class));
+                factory.addBeanPostProcessor(moved);
+                factory.addBeanPostProcessor(new org.springframework.beans.factory.config.BeanPostProcessor() {
+                    @Override public Object postProcessBeforeInitialization(Object bean, String name) {
+                        if (bean instanceof LifecycleProperties) factory.addBeanPostProcessor(moved);
+                        if (name.equals("afterLookup")) afterCalls.add("remaining");
+                        return bean;
+                    }
+                });
+            });
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            var expected = new java.util.ArrayList<>(factory.getBeanPostProcessors());
+            assertThat(expected.removeIf(processor -> processor == moved)).isTrue();
+            expected.add(moved);
+            var processor = new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment());
+
+            if (failInitialization) {
+                assertThatThrownBy(() -> processor.processAheadOfTime(factory))
+                        .hasStackTraceContaining("initialization rejected");
+            } else assertThat(processor.processAheadOfTime(factory)).isNotNull();
+
+            factory.getBean("afterLookup");
+            assertThat(afterCalls).containsExactly("remaining", "moved");
+            var actual = factory.getBeanPostProcessors();
+            assertThat(actual).hasSameSizeAs(expected);
+            for (int i = 0; i < expected.size(); i++) assertThat(actual.get(i)).isSameAs(expected.get(i));
             witness.assertNoBusinessResources(factory);
         }
     }

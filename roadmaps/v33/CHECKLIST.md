@@ -596,6 +596,26 @@ rerun and focused totals overlap with this suite. The bundle's XML-derived audit
 reviewed patch and `SHA256SUMS` preserve final evidence without replacing earlier
 bundles or claiming native/consumer/API/matrix verification.
 
+Installed-binding/restoration correction, 2026-09-27: an already installed standard
+delegate is temporarily placed at the runtime discovery boundary and reused,
+including non-singleton binding products. Restoration preserves observable
+remove-and-append re-registrations instead of resetting every surviving identity.
+Binding memoization and lifecycle history include the canonical bean name so
+shared objects from distinct definitions receive both binding prefixes. Ten new
+selection cases reproduce **six failures and four errors** before the fix; one
+additional lifecycle case checks name/alias isolation. Two placement-failure
+controls ensure ordering exceptions leave the original chain intact. The final
+focused eleven-class suite passes **494 cases**, zero failures/errors/skips, with explicit GC disabled.
+Evidence under `target/release-evidence/v33/priority5-binding-restoration/` retains
+the corrected reproduction and initial fixture iteration separately. See the
+companion record for restoration limits; later verification/release gates remain
+pending, and prior evidence is unchanged.
+The final full starter suite passes **2,093 cases**, including **73 documentation
+cases**, zero failures/errors/skips, explicit GC disabled. Focused/full/documentation
+totals overlap. The XML-derived audit, reviewed patch and `SHA256SUMS` retain final
+evidence and the two placement-control fixture corrections; `git diff --check`
+passes. No consumer/API/matrix/native verification is claimed by this correction.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points

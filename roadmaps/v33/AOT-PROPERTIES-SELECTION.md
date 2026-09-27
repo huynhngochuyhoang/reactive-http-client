@@ -815,6 +815,55 @@ reviewed sources/patch and `SHA256SUMS` preserve final evidence, including the n
 metadata contract suite. This is reviewed-patch JVM evidence, not a native binary
 or clean-release compatibility record.
 
+## Installed Binding and Lookup Mutations
+
+The 2026-09-27 correction on reachable base `a12af183` plus the reviewed patch
+temporarily repositions an already installed standard binding delegate at its
+runtime discovery boundary. A delegate appended by an earlier AOT processor no
+longer binds after ordinary processors or initialization callbacks. The installed
+instance is reused, including a non-singleton FactoryBean product; no second
+delegate or simultaneous binding adapter is installed. Temporary ordering is
+prepared off-chain before installation, so a failing comparator leaves the
+original chain intact.
+
+Restoration compares the lookup chain by identity with the temporary prepared
+chain. It restores only the unchanged subsequence to its original order, preserving
+the appended suffix containing new registrations, equal-but-distinct replacements,
+and observable remove-and-append moves of surviving processors. This supersedes
+the earlier blanket restoration of all surviving originals to snapshot order.
+Regression cases re-add a direct processor during successful and failed ordinary
+and opaque-scoped creation, then verify the next bean sees the new order.
+This covers Spring's append-style registration, not arbitrary direct-list edits or
+registration histories that leave an identical final chain.
+
+Binding results and lifecycle observations now use both canonical bean name and
+object identity. Two annotated definitions returning the same object apply their
+distinct prefixes once each, matching separate runtime contexts. Aliases and
+factory-dereference prefixes canonicalize to the owning definition; distinct
+prototype instances and returned wrappers retain the existing binding behavior.
+
+Ten new selection cases fail before correction: **six failures and four errors**.
+The preceding fixture iteration exposed a missing SAFE classification and is
+retained separately, not counted as defect evidence. A lifecycle name/alias case
+and two placement-failure cases add three controls. The final eleven-class focused
+run passes **494 cases**, including **243 properties-selection, seven
+metadata-selection and seven lifecycle cases**,
+zero failures/errors/skips, with explicit GC disabled. Evidence is under
+`target/release-evidence/v33/priority5-binding-restoration/`; earlier bundles remain
+unchanged. The initial 492-case focused/2,091-case full runs precede the two
+placement controls. Their first run had two fixture assertions incorrectly expecting
+metadata creation even though placement failed before lookup; the corrected
+controls require zero metadata and business resource creation. Full-suite and
+documentation results below refer to the final source. Consumer/API/matrix/native
+and release gates remain pending.
+
+The final full starter run passes **2,093 cases**, including **73 documentation
+cases**, zero failures/errors/skips, with explicit GC disabled. The documentation
+rerun is retained separately; these counts overlap. The XML-derived audit,
+reviewed sources/patch and `SHA256SUMS` seal the evidence, including the placement
+controls and their fixture correction. `git diff --check` passes. This remains
+reviewed-patch JVM evidence, not a clean-release or native record.
+
 ## Rollback and Remaining Gates
 
 Rollback this selection/binding correction and its internal lifecycle observer with its desired-behavior

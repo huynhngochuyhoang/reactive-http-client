@@ -69,15 +69,14 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                         && factory.containsLocalBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME)) {
                     var binding = new PropertiesBinding(factory, configurable);
                     bindings.put(factory, binding);
-                    if (binding.delegateInstalled) {
-                        continue;
-                    }
-                    var processors = factory.getBeanPostProcessors();
+                    var processors = new ArrayList<>(factory.getBeanPostProcessors());
                     List<String> registrationOrder = Arrays.asList(
                             configurable.getBeanNamesForType(BeanPostProcessor.class, true, false));
                     Map<Object, String> processorBeans = existingProcessorBeans(factory, configurable, registrationOrder);
                     processorBeans.entrySet().removeIf(entry -> !registrationOrder.contains(entry.getValue()));
                     int bindingRegistrationIndex = registrationOrder.indexOf(processorBeans.get(binding.delegate));
+                    // Reuse an installed delegate, but not a late AOT registration position.
+                    processors.removeIf(processor -> processor == binding.delegate);
                     int index = 0;
                     Comparator<Object> comparator = configurable instanceof DefaultListableBeanFactory listable
                             && listable.getDependencyComparator() != null
@@ -107,7 +106,10 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                             }
                         }
                     }
-                    processors.add(index, binding);
+                    processors.add(index, binding.delegateInstalled ? binding.delegate : binding);
+                    binding.lookupProcessors = List.copyOf(processors);
+                    factory.getBeanPostProcessors().clear();
+                    factory.getBeanPostProcessors().addAll(processors);
                 }
             }
             validateMetadataFactoryTypes(beanFactory);
@@ -368,10 +370,11 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         private final AbstractBeanFactory factory;
         private final ConfigurationPropertiesBindingPostProcessor delegate;
         private final List<BeanPostProcessor> originalProcessors;
+        private List<BeanPostProcessor> lookupProcessors;
         private final boolean delegateInstalled;
         private final PropertiesBindingLifecycle lifecycle;
         private final Set<String> singletonsBeforeDelegate = new HashSet<>();
-        private final Map<Object, Object> bound = new IdentityHashMap<>();
+        private final Map<String, Map<Object, Object>> bound = new HashMap<>();
         private final Set<String> boundBeanNames = new HashSet<>();
 
         private PropertiesBinding(AbstractBeanFactory factory, ConfigurableListableBeanFactory configurable) {
@@ -388,6 +391,7 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                     .orElseGet(() -> factory.getBean(ConfigurationPropertiesBindingPostProcessor.BEAN_NAME,
                             ConfigurationPropertiesBindingPostProcessor.class));
             this.originalProcessors = List.copyOf(factory.getBeanPostProcessors());
+            this.lookupProcessors = originalProcessors;
             this.delegateInstalled = originalProcessors.stream().anyMatch(processor -> processor == delegate);
             this.lifecycle = originalProcessors.stream().filter(PropertiesBindingLifecycle.class::isInstance)
                     .map(PropertiesBindingLifecycle.class::cast).findFirst().orElse(null);
@@ -400,23 +404,33 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
         }
 
         private void restoreProcessors() {
-            if (delegateInstalled) return;
             var processors = factory.getBeanPostProcessors();
-            processors.remove(this);
-            // Equal replacements are still distinct registrations owned by the factory.
-            Set<BeanPostProcessor> currentIdentities = Collections.newSetFromMap(new IdentityHashMap<>());
-            currentIdentities.addAll(processors);
-            Set<BeanPostProcessor> originalIdentities = Collections.newSetFromMap(new IdentityHashMap<>());
-            originalIdentities.addAll(originalProcessors);
-            var surviving = originalProcessors.stream().filter(currentIdentities::contains).toList();
-            var additions = processors.stream().filter(processor -> !originalIdentities.contains(processor)).toList();
+            processors.removeIf(processor -> processor == this);
+            Map<BeanPostProcessor, Integer> lookupPositions = new IdentityHashMap<>();
+            for (int i = 0; i < lookupProcessors.size(); i++) lookupPositions.put(lookupProcessors.get(i), i);
+            // Spring registration removes and appends an existing identity. Only the
+            // unchanged subsequence precedes that appended suffix; undo our ordering
+            // there, leaving additions, replacements and re-registrations in place.
+            Set<BeanPostProcessor> unchanged = Collections.newSetFromMap(new IdentityHashMap<>());
+            int previous = -1;
+            int boundary = 0;
+            while (boundary < processors.size()) {
+                var processor = processors.get(boundary);
+                Integer position = lookupPositions.get(processor);
+                if (position == null || position <= previous) break;
+                unchanged.add(processor);
+                previous = position;
+                boundary++;
+            }
+            var surviving = originalProcessors.stream().filter(unchanged::contains).toList();
+            var appended = List.copyOf(processors.subList(boundary, processors.size()));
             processors.clear();
             processors.addAll(surviving);
-            processors.addAll(additions);
+            processors.addAll(appended);
         }
 
         private Object bindExisting(Object bean, String beanName) {
-            Boolean previouslyBound = lifecycle != null ? lifecycle.wasBound(bean, delegate) : null;
+            Boolean previouslyBound = lifecycle != null ? lifecycle.wasBound(bean, beanName, delegate) : null;
             if (Boolean.TRUE.equals(previouslyBound)
                     || (previouslyBound == null && delegateInstalled
                     && !singletonsBeforeDelegate.contains(factory.canonicalName(beanName)))) {
@@ -428,22 +442,24 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
                 Object result = postProcessBeforeInitialization(bean, beanName);
                 return result != null ? result : bean;
             }
-            if (lifecycle != null) lifecycle.bound(bean, delegate);
+            if (lifecycle != null) lifecycle.bound(bean, beanName, delegate);
             return bean;
         }
 
         @Override
         public Object postProcessBeforeInitialization(Object bean, String beanName) {
             if (bean instanceof ReactiveHttpClientProperties && !isScopedProxy(bean, beanName)) {
-                if (bound.containsKey(bean)) return bound.get(bean);
+                String canonicalName = factory.canonicalName(BeanFactoryUtils.transformedBeanName(beanName));
+                var namedBindings = bound.computeIfAbsent(canonicalName, ignored -> new IdentityHashMap<>());
+                if (namedBindings.containsKey(bean)) return namedBindings.get(bean);
                 Object result = delegate.postProcessBeforeInitialization(bean, beanName);
                 if (lifecycle != null) {
-                    lifecycle.bound(bean, delegate);
-                    lifecycle.bound(result, delegate);
+                    lifecycle.bound(bean, canonicalName, delegate);
+                    lifecycle.bound(result, canonicalName, delegate);
                 }
-                bound.put(bean, result);
-                if (result != null && result != bean) bound.put(result, result);
-                boundBeanNames.add(factory.canonicalName(beanName));
+                namedBindings.put(bean, result);
+                if (result != null && result != bean) namedBindings.put(result, result);
+                boundBeanNames.add(canonicalName);
                 return result;
             }
             return bean;

@@ -241,7 +241,9 @@ An unused parent is not searched when local metadata candidates exist. Once meta
 selection is unambiguous, absence of a visible properties candidate permits the
 documented environment fallback.
 When Boot's standard registered binding processor instance is not installed, a temporary properties-only
-callback binds newly created properties after the directly registered processor
+callback delegates to it. If an earlier AOT processor already installed that instance,
+the same delegate is temporarily repositioned instead of adding another binder.
+Newly created properties are bound after the directly registered processor
 prefix, including context-awareness callbacks (`EnvironmentAware` and
 `ApplicationContextAware`), but before auto-detected ordinary application
 post-processors, `@PostConstruct`, `InitializingBean` and custom init methods.
@@ -251,9 +253,13 @@ removes the earlier occurrence and registers it in auto-detected order; AOT foll
 that order. Direct-only processors before Spring's discovered merged-definition
 processor group retain their prefix position, including those following a
 bean-backed instance. Processors appended or re-added after that group during AOT
-stay late, including bean-backed `PriorityOrdered` processors. Priority-group
+stay late, including bean-backed `PriorityOrdered` processors; the standard binder
+itself is placed at its runtime discovery boundary even if appended late. Priority-group
 comparisons stop at the discovery boundary. The temporary ordering is restored after lookup, including failure,
 without dropping new processors or resurrecting processors removed during lookup.
+Observable remove-and-append moves of existing identities during lookup remain
+in the factory's appended order; restoration undoes only temporary ordering of the
+unchanged subsequence, not those application registrations.
 Predictive type checks determine the processor registration group,
 including FactoryBean products. A product advertising only an ordinary or ordered
 processor stays after the priority-ordered binder even if its actual class implements
@@ -284,10 +290,13 @@ Definition-backed singletons resolved earlier still receive the fallback binding
 pass, but callbacks already run by another processor cannot be undone or replayed.
 The starter auto-configuration registers an internal merged-definition processor
 that observes properties creation before initialization AOT processors run. Its
-weak instance/delegate references distinguish an already-bound object from an
-early unbound singleton or custom-scoped target, even when the delegate was created
+weak instance/delegate references and canonical bean names distinguish an
+already-bound object from an early unbound singleton or custom-scoped target, even when the delegate was created
 before that object but installed afterward. Fallback binds the same target once;
 it does not recreate scoped targets or repeat binding on later AOT inspection.
+Binding memoization is scoped to both object identity and canonical bean name:
+two definitions returning one object still apply each definition's binding metadata.
+Aliases do not introduce a second binding name.
 Normal refresh clears and disables this observation when singleton initialization
 finishes, so runtime prototype/custom-scope creation does not accumulate records
 or scan past instances. An AOT context keeps observation active until context
