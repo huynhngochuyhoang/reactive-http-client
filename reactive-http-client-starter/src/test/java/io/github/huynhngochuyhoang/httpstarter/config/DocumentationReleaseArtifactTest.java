@@ -299,12 +299,19 @@ class DocumentationReleaseArtifactTest {
         Path root = projectRoot();
         String checklist = Files.readString(root.resolve("roadmaps/v33/CHECKLIST.md"));
         String priority = checklist.split("## Priority 7 - ", 2)[1].split("## Priority 8 - ", 2)[0];
-        assertThat(priority).contains("### [x] 7.1", "### [x] 7.2", "(PARITY-EVIDENCE.md)");
-        assertThat(priority.split(Pattern.quote("### [ ] 7.3"), 2)).hasSize(2);
+        assertThat(priority).contains("### [x] 7.1", "### [x] 7.2", "### [x] 7.3", "(PARITY-EVIDENCE.md)")
+                .doesNotContain("[ ]");
         String evidence = Files.readString(root.resolve("roadmaps/v33/PARITY-EVIDENCE.md"));
-        assertThat(evidence).contains("not Central", "Native evidence pending", "non-primary",
+        assertThat(evidence).contains("not Central", "native compilation and execution verified", "non-primary",
                 "4.0.0", "4.1.0", "programmatic", "SHA256SUMS", "verify-v33-parity.py",
-                "verify-v33-native.py", "Do not use sudo", "summary.json");
+                "verify-v33-native.py", "Do not use sudo", "summary.json",
+                "| Native compile exit | `0` |", "| Executable exit | `0` |", "Clean before and after",
+                "Retired Failures", "not a second native build")
+                .containsPattern("\\| Source commit \\| `[0-9a-f]{40}` \\|")
+                .containsPattern("\\| Source tree \\| `[0-9a-f]{40}` \\|")
+                .containsPattern("\\| Binary SHA-256 \\| `[0-9a-f]{64}` \\|");
+        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+                .contains("[ ]").doesNotContain("[x]");
         assertThat(root.resolve("scripts/verify-v33-parity.py")).exists();
         assertThat(root.resolve("scripts/verify-v33-native.py")).exists();
         String fixture = Files.readString(root.resolve(".github/native-smoke/src/main/resources/application.properties"));

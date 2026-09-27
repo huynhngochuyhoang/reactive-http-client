@@ -1,12 +1,14 @@
-# V33 Mock, Consumer and AOT Parity
+# V33 Mock, Consumer, AOT and Native Parity
 
-> **Status:** 7.1 and 7.2 verified; Native evidence pending (7.3).
+> **Status:** Priority 7 complete; native compilation and execution verified.
 > **Release scope:** unselected.
 
-Measured 2026-09-27 from base commit
+Mock, consumer and JVM AOT evidence measured 2026-09-27 from base commit
 `fefe218583a321e530f412c99c3672e5feade938` plus the recorded fixture diff.
-This is installed current-reactor evidence, not Central consumption or immutable
-native release evidence. No production implementation changed in this priority.
+Native evidence was measured later that day from clean committed source
+`08e386097f39e577349f6a4e382f424233058b17`. These are installed current-reactor
+results, not Central consumption. No production implementation changed in this
+priority, and release scope remains unselected.
 
 ## Witnesses
 
@@ -49,11 +51,14 @@ native release evidence. No production implementation changed in this priority.
 | Ordinary smoke JVM execution | 4.0.0 / 4.1.0 | exit 0 each |
 | AOT generation and AOT-enabled JVM execution | 4.0.0 / 4.1.0 | exit 0 each |
 | Documentation release-artifact guard | 4.0.0 | 75 passed |
+| Clean-source native compile, including fixture tests | 4.0.0 | exit 0; 6 passed |
+| Native executable, including context replacement | 4.0.0 | exit 0 |
 
 All listed test results have zero failures, errors and skips. Ordinary focused
-tests disable explicit GC. Java is Oracle 21.0.8; verification uses Maven 3.9.9
+tests disable explicit GC. JVM evidence uses Oracle 21.0.8; verification uses Maven 3.9.9
 (the initial successful reactor install used system Maven 3.8.7). The repository
-is the existing local Maven cache, not a fresh isolated download repository.
+for the JVM lanes is the existing local Maven cache, not a fresh isolated
+download repository. Native toolchain and repository provenance are below.
 The full Priority 8 compatibility/regression lane is not claimed here.
 
 ## Reproduction and Artifacts
@@ -82,13 +87,56 @@ failed experiment where environment binding replaced the programmatic map.
 It failed ordinary JVM startup with an undefined policy; no AOT/native success
 is inferred from that run. `SHA256SUMS` seals the evidence files excluding itself.
 
-## Native Gate
+## Native Evidence
 
-Native evidence pending. At the user's request the first 7.3 procedure is
-retired and its checklist checks reset for a fresh run. The implementation and
-fixture are committed at `bcb2045ec858efa809602e73eb1a24ebe3567463`; no native
-pass or binary hash exists yet. Neither the JVM results nor a successful socket
-preflight closes this gate.
+The replacement run completed on 2026-09-27. It used a fresh, non-root workspace
+and a clean detached checkout of the committed implementation, fixture and
+runner. No test was skipped or assertion weakened. The later closure edits
+affect only documentation and its regression guard, not compiled native inputs.
+
+| Provenance | Recorded value |
+| --- | --- |
+| Source commit | `08e386097f39e577349f6a4e382f424233058b17` |
+| Source tree | `deb12e7510a985942d6d697ea934f07538be5385` |
+| Working tree | Clean before and after |
+| Reactor / Boot | `4.5.0-SNAPSHOT` / `4.0.0` |
+| Toolchain | GraalVM/native-image `25.0.3`, Maven `3.9.9`, Java target `21`, GCC `13.3.0` |
+| Build limits | `-J-Xmx6g`, `--parallelism=2`, `-H:+SharedArenaSupport` |
+| Starting resources | Approximately 7.7 GiB available RAM; nearly 4 GiB free swap |
+| Native compile exit | `0` |
+| Native compile window | `2026-09-27T16:23:38.661347Z` to `2026-09-27T16:29:17.883795Z` |
+| Build report | Native-image generation 5m 24s; peak build RSS 5.41 GB |
+| Executable exit | `0` |
+| Executable window | `2026-09-27T16:29:18.013133Z` to `2026-09-27T16:29:36.781341Z` |
+| Fixture tests | 6 passed; zero failures, errors or skips |
+| Binary SHA-256 | `1312b2fc6269b14093f5acae302494274aeef0dd2543fdfdff629979450b2842` |
+
+Sealed evidence: `target/v33-native-runs/native-g0ynw95x/evidence/`.
+`summary.json` records successful compilation and execution separately. Command
+JSON, exit records, full logs, source commit/tree/clean status, effective POM,
+dependency tree, test XML, binary and `binary-sha256.txt` are retained. Every
+`SHA256SUMS` entry was checked. The resolved classpath contains 99 JARs, including
+the newly installed starter and matching Boot 4.0.0 dependencies. The fresh
+writable Maven repository was seeded by copying the existing local cache; this
+is not an independent download or published-artifact verification.
+
+The executable checked the non-primary programmatic properties bean and fresh
+replacement metadata, dispatched GET `/api/cached-order` instead of the original
+annotation target, decoded `cached-1`, served a hit without another request, and
+refreshed to `cached-2` with exactly two route dispatches. The main server's
+counted catch-all and method-specific routes retained the 20-dispatch pre-close
+assertion and exactly one additional dispatch on context replacement. Open
+circuit rejection retained its bounded quiet-period/no-dispatch assertion.
+Shutdown cancelled active work, completed queued callers, removed cache meters
+and checked no late dispatch before same-tag recreation. The separate cache-work
+server passed GET/POST capacity, refresh skip, slot reuse and independent-deadline
+witnesses; WebFlux capture/restoration passed its three-capture/two-restore/one-
+rejection witness. Expected connection-close warnings during shutdown remain in
+the log, alongside existing initialization/meter warnings; executable exit was 0.
+
+This closes Priority 7 only. Boot 4.1 remains JVM/assembled-consumer evidence,
+not a second native build. Priority 8 compatibility/cost gates and release
+selection remain pending. No performance improvement is claimed from build time.
 
 ### Non-Root Replacement
 
@@ -109,6 +157,7 @@ From the project root, using the installed GraalVM:
 
 ```bash
 python3 scripts/verify-v33-native.py \
+  --ref 08e386097f39e577349f6a4e382f424233058b17 \
   --java-home "$HOME/.sdkman/candidates/java/25.0.3-graal" \
   --seed-repository "$HOME/.m2/repository"
 ```
@@ -136,7 +185,8 @@ Earlier logs remain in `target/release-evidence/v33/priority7-native/`: the firs
 install failed against the read-only `~/.m2`; the writable-repository retry
 passed reactor install but failed a loopback fixture test (five passed, one
 error); the later clean-checkout retry failed its socket preflight. All used
-the commit above. Native-image compilation was never reached. The old runner
+`bcb2045ec858efa809602e73eb1a24ebe3567463`. Native-image compilation was never
+reached in those attempts. The old runner
 and directories were user-owned, not root-owned; `retry2-run.py` lacked the
 executable bit but was readable by `python3`. Those failures are not native
 product regressions and must not be presented as passing native evidence.
@@ -144,6 +194,9 @@ product regressions and must not be presented as passing native evidence.
 The replacement runner's first attempted run is retained at
 `target/v33-native-runs/native-06lse66k/evidence`: creating its workspace required
 no elevation, but the sandbox still denied `socket()` before compilation.
+`native-7vvd2rlh/evidence` records the same preflight failure on `08e38609`.
+The successful `native-g0ynw95x` run is separate; the later environment allowed
+loopback sockets without changing the fixture or elevating privileges.
 Five standard-library runner tests passed, covering command/log/status capture,
 failed commands, missing executables, timeout accounting and refusal of sudo.
 Run them with:
