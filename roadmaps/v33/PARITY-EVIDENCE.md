@@ -84,23 +84,72 @@ is inferred from that run. `SHA256SUMS` seals the evidence files excluding itsel
 
 ## Native Gate
 
-Native evidence pending: commit the final fixture and implementation, verify a
-clean reachable HEAD, then install that revision and compile/run with GraalVM.
-Do not reuse an older binary or mark 7.3 complete from the JVM results above.
-Record toolchain, available RAM/swap, command exits, full compile/run logs and
-binary SHA-256; preserve failures separately. Example build after that gate:
+Native evidence pending. At the user's request the first 7.3 procedure is
+retired and its checklist checks reset for a fresh run. The implementation and
+fixture are committed at `bcb2045ec858efa809602e73eb1a24ebe3567463`; no native
+pass or binary hash exists yet. Neither the JVM results nor a successful socket
+preflight closes this gate.
+
+### Non-Root Replacement
+
+Use the tracked [native runner](../../scripts/verify-v33-native.py), not the
+ignored `retry2-run.py`. Launch it with `python3`; executable permission on the
+script is not required. It explicitly refuses root execution. Do not use sudo,
+change ownership broadly, or run Maven as root to address a sandbox socket error.
+
+The runner creates a uniquely named workspace under `target/v33-native-runs/`
+with private user-owned source, repository and evidence directories. Each run
+checks out the selected commit into a clean detached clone; it neither resets
+the main worktree nor reuses a previous build or repository. The optional seed
+cache is read/copied, never modified, and file ownership/restrictive modes are
+not preserved into the new repository. It requires Python 3, Git, Maven,
+GraalVM/native-image, Linux coreutils, and permission to open loopback sockets.
+
+From the project root, using the installed GraalVM:
 
 ```bash
-test -z "$(git status --porcelain)"
-git rev-parse HEAD
-java -version
-native-image --version
-free -h
-mvn -B -ntp -s .mvn/maven-central-settings.xml -DskipTests -Dmaven.javadoc.skip=true install
-mvn -B -ntp -s .mvn/maven-central-settings.xml -f .github/native-smoke/pom.xml \
-  -Pnative '-DbuildArgs=-H:+SharedArenaSupport,-J-Xmx6g,--parallelism=2' clean native:compile
-timeout 180 .github/native-smoke/target/reactive-http-client-native-smoke
-sha256sum .github/native-smoke/target/reactive-http-client-native-smoke
+python3 scripts/verify-v33-native.py \
+  --java-home "$HOME/.sdkman/candidates/java/25.0.3-graal" \
+  --seed-repository "$HOME/.m2/repository"
+```
+
+`--ref` defaults to committed `HEAD`; working-tree changes are explicitly
+excluded and recorded. Commit any implementation/fixture corrections before
+running. `--work-root` may point to another user-writable directory. Omitting
+`--seed-repository` uses an empty repository and requires dependency downloads.
+Either mode installs the selected reactor, not Central consumption of the starter.
+
+The compile retains fixture tests and uses a 6 GiB native-image heap with two
+build threads. Successful compilation is followed by the executable under a
+180-second limit. Each command records its exit status/timestamps and logs;
+failures and timeouts remain failures. Timed-out command process groups are
+terminated. The printed evidence directory contains toolchains/resources,
+source provenance, reports, dependency tree/effective POM/classpath, and, only
+after compilation, the binary and its SHA-256. `summary.json` distinguishes
+compilation from successful execution; `SHA256SUMS` seals every evidence file
+on failure as well as success. No remaining checks can close without both a
+successful compile and executable and review of the fixture witnesses above.
+
+### Retired Failures and Verification
+
+Earlier logs remain in `target/release-evidence/v33/priority7-native/`: the first
+install failed against the read-only `~/.m2`; the writable-repository retry
+passed reactor install but failed a loopback fixture test (five passed, one
+error); the later clean-checkout retry failed its socket preflight. All used
+the commit above. Native-image compilation was never reached. The old runner
+and directories were user-owned, not root-owned; `retry2-run.py` lacked the
+executable bit but was readable by `python3`. Those failures are not native
+product regressions and must not be presented as passing native evidence.
+
+The replacement runner's first attempted run is retained at
+`target/v33-native-runs/native-06lse66k/evidence`: creating its workspace required
+no elevation, but the sandbox still denied `socket()` before compilation.
+Five standard-library runner tests passed, covering command/log/status capture,
+failed commands, missing executables, timeout accounting and refusal of sudo.
+Run them with:
+
+```bash
+python3 -B -m unittest discover -s scripts -p test_verify_v33_native.py -v
 ```
 
 See [checklist](CHECKLIST.md), [cross-path regressions](CROSS-PATH-REGRESSIONS.md)

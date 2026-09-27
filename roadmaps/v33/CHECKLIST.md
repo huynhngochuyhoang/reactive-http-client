@@ -700,8 +700,12 @@ assembled consumers 29 per Boot row; physically minimal consumers one per row;
 AOT/selection/cross-path regressions 283 per row. Both Boot 4.0.0 and 4.1.0
 smoke packages passed six fixture tests, ordinary JVM execution, AOT generation
 and AOT-enabled JVM execution. The first JVM fixture failure remains recorded.
-Priority 7 is not complete: the changed native fixture must be committed before
-the clean-source compile/executable evidence below can be collected.
+Priority 7 is not complete. The native procedure was reset to the tracked,
+non-root [native runner](../../scripts/verify-v33-native.py); it creates a fresh
+workspace and never uses the old `retry2-run.py` or its repository. The final
+fixture is committed, but this session still denies loopback socket creation.
+All 7.3 checks below remain pending for the replacement run. Retired failures and
+the new command are documented in [parity evidence](PARITY-EVIDENCE.md).
 
 ### [ ] 7.3 Compile and run native evidence
 

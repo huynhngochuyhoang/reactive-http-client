@@ -303,8 +303,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority.split(Pattern.quote("### [ ] 7.3"), 2)).hasSize(2);
         String evidence = Files.readString(root.resolve("roadmaps/v33/PARITY-EVIDENCE.md"));
         assertThat(evidence).contains("not Central", "Native evidence pending", "non-primary",
-                "4.0.0", "4.1.0", "programmatic", "SHA256SUMS", "verify-v33-parity.py");
+                "4.0.0", "4.1.0", "programmatic", "SHA256SUMS", "verify-v33-parity.py",
+                "verify-v33-native.py", "Do not use sudo", "summary.json");
         assertThat(root.resolve("scripts/verify-v33-parity.py")).exists();
+        assertThat(root.resolve("scripts/verify-v33-native.py")).exists();
         String fixture = Files.readString(root.resolve(".github/native-smoke/src/main/resources/application.properties"));
         assertThat(fixture).doesNotContain("policies.native-cache.", "customizations.starterWebClientBuilder");
     }
