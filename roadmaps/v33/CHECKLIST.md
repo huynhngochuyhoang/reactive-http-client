@@ -674,25 +674,34 @@ pending/unselected; no native, API, matrix or performance result is claimed.
 
 ## Priority 7 - Mock, Assembled-Consumer, AOT and Native Evidence
 
-### [ ] 7.1 Verify mock and assembled consumers
+### [x] 7.1 Verify mock and assembled consumers
 
-- [ ] Exercise accepted extensions through the mock/public helper where supported;
+- [x] Exercise accepted extensions through the mock/public helper where supported;
       distinguish helper behavior from Spring selection and transport evidence.
-- [ ] Run external consumers against assembled artifacts with counted method/target
+- [x] Run external consumers against assembled artifacts with counted method/target
       and decoded-result witnesses for selected corrections.
-- [ ] Keep optional-dependency absence physical: cache-disabled without Caffeine and
+- [x] Keep optional-dependency absence physical: cache-disabled without Caffeine and
       enabled-only resilience without selected operators/registry classes.
-- [ ] Preserve artifact-only classpaths, effective POMs, dependency trees and actual
+- [x] Preserve artifact-only classpaths, effective POMs, dependency trees and actual
       counts; do not relabel installed reactor results as Central consumption.
 
-### [ ] 7.2 Verify supported Boot and JVM AOT paths
+### [x] 7.2 Verify supported Boot and JVM AOT paths
 
-- [ ] Run both supported Boot rows, including genuine matching consumer parents.
+- [x] Run both supported Boot rows, including genuine matching consumer parents.
       Track overlays or exact generator commands required to reproduce them.
-- [ ] Add/run JVM AOT witnesses for the selected builder, metadata and properties
+- [x] Add/run JVM AOT witnesses for the selected builder, metadata and properties
       cases with invalid-selected and non-instantiation controls.
-- [ ] Confirm actual selected programmatic policy and applicable reflection hints;
+- [x] Confirm actual selected programmatic policy and applicable reflection hints;
       retain environment and optional-integration absence cases.
+
+Evidence: [mock, consumer and AOT parity](PARITY-EVIDENCE.md), measured on
+2026-09-27 against the installed current reactor, not Central: mock 76 cases;
+assembled consumers 29 per Boot row; physically minimal consumers one per row;
+AOT/selection/cross-path regressions 283 per row. Both Boot 4.0.0 and 4.1.0
+smoke packages passed six fixture tests, ordinary JVM execution, AOT generation
+and AOT-enabled JVM execution. The first JVM fixture failure remains recorded.
+Priority 7 is not complete: the changed native fixture must be committed before
+the clean-source compile/executable evidence below can be collected.
 
 ### [ ] 7.3 Compile and run native evidence
 

@@ -31,7 +31,7 @@ interface NativeSmokeOperations<T> {
     @CircuitBreaker("native-open")
     Mono<T> getOpenCircuit();
 
-    @GET("/api/cached-order")
+    @GET("/metadata-must-replace-this-target")
     @CacheResponse("native-cache")
     Mono<T> getCachedOrder();
 
