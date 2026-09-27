@@ -1144,6 +1144,66 @@ class AotPropertiesSelectionContractTest {
     }
 
     @ParameterizedTest
+    @CsvSource({"ORDINARY,false", "ORDINARY,true", "OPAQUE_SUPPLIER_PROXY,false", "OPAQUE_SUPPLIER_PROXY,true"})
+    void restorationPreservesEqualButDistinctProcessorReplacements(LifecycleShape shape, boolean failInitialization) {
+        try (var context = lifecycleContext(shape, new java.util.ArrayList<>(), failInitialization)) {
+            var original = new EqualProcessor();
+            var replacement = new EqualProcessor();
+            assertThat(replacement).isEqualTo(original).isNotSameAs(original);
+            context.registerBean("afterLookup", Object.class, Object::new);
+            context.addBeanFactoryPostProcessor(factory -> {
+                factory.addBeanPostProcessor(original);
+                factory.addBeanPostProcessor(new org.springframework.beans.factory.config.BeanPostProcessor() {
+                    @Override public Object postProcessBeforeInitialization(Object bean, String name) {
+                        if (bean instanceof LifecycleProperties) {
+                            factory.addBeanPostProcessor(replacement);
+                            var chain = ((DefaultListableBeanFactory) factory).getBeanPostProcessors();
+                            assertThat(chain.stream().anyMatch(processor -> processor == original)).isFalse();
+                            assertThat(chain.stream().anyMatch(processor -> processor == replacement)).isTrue();
+                        }
+                        return bean;
+                    }
+                });
+            });
+            var factory = context.getDefaultListableBeanFactory();
+            var witness = witness(factory, Client.class);
+            context.refreshForAotProcessing(new RuntimeHints());
+            var expected = new java.util.ArrayList<>(factory.getBeanPostProcessors());
+            assertThat(expected.removeIf(processor -> processor == original)).isTrue();
+            expected.add(replacement);
+            var processor = new ReactiveHttpClientBeanFactoryInitializationAotProcessor(context.getEnvironment());
+
+            if (failInitialization) {
+                assertThatThrownBy(() -> processor.processAheadOfTime(factory))
+                        .hasStackTraceContaining("initialization rejected");
+                assertThat(witness.config).isNull();
+            } else {
+                assertThat(processor.processAheadOfTime(factory)).isNotNull();
+            }
+
+            factory.getBean("afterLookup");
+            assertThat(replacement.followingCalls).hasValue(1);
+            assertThat(original.followingCalls).hasValue(0);
+            var actual = factory.getBeanPostProcessors();
+            assertThat(actual).hasSameSizeAs(expected);
+            for (int i = 0; i < expected.size(); i++) {
+                assertThat(actual.get(i)).as("processor at index %s", i).isSameAs(expected.get(i));
+            }
+            witness.assertNoBusinessResources(factory);
+        }
+    }
+
+    static class EqualProcessor implements org.springframework.beans.factory.config.BeanPostProcessor {
+        final AtomicInteger followingCalls = new AtomicInteger();
+        @Override public Object postProcessBeforeInitialization(Object bean, String name) {
+            if (name.equals("afterLookup")) followingCalls.incrementAndGet();
+            return bean;
+        }
+        @Override public boolean equals(Object other) { return other instanceof EqualProcessor; }
+        @Override public int hashCode() { return 1; }
+    }
+
+    @ParameterizedTest
     @CsvSource({"ORDINARY,true,false", "ORDINARY,false,false", "OPAQUE_SUPPLIER_PROXY,true,false", "OPAQUE_SUPPLIER_PROXY,false,false",
             "ORDINARY,true,true", "ORDINARY,false,true", "OPAQUE_SUPPLIER_PROXY,true,true", "OPAQUE_SUPPLIER_PROXY,false,true"})
     void equalPriorityProcessorsRetainDefinitionRegistrationOrder(LifecycleShape shape, boolean registeredFirst, boolean aliased) {

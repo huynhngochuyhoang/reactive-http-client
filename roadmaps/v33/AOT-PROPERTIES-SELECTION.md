@@ -743,6 +743,30 @@ reordering, replay callbacks already run before binding, or activate unavailable
 scopes. The earlier ordering/discovery and non-eager lookup qualifications remain.
 Consumer/API/matrix/native evidence is not replaced by these JVM tests.
 
+## Processor Replacement Identity
+
+The 2026-09-27 correction on reachable source base `02181932` plus the reviewed
+patch uses identity-backed membership for both surviving original processors and
+new registrations during restoration. Replacing a processor with a distinct but
+equal instance therefore retains the replacement, without resurrecting its removed
+predecessor. Surviving originals keep their prior relative order; additions keep
+their current relative order after them. This applies on successful lookup and
+initialization failure, without changing Spring's registration behavior itself.
+
+Four new cases cover ordinary and opaque-scoped properties, success and failed
+initialization. Each verifies the original was actually replaced during creation,
+checks every restored chain position by identity, and creates a subsequent bean
+that must be processed by the replacement only. All four cases fail before the fix.
+The ten-class focused rerun passes **467 cases**, including **227 selection cases**,
+zero failures/errors/skips, with explicit GC disabled. Evidence is under
+`target/release-evidence/v33/priority5-processor-identity/`; earlier bundles and
+their recorded totals remain unchanged. The full starter suite passes **2,066
+cases**, including **73 documentation cases**, zero failures/errors/skips, with
+explicit GC disabled. The final documentation rerun is recorded separately;
+focused/full/documentation counts overlap. The XML-derived audit, reviewed patch
+and `SHA256SUMS` retain the final evidence. Consumer/API/matrix/native and release
+gates remain pending; this does not certify arbitrary processor-chain mutation.
+
 ## Rollback and Remaining Gates
 
 Rollback this selection/binding correction and its internal lifecycle observer with its desired-behavior

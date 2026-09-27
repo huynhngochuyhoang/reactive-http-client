@@ -383,10 +383,13 @@ public class ReactiveHttpClientBeanFactoryInitializationAotProcessor implements 
             if (delegateInstalled) return;
             var processors = factory.getBeanPostProcessors();
             processors.remove(this);
-            // Restore surviving originals only; removals and new registrations belong to the owner.
-            var surviving = originalProcessors.stream().filter(processors::contains).toList();
-            var additions = new ArrayList<>(processors);
-            additions.removeAll(originalProcessors);
+            // Equal replacements are still distinct registrations owned by the factory.
+            Set<BeanPostProcessor> currentIdentities = Collections.newSetFromMap(new IdentityHashMap<>());
+            currentIdentities.addAll(processors);
+            Set<BeanPostProcessor> originalIdentities = Collections.newSetFromMap(new IdentityHashMap<>());
+            originalIdentities.addAll(originalProcessors);
+            var surviving = originalProcessors.stream().filter(currentIdentities::contains).toList();
+            var additions = processors.stream().filter(processor -> !originalIdentities.contains(processor)).toList();
             processors.clear();
             processors.addAll(surviving);
             processors.addAll(additions);

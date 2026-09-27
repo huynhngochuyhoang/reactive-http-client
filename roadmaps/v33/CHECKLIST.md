@@ -563,6 +563,21 @@ XML-derived audit and `SHA256SUMS` retain the final patch, including new source
 files; focused/full/documentation counts overlap. No later checklist priority or
 release gate is closed by this correction.
 
+Processor replacement identity correction, 2026-09-27: restoration now uses
+identity membership for surviving originals and additions, retaining an equal-but-
+distinct replacement instead of resurrecting the removed processor. Four new
+ordinary/opaque-scoped success/failure cases fail before the fix and verify both
+chain identity/order and which processor handles a subsequent bean. The ten-class
+focused rerun passes **467 cases**, including **227 selection cases**, zero
+failures/errors/skips, explicit GC disabled. Evidence under
+`target/release-evidence/v33/priority5-processor-identity/` preserves the pre-fix
+run, source patch and actual XML totals; earlier evidence and release gates remain
+unchanged. The full starter suite passes **2,066 cases**, including **73
+documentation cases**, zero failures/errors/skips, explicit GC disabled. These
+counts overlap with the focused and final documentation reruns; the bundle's
+XML-derived audit and `SHA256SUMS` preserve final evidence. See the companion
+record for scope and verification details.
+
 ## Priority 6 - Cross-Path Contract and Ownership Regressions
 
 ### [ ] 6.1 Compare effective decisions across entry points
