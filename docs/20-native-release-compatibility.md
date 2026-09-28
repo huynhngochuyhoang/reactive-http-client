@@ -185,7 +185,11 @@ with [F001/F002/F003 approved for correction](../roadmaps/v33/FIX-DECISION.md);
 [F001](../roadmaps/v33/BUILDER-OWNERSHIP.md),
 [F002](../roadmaps/v33/STATIC-METADATA.md) and
 [F003](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) are implemented,
-and next release scope remains unselected.
+with [shared compatibility/cost verification](../roadmaps/v33/COMPATIBILITY-COST.md)
+and [mock/consumer/AOT/native evidence](../roadmaps/v33/PARITY-EVIDENCE.md).
+The [V33 migration and operations guide](../roadmaps/v33/MAINTAINER-GUIDANCE.md)
+consolidates current limits and a [checked public example](examples/v33-extensions.md).
+Next release scope remains unselected.
 V1-V32 are completed release records.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records the release tag, successful signing/staging/packaging/deployment workflow,
@@ -342,9 +346,12 @@ types. This does not suppress Spring's earlier AOT refresh, dependency resolutio
 inside selected bean creation, or Boot's binding-advisor discovery; those framework
 paths can still initialize raw FactoryBeans. Expose predictable product types and
 avoid allocating business resources in configuration/factory construction.
-This is not an eager diagnostics path or
-a universal replacement/native guarantee; final native and supported-Boot
-evidence remains pending. No application-side reflective workaround is required.
+This is not an eager diagnostics path or a universal replacement/native guarantee.
+The [V33 parity record](../roadmaps/v33/PARITY-EVIDENCE.md) identifies the verified
+Boot rows, clean-source native binary, counted witnesses and retained failures;
+the [compatibility record](../roadmaps/v33/COMPATIBILITY-COST.md) bounds its reuse.
+Any selected final candidate still needs the Priority 10 evidence review.
+No application-side reflective workaround is required.
 
 ### V31 additive surface freeze
 

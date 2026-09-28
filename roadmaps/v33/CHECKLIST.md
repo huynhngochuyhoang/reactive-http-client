@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.1`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; release decision pending
 > **Release scope:** unselected
 > **Adopted:** 2026-09-19
 
@@ -15,7 +15,9 @@ release records. V32-F004/F005 are delivered safeguards, not new feature work.
 Priority 2.3 approval is recorded in [FIX-DECISION.md](FIX-DECISION.md).
 All three corrections are selected for Priorities 3-5; none is implemented by
 the reproduction/decision work. Priority 3 records the F001 correction and its
-verification separately. Release scope remains unselected.
+verification separately. Priorities 6-8 now record shared verification;
+[Priority 9 guidance](MAINTAINER-GUIDANCE.md) consolidates the delivered limits.
+Release scope remains unselected.
 
 Execute priorities in order. Record any dependency-based reordering explicitly.
 Production edits require the maintainer decision in **Priority 2.3** first.
@@ -724,63 +726,104 @@ after the successful run. Priority 8 and release selection remain pending.
 
 ## Priority 8 - Compatibility and Targeted Cost Evidence
 
-### [ ] 8.1 Freeze the supported surface
+### [x] 8.1 Freeze the supported surface
 
-- [ ] Inventory public APIs/constructors/accessors, metadata/configuration semantics,
+- [x] Inventory public APIs/constructors/accessors, metadata/configuration semantics,
       optional dependencies and module packaging affected by the accepted diff.
-- [ ] Review removed redundant configuration, earlier metadata errors and corrected
+- [x] Review removed redundant configuration, earlier metadata errors and corrected
       AOT preference separately from source/binary compatibility.
-- [ ] Preserve valid workarounds and defaults; stop for a newly required public
+- [x] Preserve valid workarounds and defaults; stop for a newly required public
       break, new SPI, dependency upgrade or broader behavior change.
 
-### [ ] 8.2 Run compatibility and regression lanes
+### [x] 8.2 Run compatibility and regression lanes
 
-- [ ] Run strict root and independent starter source/binary API checks against
+- [x] Run strict root and independent starter source/binary API checks against
       published `4.4.1` with isolated repositories and artifact provenance.
-- [ ] Run focused affected suites and full module regressions; preserve optional
+- [x] Run focused affected suites and full module regressions; preserve optional
       integration, binary/source/Javadoc and generation-packaging checks.
-- [ ] Record exact final-source results and failures; reuse Priority 7 evidence only
+- [x] Record exact final-source results and failures; reuse Priority 7 evidence only
       when its revision and scope still match. Missing gates remain visible.
 
-### [ ] 8.3 Assess targeted cost without inventing claims
+### [x] 8.3 Assess targeted cost without inventing claims
 
-- [ ] Inspect the actual diff for construction-only, AOT-only, planning and hot-path
+- [x] Inspect the actual diff for construction-only, AOT-only, planning and hot-path
       changes; record the measurement decision before running benchmarks.
-- [ ] If static planning/invocation allocation changes, set regression criteria and
+- [x] If static planning/invocation allocation changes, set regression criteria and
       measure identical cold-plan and warm-call workloads against `4.4.1`.
-- [ ] Include correctness witnesses, fork/warmup/allocation configuration, variance,
+- [x] Include correctness witnesses, fork/warmup/allocation configuration, variance,
       source/toolchain/report hashes and comparable baseline rows.
-- [ ] Record a justified no-benchmark disposition when applicable; do not imply a
+- [x] Record a justified no-benchmark disposition when applicable; do not imply a
       speed, RSS, cache-throughput or native-startup gain from source inspection.
+
+Implemented 2026-09-28: [compatibility and targeted cost evidence](COMPATIBILITY-COST.md)
+on reachable source `9f5d1e107e19efd63df0ed866dc01192790eca82` plus the reviewed
+benchmark/documentation patch. No production API, dependency, default or operator
+change was needed. Strict root and independent starter source/binary comparisons
+against Central `4.4.1` pass with isolated repositories/provenance; additive,
+binary/source-breaking and baseline-provenance guard fixtures pass. The focused
+23-class run passes **646 cases**, explicit GC disabled. The final full reactor
+passes **2,099 starter** (including **76 documentation**), **80 helper** and **62
+OTel** cases, zero failures/errors/skips. Generation-packaging and the separate
+**16-case** controlled reachability lane pass. Counts overlap.
+
+The same four cold-plan/warm-call JMH rows ran against published `4.4.1` and the
+assembled candidate with two forks, five warmup/measurement iterations and the GC
+profiler. Both benchmark test suites pass **35 cases**. The first cold-plan timing
+flag was retained and assessed with a second matched pair using the same JARs in
+reverse order: **+4.64%** on confirmation, with overlapping intervals and unchanged
+allocation. No repeatable review-threshold breach or performance gain is claimed.
+The evidence retains the fixture compilation failure, raw samples, commands,
+source/dependency/artifact hashes and `SHA256SUMS`. Priority 7 reuse is limited to
+unchanged inputs, not a new native run. Guidance and release selection remain open.
 
 ## Priority 9 - Maintainer, Migration and Operations Guidance
 
-### [ ] 9.1 Document delivered extension behavior
+### [x] 9.1 Document delivered extension behavior
 
-- [ ] Update customizer, replacement-bean, cache and native guidance only for
+- [x] Update customizer, replacement-bean, cache and native guidance only for
       accepted corrections, with release-scoped availability.
-- [ ] Provide public-API examples with complete dependency, customization-safety
+- [x] Provide public-API examples with complete dependency, customization-safety
       and configuration prerequisites.
-- [ ] Keep published `4.4.1` workarounds distinct from current-source behavior;
+- [x] Keep published `4.4.1` workarounds distinct from current-source behavior;
       do not prescribe blanket SAFE or reflection into internal metadata.
 
-### [ ] 9.2 Preserve operational boundaries
+### [x] 9.2 Preserve operational boundaries
 
-- [ ] Explain runtime/AOT creation permissions, diagnostic unknowns, application
+- [x] Explain runtime/AOT creation permissions, diagnostic unknowns, application
       ownership and factory recreation instead of unsupported live mutation.
-- [ ] Document classification, incomplete-metadata, ambiguity and invalid-selected
+- [x] Document classification, incomplete-metadata, ambiguity and invalid-selected
       failures using bounded structural evidence without sensitive request data.
-- [ ] Identify deferred IDs, workaround, owner and trigger; link new results to V32
+- [x] Identify deferred IDs, workaround, owner and trigger; link new results to V32
       findings without rewriting their historical outcomes.
 
-### [ ] 9.3 Validate guidance and result records
+### [x] 9.3 Validate guidance and result records
 
-- [ ] Reconcile versioned examples, roadmap/checklist/index and readiness status
+- [x] Reconcile versioned examples, roadmap/checklist/index and readiness status
       with actual implementation and release state.
-- [ ] Run documentation/link/fixture tests and applicable example validation; record
+- [x] Run documentation/link/fixture tests and applicable example validation; record
       actual counts and failures rather than copying earlier totals.
-- [ ] Record delivered scope, compatibility/migration notes and limitations in V33;
+- [x] Record delivered scope, compatibility/migration notes and limitations in V33;
       leave unrelated operational and dashboard contracts unchanged.
+
+Implemented 2026-09-28: [maintainer, migration and operations record](MAINTAINER-GUIDANCE.md)
+on reachable base `dca0dda985f3322efc53e4f6e7a57f037813f9c1` plus the reviewed
+documentation/test patch. Canonical customizer, replacement, cache, native and
+operations guidance now separates published `4.4.1` workarounds from current
+F001/F002/F003 behavior. The complete public example includes explicit Caffeine,
+policy/variants and narrow customization safety; its actual Java block is compiled
+and exercised. Ownership, non-instantiating diagnostics, AOT limits, deferred
+expansions and bounded failure evidence remain explicit. V1-V32 history is unchanged.
+
+The final focused run passes **433 cases across seven classes**, including **77
+documentation**, **four compiled-example**, **36 context-documentation** and
+**35 properties** cases; all have zero failures/errors/skips and explicit GC
+disabled. The record gives the other three suites and exact command. The initial
+81-case run's two example-header failures remain in the evidence; the corrected
+and final 433-case runs overlap, not additional independent coverage.
+`target/release-evidence/v33/priority9/` retains logs/XML, commands, source/patch,
+generated readiness and hashes. `git diff --check` passes. Production, dependency,
+native/consumer fixtures and coordinates are unchanged; no new native/API/JMH
+run or release approval is claimed. Priority 10 remains open and V33 active.
 
 ## Priority 10 - Scope Decision and Conditional Release Go/No-Go
 

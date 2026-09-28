@@ -4,7 +4,7 @@
 > **Theme:** supported extension and AOT selection parity
 > **Published baseline:** `4.4.1`
 > **Development reactor:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; release decision pending
 > **Release scope:** unselected
 > **Draft date:** 2026-09-19
 > **Adopted:** 2026-09-19
@@ -25,7 +25,11 @@ the bounded acceptance and verification requirements in [FIX-DECISION.md](FIX-DE
 Priority 2 completes reproduction and selection, not implementation or release
 approval. [Priority 3](BUILDER-OWNERSHIP.md) implements F001 and
 [Priority 4](STATIC-METADATA.md) implements F002 and
-[Priority 5](AOT-PROPERTIES-SELECTION.md) implements F003. Shared verification remains pending.
+[Priority 5](AOT-PROPERTIES-SELECTION.md) implements F003.
+[Parity](PARITY-EVIDENCE.md) and [compatibility/cost](COMPATIBILITY-COST.md)
+verification cover the recorded source. [Current maintainer guidance](MAINTAINER-GUIDANCE.md)
+separates delivered behavior, published workarounds and limits. Priority 10 still
+owns release selection and final evidence reconciliation.
 
 ## Intent
 

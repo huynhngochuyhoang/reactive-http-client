@@ -133,6 +133,13 @@ That gap remains in published `4.4.1`; [V33 Priority 3](../roadmaps/v33/BUILDER-
 corrects the ownership lookup in `4.5.0-SNAPSHOT` without exempting application
 customizers from classification.
 
+For current-source migration, use the [V33 extension guide](../roadmaps/v33/MAINTAINER-GUIDANCE.md)
+and its [checked example](examples/v33-extensions.md). It includes the optional
+Caffeine dependency, policy/variant prerequisites and a deliberately narrow SAFE
+declaration. F001 removes only a proven starter-builder entry, not the requirement
+to inventory Boot customizers, matching per-client customizers and replacement
+builders. No V33 correction is published in `4.4.1`.
+
 ---
 
 ## Applying a customizer to all clients

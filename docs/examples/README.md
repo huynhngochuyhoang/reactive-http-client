@@ -4,6 +4,14 @@ These examples are documentation snippets, not a compiled sample module. They ar
 kept small so each block can be copied into an application and adapted to local
 package names, credentials, and upstream URLs.
 
+## V33 Extensions (Development Only)
+
+See the [checked public replacement example](v33-extensions.md) for fresh static
+metadata, programmatic properties and explicit cache customization safety in
+`4.5.0-SNAPSHOT`. Its Java block is compiled and exercised by the documentation
+test lane. Published `4.4.1` still needs the linked workarounds; no next release
+version is selected by this example.
+
 ## Effective Configuration
 
 See [Effective Configuration Examples](effective-configuration.md) for metadata-validated starter configuration snippets covering inherited clients, auth, proxy/TLS, redirects, strict retry, strict body signing, and diagnostics.

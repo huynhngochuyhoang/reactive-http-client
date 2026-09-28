@@ -890,6 +890,14 @@ context or bean factory. The starter-owned builder no longer needs that redundan
 entry; existing explicit SAFE entries remain accepted. Inherited ownership does
 not exempt child replacements, unknown factories, or application customizers.
 
+The [V33 public replacement example](examples/v33-extensions.md) combines this
+ownership correction with fresh metadata and programmatic properties. It is
+development-only and includes the Caffeine, TTL/capacity and variant prerequisites;
+it does not change cache eligibility, key isolation or per-caller authorization.
+Keep policies and metadata stable after client creation. Use factory recreation,
+not live setter mutation, to apply changes; see the
+[ownership limits](../roadmaps/v33/MAINTAINER-GUIDANCE.md#creation-and-ownership-boundaries).
+
 The cache runtime must execute mandatory authorization, tenant, and policy
 checks at a cache-aware pre-lookup boundary for both hits and misses. Until a
 customization is represented by that gate or by the key/variant contract, mark

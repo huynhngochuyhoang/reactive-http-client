@@ -175,7 +175,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
         assertThat(checklist)
-                .contains("> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending",
+                .contains("> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; release decision pending",
                         "> **Release scope:** unselected", "V32-F001", "V32-F002", "V32-F003",
                         "target/release-evidence/v33/priority<N>/")
                 .containsPattern("(?m)^### \\[[ x]\\] 2\\.3 Record the maintainer scope decision$")
@@ -191,11 +191,8 @@ class DocumentationReleaseArtifactTest {
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         String priority = checklist.split("## Priority 3 - ", 2)[1].split("## Priority 4 - ", 2)[0];
         assertThat(priority).contains("(BUILDER-OWNERSHIP.md)").doesNotContain("[ ]");
-        for (int pending : List.of(8)) {
-            assertThat(checklist.split("## Priority " + pending + " - ", 2)[1]
-                    .split("## Priority " + (pending + 1) + " - ", 2)[0])
-                    .contains("[ ]").doesNotContain("[x]");
-        }
+        assertThat(checklist.split("## Priority 10 - ", 2)[1])
+                .contains("[ ]").doesNotContain("[x]");
         String evidence = Files.readString(directory.resolve("BUILDER-OWNERSHIP.md"));
         assertThat(evidence).contains("V32-F001 implemented; F002/F003 pending",
                 "No public API", "## Rollback and Remaining Gates", "pre-fix",
@@ -225,7 +222,7 @@ class DocumentationReleaseArtifactTest {
                 "Existing supplied derived value", "API-ref metadata", "not a logical-call",
                 "argument-only", "Legacy handlers", "No public constructor", "Priority 8",
                 "not a native binary", "SHA256SUMS", "> **Release scope:** unselected");
-        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+        assertThat(checklist.split("## Priority 10 - ", 2)[1])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("limits remain in published `4.4.1`", "(../roadmaps/v33/STATIC-METADATA.md)",
@@ -254,7 +251,7 @@ class DocumentationReleaseArtifactTest {
                 "PropertiesBindingLifecycle", "weak references", "Low-level contexts",
                 "opaque parent", "Boot binding", "No public API", "not a native binary",
                 "## Rollback and Remaining Gates", "SHA256SUMS", "> **Release scope:** unselected");
-        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+        assertThat(checklist.split("## Priority 10 - ", 2)[1])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("In published `4.4.1`, AOT properties selection can still differ",
@@ -290,7 +287,7 @@ class DocumentationReleaseArtifactTest {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
         }
-        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+        assertThat(checklist.split("## Priority 10 - ", 2)[1])
                 .contains("[ ]").doesNotContain("[x]");
     }
 
@@ -310,7 +307,7 @@ class DocumentationReleaseArtifactTest {
                 .containsPattern("\\| Source commit \\| `[0-9a-f]{40}` \\|")
                 .containsPattern("\\| Source tree \\| `[0-9a-f]{40}` \\|")
                 .containsPattern("\\| Binary SHA-256 \\| `[0-9a-f]{64}` \\|");
-        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+        assertThat(checklist.split("## Priority 10 - ", 2)[1])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(root.resolve("scripts/verify-v33-parity.py")).exists();
         assertThat(root.resolve("scripts/verify-v33-native.py")).exists();
@@ -319,10 +316,70 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v33CompatibilityCostEvidenceKeepsVerificationSeparateFromReleaseApproval() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v33");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0];
+        assertThat(priority).contains("### [x] 8.1", "### [x] 8.2", "### [x] 8.3",
+                "(COMPATIBILITY-COST.md)").doesNotContain("[ ]");
+        String evidence = Files.readString(directory.resolve("COMPATIBILITY-COST.md"));
+        assertThat(evidence).contains("Priority 8 complete", "> **Release scope:** unselected",
+                "## Pre-Measurement Decision", "## Surface Inventory", "## Verification",
+                "## Cost Results", "## Reproduction", "## Provenance and Limits",
+                "4.4.1", "strict root", "independent starter", "source/binary",
+                "-XX:+DisableExplicitGC", "generation-packaging", "V33PlanningCostBenchmark",
+                "two forks", "GC profiler", "99.9%", "32 B/op", "20%", "SHA256SUMS",
+                "not a new native run", "not TCP throughput", "No release decision");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(evidence);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+        assertThat(checklist.split("## Priority 10 - ", 2)[1])
+                .contains("[ ]").doesNotContain("[x]");
+        assertThat(checklist).contains("> **Release scope:** unselected", "### [ ] 10.1", "### [ ] 10.4");
+    }
+
+    @Test
+    void v33GuidanceSeparatesDeliveredBehaviorFromPublishedWorkaroundsAndRelease() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v33");
+        String guide = Files.readString(directory.resolve("MAINTAINER-GUIDANCE.md"));
+        assertThat(guide).contains("4.4.1", "4.5.0-SNAPSHOT", "V32-F001", "V32-F002", "V32-F003",
+                "## Migration by Finding", "## Creation and Ownership Boundaries",
+                "## Bounded Operational Triage", "## Deferred Scope and Reopening Triggers",
+                "No V33 accepted ID was silently deferred", "non-instantiating",
+                "unknown/null", "No speed, memory or startup",
+                "plannedFinalVersion=null", "> **Release scope:** unselected");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0])
+                .contains("(MAINTAINER-GUIDANCE.md)").doesNotContain("[ ]");
+        assertThat(checklist.split("## Priority 10 - ", 2)[1]).contains("[ ]").doesNotContain("[x]");
+        for (String name : List.of("15-customizer.md", "18-conflict-cardinality-guardrails.md", "20-native-release-compatibility.md",
+                "30-operations-troubleshooting.md", "32-response-caching.md")) {
+            assertThat(Files.readString(root.resolve("docs/" + name))).as(name)
+                    .contains("../roadmaps/v33/MAINTAINER-GUIDANCE.md", "4.4.1", "4.5.0-SNAPSHOT");
+        }
+        assertThat(Files.readString(root.resolve("docs/examples/v33-extensions.md")))
+                .contains("com.github.ben-manes.caffeine", "Idempotency-Key",
+                        "Never copy a blanket SAFE", "not published `4.4.1`", "V33GuidanceExampleTest")
+                .doesNotContain("setStaticEffectiveApi", "setAccessible");
+        Matcher links = MARKDOWN_LINK.matcher(guide);
+        while (links.find()) {
+            String target = links.group(1).split("#", 2)[0];
+            if (!target.isEmpty() && !target.contains(":")) {
+                assertThat(directory.resolve(target).normalize()).as("V33 guidance link %s", target).exists();
+            }
+        }
+        assertThat(Files.readString(root.resolve("roadmaps/README.md")))
+                .contains("(v33/MAINTAINER-GUIDANCE.md)", "Priority 10 remains open");
+    }
+
+    @Test
     void v33FixDecisionSeparatesApprovalImplementationAndRelease() throws IOException {
         Path root = projectRoot();
         Path directory = root.resolve("roadmaps/v33");
-        String scope = "> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending";
+        String scope = "> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; release decision pending";
         for (String name : List.of("ROADMAP.md", "CHECKLIST.md", "FIX-DECISION.md")) {
             String document = Files.readString(directory.resolve(name));
             assertThat(document.lines().filter(line -> line.startsWith("> **Implementation scope:**")).toList())
