@@ -724,34 +724,55 @@ after the successful run. Priority 8 and release selection remain pending.
 
 ## Priority 8 - Compatibility and Targeted Cost Evidence
 
-### [ ] 8.1 Freeze the supported surface
+### [x] 8.1 Freeze the supported surface
 
-- [ ] Inventory public APIs/constructors/accessors, metadata/configuration semantics,
+- [x] Inventory public APIs/constructors/accessors, metadata/configuration semantics,
       optional dependencies and module packaging affected by the accepted diff.
-- [ ] Review removed redundant configuration, earlier metadata errors and corrected
+- [x] Review removed redundant configuration, earlier metadata errors and corrected
       AOT preference separately from source/binary compatibility.
-- [ ] Preserve valid workarounds and defaults; stop for a newly required public
+- [x] Preserve valid workarounds and defaults; stop for a newly required public
       break, new SPI, dependency upgrade or broader behavior change.
 
-### [ ] 8.2 Run compatibility and regression lanes
+### [x] 8.2 Run compatibility and regression lanes
 
-- [ ] Run strict root and independent starter source/binary API checks against
+- [x] Run strict root and independent starter source/binary API checks against
       published `4.4.1` with isolated repositories and artifact provenance.
-- [ ] Run focused affected suites and full module regressions; preserve optional
+- [x] Run focused affected suites and full module regressions; preserve optional
       integration, binary/source/Javadoc and generation-packaging checks.
-- [ ] Record exact final-source results and failures; reuse Priority 7 evidence only
+- [x] Record exact final-source results and failures; reuse Priority 7 evidence only
       when its revision and scope still match. Missing gates remain visible.
 
-### [ ] 8.3 Assess targeted cost without inventing claims
+### [x] 8.3 Assess targeted cost without inventing claims
 
-- [ ] Inspect the actual diff for construction-only, AOT-only, planning and hot-path
+- [x] Inspect the actual diff for construction-only, AOT-only, planning and hot-path
       changes; record the measurement decision before running benchmarks.
-- [ ] If static planning/invocation allocation changes, set regression criteria and
+- [x] If static planning/invocation allocation changes, set regression criteria and
       measure identical cold-plan and warm-call workloads against `4.4.1`.
-- [ ] Include correctness witnesses, fork/warmup/allocation configuration, variance,
+- [x] Include correctness witnesses, fork/warmup/allocation configuration, variance,
       source/toolchain/report hashes and comparable baseline rows.
-- [ ] Record a justified no-benchmark disposition when applicable; do not imply a
+- [x] Record a justified no-benchmark disposition when applicable; do not imply a
       speed, RSS, cache-throughput or native-startup gain from source inspection.
+
+Implemented 2026-09-28: [compatibility and targeted cost evidence](COMPATIBILITY-COST.md)
+on reachable source `9f5d1e107e19efd63df0ed866dc01192790eca82` plus the reviewed
+benchmark/documentation patch. No production API, dependency, default or operator
+change was needed. Strict root and independent starter source/binary comparisons
+against Central `4.4.1` pass with isolated repositories/provenance; additive,
+binary/source-breaking and baseline-provenance guard fixtures pass. The focused
+23-class run passes **646 cases**, explicit GC disabled. The final full reactor
+passes **2,099 starter** (including **76 documentation**), **80 helper** and **62
+OTel** cases, zero failures/errors/skips. Generation-packaging and the separate
+**16-case** controlled reachability lane pass. Counts overlap.
+
+The same four cold-plan/warm-call JMH rows ran against published `4.4.1` and the
+assembled candidate with two forks, five warmup/measurement iterations and the GC
+profiler. Both benchmark test suites pass **35 cases**. The first cold-plan timing
+flag was retained and assessed with a second matched pair using the same JARs in
+reverse order: **+4.64%** on confirmation, with overlapping intervals and unchanged
+allocation. No repeatable review-threshold breach or performance gain is claimed.
+The evidence retains the fixture compilation failure, raw samples, commands,
+source/dependency/artifact hashes and `SHA256SUMS`. Priority 7 reuse is limited to
+unchanged inputs, not a new native run. Guidance and release selection remain open.
 
 ## Priority 9 - Maintainer, Migration and Operations Guidance
 

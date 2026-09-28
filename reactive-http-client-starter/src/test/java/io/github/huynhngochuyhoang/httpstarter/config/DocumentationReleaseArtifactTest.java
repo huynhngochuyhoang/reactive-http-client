@@ -191,7 +191,7 @@ class DocumentationReleaseArtifactTest {
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         String priority = checklist.split("## Priority 3 - ", 2)[1].split("## Priority 4 - ", 2)[0];
         assertThat(priority).contains("(BUILDER-OWNERSHIP.md)").doesNotContain("[ ]");
-        for (int pending : List.of(8)) {
+        for (int pending : List.of(9)) {
             assertThat(checklist.split("## Priority " + pending + " - ", 2)[1]
                     .split("## Priority " + (pending + 1) + " - ", 2)[0])
                     .contains("[ ]").doesNotContain("[x]");
@@ -225,7 +225,7 @@ class DocumentationReleaseArtifactTest {
                 "Existing supplied derived value", "API-ref metadata", "not a logical-call",
                 "argument-only", "Legacy handlers", "No public constructor", "Priority 8",
                 "not a native binary", "SHA256SUMS", "> **Release scope:** unselected");
-        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+        assertThat(checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("limits remain in published `4.4.1`", "(../roadmaps/v33/STATIC-METADATA.md)",
@@ -254,7 +254,7 @@ class DocumentationReleaseArtifactTest {
                 "PropertiesBindingLifecycle", "weak references", "Low-level contexts",
                 "opaque parent", "Boot binding", "No public API", "not a native binary",
                 "## Rollback and Remaining Gates", "SHA256SUMS", "> **Release scope:** unselected");
-        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+        assertThat(checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("In published `4.4.1`, AOT properties selection can still differ",
@@ -290,7 +290,7 @@ class DocumentationReleaseArtifactTest {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
         }
-        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+        assertThat(checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0])
                 .contains("[ ]").doesNotContain("[x]");
     }
 
@@ -310,12 +310,37 @@ class DocumentationReleaseArtifactTest {
                 .containsPattern("\\| Source commit \\| `[0-9a-f]{40}` \\|")
                 .containsPattern("\\| Source tree \\| `[0-9a-f]{40}` \\|")
                 .containsPattern("\\| Binary SHA-256 \\| `[0-9a-f]{64}` \\|");
-        assertThat(checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0])
+        assertThat(checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0])
                 .contains("[ ]").doesNotContain("[x]");
         assertThat(root.resolve("scripts/verify-v33-parity.py")).exists();
         assertThat(root.resolve("scripts/verify-v33-native.py")).exists();
         String fixture = Files.readString(root.resolve(".github/native-smoke/src/main/resources/application.properties"));
         assertThat(fixture).doesNotContain("policies.native-cache.", "customizations.starterWebClientBuilder");
+    }
+
+    @Test
+    void v33CompatibilityCostEvidenceKeepsVerificationSeparateFromReleaseApproval() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v33");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0];
+        assertThat(priority).contains("### [x] 8.1", "### [x] 8.2", "### [x] 8.3",
+                "(COMPATIBILITY-COST.md)").doesNotContain("[ ]");
+        String evidence = Files.readString(directory.resolve("COMPATIBILITY-COST.md"));
+        assertThat(evidence).contains("Priority 8 complete", "> **Release scope:** unselected",
+                "## Pre-Measurement Decision", "## Surface Inventory", "## Verification",
+                "## Cost Results", "## Reproduction", "## Provenance and Limits",
+                "4.4.1", "strict root", "independent starter", "source/binary",
+                "-XX:+DisableExplicitGC", "generation-packaging", "V33PlanningCostBenchmark",
+                "two forks", "GC profiler", "99.9%", "32 B/op", "20%", "SHA256SUMS",
+                "not a new native run", "not TCP throughput", "No release decision");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(evidence);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+        assertThat(checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0])
+                .contains("[ ]").doesNotContain("[x]");
+        assertThat(checklist).contains("> **Release scope:** unselected", "### [ ] 10.1", "### [ ] 10.4");
     }
 
     @Test
