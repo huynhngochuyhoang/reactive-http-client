@@ -3,7 +3,7 @@
 > **Status:** active
 > **Published baseline:** `4.4.1`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 approved and implemented; shared verification pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; release decision pending
 > **Release scope:** unselected
 > **Adopted:** 2026-09-19
 
@@ -15,7 +15,9 @@ release records. V32-F004/F005 are delivered safeguards, not new feature work.
 Priority 2.3 approval is recorded in [FIX-DECISION.md](FIX-DECISION.md).
 All three corrections are selected for Priorities 3-5; none is implemented by
 the reproduction/decision work. Priority 3 records the F001 correction and its
-verification separately. Release scope remains unselected.
+verification separately. Priorities 6-8 now record shared verification;
+[Priority 9 guidance](MAINTAINER-GUIDANCE.md) consolidates the delivered limits.
+Release scope remains unselected.
 
 Execute priorities in order. Record any dependency-based reordering explicitly.
 Production edits require the maintainer decision in **Priority 2.3** first.
@@ -776,32 +778,52 @@ unchanged inputs, not a new native run. Guidance and release selection remain op
 
 ## Priority 9 - Maintainer, Migration and Operations Guidance
 
-### [ ] 9.1 Document delivered extension behavior
+### [x] 9.1 Document delivered extension behavior
 
-- [ ] Update customizer, replacement-bean, cache and native guidance only for
+- [x] Update customizer, replacement-bean, cache and native guidance only for
       accepted corrections, with release-scoped availability.
-- [ ] Provide public-API examples with complete dependency, customization-safety
+- [x] Provide public-API examples with complete dependency, customization-safety
       and configuration prerequisites.
-- [ ] Keep published `4.4.1` workarounds distinct from current-source behavior;
+- [x] Keep published `4.4.1` workarounds distinct from current-source behavior;
       do not prescribe blanket SAFE or reflection into internal metadata.
 
-### [ ] 9.2 Preserve operational boundaries
+### [x] 9.2 Preserve operational boundaries
 
-- [ ] Explain runtime/AOT creation permissions, diagnostic unknowns, application
+- [x] Explain runtime/AOT creation permissions, diagnostic unknowns, application
       ownership and factory recreation instead of unsupported live mutation.
-- [ ] Document classification, incomplete-metadata, ambiguity and invalid-selected
+- [x] Document classification, incomplete-metadata, ambiguity and invalid-selected
       failures using bounded structural evidence without sensitive request data.
-- [ ] Identify deferred IDs, workaround, owner and trigger; link new results to V32
+- [x] Identify deferred IDs, workaround, owner and trigger; link new results to V32
       findings without rewriting their historical outcomes.
 
-### [ ] 9.3 Validate guidance and result records
+### [x] 9.3 Validate guidance and result records
 
-- [ ] Reconcile versioned examples, roadmap/checklist/index and readiness status
+- [x] Reconcile versioned examples, roadmap/checklist/index and readiness status
       with actual implementation and release state.
-- [ ] Run documentation/link/fixture tests and applicable example validation; record
+- [x] Run documentation/link/fixture tests and applicable example validation; record
       actual counts and failures rather than copying earlier totals.
-- [ ] Record delivered scope, compatibility/migration notes and limitations in V33;
+- [x] Record delivered scope, compatibility/migration notes and limitations in V33;
       leave unrelated operational and dashboard contracts unchanged.
+
+Implemented 2026-09-28: [maintainer, migration and operations record](MAINTAINER-GUIDANCE.md)
+on reachable base `dca0dda985f3322efc53e4f6e7a57f037813f9c1` plus the reviewed
+documentation/test patch. Canonical customizer, replacement, cache, native and
+operations guidance now separates published `4.4.1` workarounds from current
+F001/F002/F003 behavior. The complete public example includes explicit Caffeine,
+policy/variants and narrow customization safety; its actual Java block is compiled
+and exercised. Ownership, non-instantiating diagnostics, AOT limits, deferred
+expansions and bounded failure evidence remain explicit. V1-V32 history is unchanged.
+
+The final focused run passes **433 cases across seven classes**, including **77
+documentation**, **four compiled-example**, **36 context-documentation** and
+**35 properties** cases; all have zero failures/errors/skips and explicit GC
+disabled. The record gives the other three suites and exact command. The initial
+81-case run's two example-header failures remain in the evidence; the corrected
+and final 433-case runs overlap, not additional independent coverage.
+`target/release-evidence/v33/priority9/` retains logs/XML, commands, source/patch,
+generated readiness and hashes. `git diff --check` passes. Production, dependency,
+native/consumer fixtures and coordinates are unchanged; no new native/API/JMH
+run or release approval is claimed. Priority 10 remains open and V33 active.
 
 ## Priority 10 - Scope Decision and Conditional Release Go/No-Go
 
