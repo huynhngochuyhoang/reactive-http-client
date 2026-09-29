@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.4.2] - Unreleased
+## [4.4.2] - 2026-09-29
 
-- **`4.4.2` release candidate (pending publication).** V33's approved F001/F002/F003
+- **`4.4.2` published patch release.** V33's approved F001/F002/F003
   corrections only. No new public API, dependency, property/default or outbound
   operator; no public performance or deployment-memory claim. Signing, publication
-  and fresh Central consumption remain separate gates. See the
+  and fresh Central consumption are verified. See the
   [release decision](roadmaps/v33/RELEASE-DECISION.md) and
   [migration limits](roadmaps/v33/MAINTAINER-GUIDANCE.md).
 

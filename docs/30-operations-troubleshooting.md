@@ -7,7 +7,7 @@ logs, or application metrics.
 
 ## Current release scope
 
-Current consumer instructions apply to published starter `4.4.1` on Spring Boot
+Current consumer instructions apply to published starter `4.4.2` on Spring Boot
 4. The repository may contain a newer snapshot while the next release is being
 prepared. Use the published coordinates from the [Quick Start](01-quick-start.md)
 for applications and reserve snapshot commands for the explicitly labeled
@@ -61,7 +61,7 @@ The `4.4.2` source corrects starter-builder classification, fresh static
 metadata planning and selected AOT properties (V32-F001/F002/F003); use the
 [V33 migration table](../roadmaps/v33/MAINTAINER-GUIDANCE.md#migration-by-finding)
 and [bounded failure triage](../roadmaps/v33/MAINTAINER-GUIDANCE.md#bounded-operational-triage)
-only for that unpublished candidate behavior. It is not a published `4.4.1` capability.
+for that published `4.4.2` behavior. It is not a published `4.4.1` capability.
 Record the actual version and runtime/AOT/diagnostics creation path first.
 Classification, incomplete-metadata, ambiguity and invalid-selected errors are
 pre-dispatch failures; retain sanitized structural outcomes and exception classes,

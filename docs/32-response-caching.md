@@ -884,7 +884,7 @@ Do not trust a same-named replacement automatically. This workaround is not a
 fix; the [maintainer guidance](../roadmaps/v32/MAINTAINER-GUIDANCE.md#deferred-and-intentional-limits)
 records the deferred decision and reconsideration trigger.
 
-In the unpublished `4.4.2` candidate, [V33 Priority 3](../roadmaps/v33/BUILDER-OWNERSHIP.md)
+In published `4.4.2`, [V33 Priority 3](../roadmaps/v33/BUILDER-OWNERSHIP.md)
 corrects V32-F001 by inspecting the builder's owning definition through the
 context or bean factory. The starter-owned builder no longer needs that redundant
 entry; existing explicit SAFE entries remain accepted. Inherited ownership does

@@ -1,13 +1,13 @@
 # V33 Maintainer, Migration and Operations Guidance
 
 > **Recorded:** 2026-09-28
-> **Published / candidate:** `4.4.1` / `4.4.2`
+> **Published / development:** `4.4.2` / `4.5.0-SNAPSHOT`
 > **Delivered scope:** V32-F001 + V32-F002 + V32-F003
-> **Release scope:** patch `4.4.2` selected; publication pending
+> **Release scope:** patch `4.4.2` published; V33 closed
 
 Companion to [Priority 9](CHECKLIST.md). The [Priority 10 decision](RELEASE-DECISION.md)
-selects patch preparation; it does not publish it. This is current-source guidance, not
-publication approval. [V32 findings](../v32/FINDINGS.md) and its
+records preparation and [verified publication](RELEASE-DECISION.md#post-publication-closure).
+This guidance applies to published `4.4.2`. [V32 findings](../v32/FINDINGS.md) and its
 [decision](../v32/ARCHITECTURE-DECISION.md) retain the original deferrals;
 [V33 approval](FIX-DECISION.md) selected all three for correction. No accepted
 finding is deferred in V33. F004/F005 remain published `4.4.1` safeguards.
@@ -59,7 +59,7 @@ Scopes must exist at build time; the starter does not activate request/session
 scope. Opaque scoped factories need discoverable target metadata or the documented
 cached-factory path. Broad/ambiguous non-singleton processor identity can fail;
 use a singleton or unique concrete predicted product type. See the
-[canonical AOT details](../../docs/20-native-release-compatibility.md#post-441-development-lane)
+[canonical AOT details](../../docs/20-native-release-compatibility.md#post-442-development-lane)
 for aliases, wrapping, replacement and restoration limits. Neither JVM processor
 tests nor one native fixture proves every application extension/native combination.
 
@@ -133,11 +133,11 @@ native inputs, and does not claim another native or benchmark run.
 
 At the Priority 9 checkpoint, `4.5.0-SNAPSHOT` did not select a minor release;
 readiness had `plannedFinalVersion=null` and an unselected lane. The subsequent
-patch selection has `activeRoadmap=v33`, `plannedFinalVersion=4.4.2`, a selected
-patch lane and a pending-publication candidate. Generated pending manual release commands are candidate
-revalidation gates, not a claim that the linked development verification never
-ran. Priority 10 owns scope, exact version, final evidence reconciliation,
-signing/publication or an explicit no-release decision.
+patch selection had `activeRoadmap=v33`, `plannedFinalVersion=4.4.2`, a selected
+patch lane and a pending-publication candidate. Verified publication now closes
+V33. Development `4.5.0-SNAPSHOT` has `activeRoadmap=null`, `plannedFinalVersion=null`
+and unselected future scope. Generated pending manual commands describe future
+revalidation, not unfinished V33 release work.
 
 No V1-V32 record is rewritten to turn a historical deferral into a pass.
 

@@ -49,7 +49,7 @@ Registering a bean with one of these names replaces that built-in while leaving 
 | `defaultErrorDecoder` | `DefaultErrorDecoder` | Replaces default 4xx/5xx response decoding. |
 | `methodMetadataCache` | `MethodMetadataCache` | Replaces method metadata caching/parsing. |
 
-### V33 replacement behavior (candidate only)
+### V33 replacement behavior (published 4.4.2)
 
 Published `4.4.1` still needs delegated built-in parsing or public API-ref
 configuration for the reviewed fresh-static metadata gap, and a primary

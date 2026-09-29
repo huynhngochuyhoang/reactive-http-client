@@ -5,13 +5,17 @@
 > **Preparation tree:** `54dc931cf332f3f5cb86d0c0104fb1fbb452a9c4`
 > **Candidate source:** `5b65c4cb41bc93d3af06d494fe5a9a0c2dfefad9` (clean at 10.3 verification)
 > **Candidate tree:** `51a645e38c8b3b4b7f63a9fc1cfa768a69803315`
-> **Release scope:** patch `4.4.2` selected; publication pending
-> **Decision:** GO for preparation; NO-GO for publication/closure until remaining gates pass
+> **Release scope:** patch `4.4.2` published; V33 closed
+> **Decision:** GO; publication and closure verified
+
+[Post-Publication Closure](#post-publication-closure) supersedes the pending
+preparation state below. The original evidence, failures and source IDs remain
+historical, not claims that the original local verification signed artifacts.
 
 The maintainer explicitly selected **"Prepare patch 4.4.2 (Recommended)"** in
 response to the question proposing F001/F002/F003 and retaining signing and
 publication as closure gates. This authorizes patch preparation, not publication
-or a claim that artifacts are on Central. [V33 remains active](CHECKLIST.md).
+or a claim that artifacts are on Central. At that checkpoint [V33 remained active](CHECKLIST.md).
 The former `4.5.0-SNAPSHOT` coordinate did not select a minor release.
 
 ## Scope and Migration Review
@@ -220,6 +224,10 @@ fresh repository. No production behavior or safety assertion was weakened.
 
 ## Remaining Gates
 
+This table preserves the preparation checkpoint. The release-path gates are now
+verified in [Post-Publication Closure](#post-publication-closure). The earlier
+decision was NO-GO for publication/closure until those gates passed.
+
 | Gate | State |
 |---|---|
 | Patch scope | Selected by the maintainer; F001/F002/F003 only |
@@ -244,3 +252,115 @@ These are future gates, not commands run or successful outcomes. Baselines,
 public installation examples and archive/readiness status must advance together
 only after verified publication. Candidate readiness must say selected patch,
 pending-publication, unpublished and activeRoadmap=v33, not GO for deployment.
+
+## Post-Publication Closure
+
+Verified on 2026-09-29 against tag `v4.4.2`, commit
+`bdacfc439b7fab7df1b319d057782c3b69ce9676`, tree
+`ca79d48831d59c78e6dfd2a473f80b5f74151867`. This reachable release revision
+contains the preparation and 10.3 provenance supplement after squash; the
+historical local commit IDs above are not substituted for the release tag.
+The tag's 28 changed paths match the sealed preparation snapshot overlaid with
+the three 10.3 documentation/guard files byte-for-byte; all other files match
+the preparation base. All **4,010 entries across six earlier manifests** rehash
+successfully. This establishes reachable provenance after squash without
+rewriting the original measurement records.
+
+The [GitHub release](https://github.com/huynhngochuyhoang/reactive-http-client/releases/tag/v4.4.2)
+was published at `2026-09-29T04:07:58Z`.
+The [publication workflow](https://github.com/huynhngochuyhoang/reactive-http-client/actions/runs/36520236985)
+finished successfully at `2026-09-29T04:12:09Z`. Both jobs and every listed step
+passed, including reactor verification, tag/version assertion, signed build,
+staged publishable-artifact inspection, generation packaging and Central deploy.
+This is signing/staging evidence from the release workflow, not a new local
+signing or deployment claim.
+
+Fresh Central-only repositories verified **13 release artifacts**: parent POM
+plus each module's POM, binary, sources and Javadoc. All 13 detached signatures
+verify against public fingerprint `F59B33A2794AF19A54D2E7EC21A85300A73092D7`;
+all downloaded SHA-1 sidecars match, and local SHA-256 hashes are preserved.
+Published production Java and all four POMs match the tag byte-for-byte.
+No private key or passphrase was accessed.
+
+The published-consumer verifier passed **four cases** from the independent
+repository with `completedStage=evidence-verified` and `exitStatus=0`; its source
+fixture was clean. The all-profile follow-up passed **29 cases**, including
+extension scenarios, zero failures/errors/skips. These are genuine Central
+artifacts, not candidate installs or reactor classes. Reproduction:
+
+```bash
+bash scripts/verify-published-release-artifacts.sh 4.4.2
+bash scripts/verify-published-consumer.sh 4.4.2
+mvn -B -ntp -s .mvn/maven-central-settings.xml \
+  -Dmaven.repo.local="$PWD/target/published-baseline-repositories/consumer-4.4.2" \
+  -f .github/boot4-consumer/pom.xml -Dreactive-http-client.version=4.4.2 \
+  -Dconsumer.v26.observability=true -Dconsumer.v27.parity=true \
+  -Dconsumer.v28.parity=true -Dconsumer.v29.parity=true \
+  -Dconsumer.v30.parity=true -Dconsumer.v31.parity=true \
+  -Dconsumer.v32.extensions=true clean test
+```
+
+Each verifier requires fresh output/repository paths. The publication bundle
+`target/release-evidence/v33/priority10-publication/` retains public release/tag/
+workflow/job JSON, commands, actual statuses, XML, effective POMs, dependency
+trees/classpaths, Central markers, artifact hashes, public key/signatures,
+source comparison and closure verification, sealed by `SHA256SUMS`.
+It is local ignored evidence; preserve it before root clean. The tracked record
+and commands remain reproducible without claiming the local bundle is published.
+
+The first public-key import failed to start a GPG agent after importing the key.
+A no-autostart retry identified an overlong socket filename in the evidence
+directory. The successful retry used a short isolated public-only home under
+`/tmp`, with no agent autostart. Both failed logs remain. All signature checks
+then passed; no signing configuration or production code was changed.
+
+F001/F002/F003 are delivered; F004/F005 safeguards remain. V33 is closed, and
+public/API/consumer/benchmark baselines advance to verified `4.4.2`. The reactor
+and current fixtures return to `4.5.0-SNAPSHOT`, with `activeRoadmap=null`,
+`plannedFinalVersion=null` and unselected future scope. No V34 roadmap is active.
+No new native binary, JMH measurement, memory-leak or service-mesh claim is made.
+Prior native/cost evidence retains its original inputs and limits; V1-V32
+records are unchanged. Future generated manual gates do not reopen V33.
+
+### Archive Verification
+
+The archive patch changes coordinates, current documentation, CI baseline paths
+and documentation guards only. Oracle JDK 21.0.8 and Maven 3.9.9 validated it
+with explicit GC disabled for ordinary tests:
+
+| Check | Result |
+|---|---|
+| Unsigned development reactor install | **2,247 cases**: starter 2,105, helper 80, OTel 62; zero failures/errors/skips |
+| Strict root and independent starter API | Binary/source checks pass against fresh Central `4.4.2` in separate repositories, with verified artifact provenance |
+| Generation packaging | All three `4.5.0-SNAPSHOT` modules pass binary/source/Javadoc inspection |
+| Final documentation and compiled example | **82 cases**: 78 documentation + four example; zero failures/errors/skips; overlaps reactor coverage |
+| Matrix script syntax, production/V1-V32 preservation and diff whitespace | Pass |
+
+The first archive documentation run had three failures: two stale section links
+caused both the link and generated-readiness assertions to fail, and one assertion
+still expected the old pending-publication wording. All four example cases passed.
+That failed log/XML is retained alongside the final results; no production or
+safety assertion was changed. Broader Boot matrix, native and JMH executions are
+not repeated for this archive-only change.
+
+From the repository root, with the toolchain above:
+
+```bash
+export MAVEN_OPTS='-Xmx512m -XX:ActiveProcessorCount=2'
+REPO="$PWD/target/v33-native-runs/native-g0ynw95x/repository"
+mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local="$REPO" -DargLine=-XX:+DisableExplicitGC install
+bash scripts/verify-generation-packaging.sh 4.5.0-SNAPSHOT
+mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local="$PWD/target/published-baseline-repositories/v33-archive-api-root-4.4.2" -Papi-compatibility -DskipTests verify
+bash scripts/verify-published-baseline-provenance.sh v33-archive-api-root 4.4.2 target/release-evidence/v33/priority10-publication/api-root/provenance reactive-http-client reactive-http-client-starter reactive-http-client-test reactive-http-client-otel
+mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local="$PWD/target/published-baseline-repositories/v33-archive-api-starter-4.4.2" -pl reactive-http-client-starter -Papi-compatibility -DskipTests verify
+bash scripts/verify-published-baseline-provenance.sh v33-archive-api-starter 4.4.2 target/release-evidence/v33/priority10-publication/api-starter/provenance reactive-http-client-starter
+mvn -B -ntp -s .mvn/maven-central-settings.xml -Dmaven.repo.local="$REPO" -pl reactive-http-client-starter -DargLine=-XX:+DisableExplicitGC -Dtest=DocumentationReleaseArtifactTest,V33GuidanceExampleTest test
+bash -n scripts/verify-supported-matrix.sh
+git diff --check
+```
+
+The strict repositories were created empty and seeded with third-party artifacts
+only; no local project artifacts were copied into them. Use absent repositories
+and new evidence directories on a rerun, and substitute another writable general
+Maven cache if necessary. The exact commands, dependency reports, artifact hashes,
+closure source patch and generated readiness are sealed in the publication bundle.
