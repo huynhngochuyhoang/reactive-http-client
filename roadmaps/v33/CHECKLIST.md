@@ -850,14 +850,14 @@ run or release approval is claimed. Priority 10 remains open and V33 active.
 - [x] Record the selected branch without treating candidate preparation as GO or
       publication, and preserve historical version evidence.
 
-### [ ] 10.3 Assemble immutable release or review evidence
+### [x] 10.3 Assemble immutable release or review evidence
 
 Decision and evidence inventory: [conditional patch release](RELEASE-DECISION.md).
 
-- [ ] Inventory final reachable source, scope/decision records and all required
+- [x] Inventory final reachable source, scope/decision records and all required
       correctness/API/consumer/Boot/AOT/native/cost/guidance results.
-      Candidate patch evidence is assembled; a reviewed clean candidate commit
-      is still required. Do not relabel the pre-cut commit as final `4.4.2` source.
+      Clean candidate `5b65c4cb41bc93d3af06d494fe5a9a0c2dfefad9` exactly matches
+      the sealed candidate snapshot; the pre-cut commit remains historical provenance.
 - [x] Seal commands, actual totals, toolchains, effective dependencies, reports and
       artifact hashes. Keep failed/partial attempts and remaining limitations.
 - [x] Revalidate relevant evidence after final source/fixture/coordinate changes;
@@ -885,9 +885,17 @@ from manifest/Maven version metadata. Native and JMH reuse is explicitly scoped,
 not a new `4.4.2` native compile or benchmark claim. The sealed local bundle is
 `target/release-evidence/v33/priority10/`; `git diff --check` passes.
 
-This is **GO for preparation only**. Priority 10.3 remains open for the final
-reviewed clean candidate revision; signing/staged verification, tag/workflow,
-Central publication, published consumption and roadmap closure remain open.
+Completed 10.3 on 2026-09-29: clean candidate
+`5b65c4cb41bc93d3af06d494fe5a9a0c2dfefad9`, tree
+`51a645e38c8b3b4b7f63a9fc1cfa768a69803315`, contains exactly the 28 sealed
+preparation files; all other tracked files match the recorded base. All **3,983
+entries across five evidence manifests** rehash successfully. The separate
+`target/release-evidence/v33/priority10-3/` supplement preserves this comparison
+and the **82-case** documentation/example rerun, zero failures/errors/skips.
+The original evidence bundles are unchanged; no new native/JMH run is claimed.
+
+This is **GO for preparation only**. Signing/staged verification, tag/workflow,
+Central publication, published consumption and roadmap closure remain open in 10.4.
 
 ### [ ] 10.4 Verify publication or no-release closure
 

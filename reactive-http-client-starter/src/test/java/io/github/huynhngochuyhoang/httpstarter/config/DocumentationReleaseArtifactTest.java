@@ -383,8 +383,14 @@ class DocumentationReleaseArtifactTest {
                 "NO-GO for publication/closure", "V32-F001", "V32-F002", "V32-F003",
                 "not** a new `4.4.2` native build", "No public speed", "publication pending");
         String checklist = Files.readString(root.resolve("roadmaps/v33/CHECKLIST.md"));
-        assertThat(checklist).contains("### [x] 10.1", "### [x] 10.2", "### [ ] 10.4",
+        assertThat(checklist).contains("### [x] 10.1", "### [x] 10.2", "### [x] 10.3", "### [ ] 10.4",
                 "> **Status:** active", "> **Candidate coordinate:** `4.4.2`");
+        assertThat(checklist.split("### \\[x\\] 10.3", 2)[1].split("### \\[ \\] 10.4", 2)[0])
+                .doesNotContain("[ ]");
+        assertThat(decision).containsPattern("(?m)^> \\*\\*Candidate source:\\*\\* `[0-9a-f]{40}`")
+                .containsPattern("(?m)^> \\*\\*Candidate tree:\\*\\* `[0-9a-f]{40}`$")
+                .contains("### Committed Candidate Provenance", "28 paths", "3,983 entries",
+                        "060322bc4e64df2406a7ce406e7f75f7283ea4be9390eee39cfda87ab12374e8");
         var candidate = majorReleaseCandidate("4.4.2",
                 releaseVersionContract("4.4.2", "4.4.1", "## [4.4.2] - Unreleased\n"));
         assertThat(candidate).containsEntry("scopeStatus", "selected")

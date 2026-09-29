@@ -1,8 +1,10 @@
 # V33 Conditional Release Decision
 
 > **Recorded:** 2026-09-29
-> **Reviewed source:** `a43959fee81b9ec5644b81636b5b511574d6a497` (clean before preparation)
-> **Reviewed tree:** `54dc931cf332f3f5cb86d0c0104fb1fbb452a9c4`
+> **Preparation base:** `a43959fee81b9ec5644b81636b5b511574d6a497` (clean before preparation)
+> **Preparation tree:** `54dc931cf332f3f5cb86d0c0104fb1fbb452a9c4`
+> **Candidate source:** `5b65c4cb41bc93d3af06d494fe5a9a0c2dfefad9` (clean at 10.3 verification)
+> **Candidate tree:** `51a645e38c8b3b4b7f63a9fc1cfa768a69803315`
 > **Release scope:** patch `4.4.2` selected; publication pending
 > **Decision:** GO for preparation; NO-GO for publication/closure until remaining gates pass
 
@@ -37,7 +39,7 @@ and final-source evidence are required, not waived.
 
 ## Reachable Source and Reuse
 
-The clean reviewed commit above contains the accepted production code and the
+The clean preparation base above contains the accepted production code and the
 Priority 8 benchmark/Priority 9 example and documentation tests. The inventory
 checks the recorded Git objects for all production sources, root/module POMs,
 Maven settings, native fixture, both consumer fixtures and parity/native runners
@@ -51,8 +53,8 @@ as `4.5.0-SNAPSHOT`, SHA-256
 `1312b2fc6269b14093f5acae302494274aeef0dd2543fdfdff629979450b2842`.
 It is **not** a new `4.4.2` native build. The candidate patch changes coordinates,
 current commands, documentation and release guards, not native fixture Java or
-production Java/resources. Candidate JVM/AOT, packaging and artifact comparison
-must verify those changed inputs before reuse is accepted for preparation.
+production Java/resources. The candidate JVM/AOT, packaging and artifact comparison
+below verify those changed inputs and support reuse for preparation.
 No new JMH run is required for a coordinate/documentation-only cut; no quantitative
 public performance claim is selected.
 
@@ -88,8 +90,9 @@ not a claim to rerun old tests or to have a signed final binary.
 
 ## Candidate Verification
 
-The unsigned candidate is the patch over the reachable source above, not a new
-commit/tag. Tests use Oracle JDK 21.0.8 and Maven 3.9.9, with Maven heap 512 MiB
+These checks originally ran on the unsigned preparation patch, now exactly
+matched to the candidate commit above. No release tag is claimed.
+Tests use Oracle JDK 21.0.8 and Maven 3.9.9, with Maven heap 512 MiB
 and two active processors. Ordinary reactor tests disable explicit GC. Logs,
 XML, commands, toolchain, dependency trees, effective POMs, baseline provenance
 and copied artifacts are under `target/release-evidence/v33/priority10/`.
@@ -124,13 +127,42 @@ reuse above without pretending the old binary was compiled with the new version.
 | OpenTelemetry `4.4.2` | `54ea475466b4ad6f63c810205a7d4e0358636b1b835bcaaadc08e4d3bb2c4643` |
 
 These are retained unsigned build hashes, not promises about subsequently signed
-or published files. A clean candidate commit/tag and its provenance remain a
-Priority 10.3 gate; the source/patch archive does not create that commit.
+or published files. The clean candidate provenance is verified below; a matching
+release tag and signed/published artifact verification remain Priority 10.4 gates.
 The local `SHA256SUMS` seals commands, failures, artifacts, reports, generated
 readiness and `final-source/` (including this decision); verification uses
 `sha256sum --quiet -c SHA256SUMS` from the bundle directory. `git diff --check`
-also passes. Review and commit this preparation before recording final clean
-candidate provenance; do not overwrite the prior evidence bundles.
+also passes. The prior evidence bundles are not overwritten by closure records.
+
+### Committed Candidate Provenance
+
+Priority 10.3 completed on 2026-09-29 against clean reachable commit
+`5b65c4cb41bc93d3af06d494fe5a9a0c2dfefad9`, tree
+`51a645e38c8b3b4b7f63a9fc1cfa768a69803315`. Its changed-file set relative to
+the preparation base is exactly the 28 paths in the sealed `final-source/`
+snapshot, including the release decision. Every committed file matches its
+snapshot byte-for-byte, and there are no additional changed paths. Thus the
+recorded tests and artifact checks describe the committed candidate inputs,
+not an uncommitted or squash-local implementation.
+
+All five evidence manifests were rechecked: **3,983 entries**, zero checksum
+failures. The Priority 10 bundle has **1,277 entries**, with `SHA256SUMS` SHA-256
+`060322bc4e64df2406a7ce406e7f75f7283ea4be9390eee39cfda87ab12374e8`.
+The four older manifest hashes remain in the inventory above. The separate
+`target/release-evidence/v33/priority10-3/` supplement records initial clean
+status, commit/tree, each matched file hash, checksum commands/results and the
+closure patch. It is sealed separately; none of the earlier bundles is modified.
+
+Only this decision, the checklist and the documentation release-state guard
+change after that comparison. The same documented targeted Maven command reruns
+**78 documentation + four compiled-example cases**, all passing with zero
+failures/errors/skips and explicit GC disabled. Its command, toolchain, XML,
+generated readiness and source patch are in the supplement. Production,
+coordinates, dependencies, native/consumer fixtures and benchmark inputs remain
+unchanged, so the broader results are reused, not reported as new executions.
+`git diff --check` passes. The supplementary documentation/guard edits still need
+their ordinary review/commit; they do not invalidate the recorded candidate code
+identity or authorize a tag, signing, deployment or roadmap closure.
 
 ### Reproduction
 
@@ -192,7 +224,8 @@ fresh repository. No production behavior or safety assertion was weakened.
 |---|---|
 | Patch scope | Selected by the maintainer; F001/F002/F003 only |
 | Candidate coordinates | `4.4.2`; public/API/benchmark baselines remain `4.4.1` |
-| Final reviewed clean commit and matching tag | Pending; do not tag or publish a dirty preparation tree |
+| Clean candidate source / Priority 10.3 | Verified against `5b65c4cb41bc93d3af06d494fe5a9a0c2dfefad9`; immutable evidence assembled |
+| Release tag and final publication tree | Pending; review/commit closure records and match the release tag to signed artifacts |
 | Signed artifacts/staged preflight | Pending; unsigned verification cannot satisfy signature checks |
 | Publication workflow / Central | Pending; no deploy, tag push or Central verification performed |
 | Published assembled consumer | Pending; must resolve `4.4.2` independently, not installed candidate artifacts |
