@@ -4,13 +4,13 @@ These examples are documentation snippets, not a compiled sample module. They ar
 kept small so each block can be copied into an application and adapted to local
 package names, credentials, and upstream URLs.
 
-## V33 Extensions (Development Only)
+## V33 Extensions (Candidate Only)
 
 See the [checked public replacement example](v33-extensions.md) for fresh static
 metadata, programmatic properties and explicit cache customization safety in
-`4.5.0-SNAPSHOT`. Its Java block is compiled and exercised by the documentation
-test lane. Published `4.4.1` still needs the linked workarounds; no next release
-version is selected by this example.
+`4.4.2`. Its Java block is compiled and exercised by the documentation
+test lane. Published `4.4.1` still needs the linked workarounds; patch `4.4.2`
+is selected but not yet verified published.
 
 ## Effective Configuration
 

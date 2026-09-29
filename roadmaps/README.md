@@ -9,8 +9,8 @@ is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V32 are completed release records. V32 was released as `4.4.1`.
-V33 is the active execution roadmap. The reactor is `4.5.0-SNAPSHOT`, with
-F001/F002/F003 approved for correction and no next release scope selected.
+V33 is the active execution roadmap. The reactor is candidate `4.4.2`, with
+F001/F002/F003 selected for a compatible patch; publication remains pending.
 Public/API/consumer/benchmark baselines are verified `4.4.1`.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
@@ -22,7 +22,8 @@ corrections. [Priority 3](v33/BUILDER-OWNERSHIP.md) implements F001 and
 [Parity](v33/PARITY-EVIDENCE.md) and [compatibility/cost](v33/COMPATIBILITY-COST.md)
 verification are complete for the recorded source; use the
 [current migration guidance](v33/MAINTAINER-GUIDANCE.md) for delivered behavior
-and remaining limits. No release is selected; Priority 10 remains open.
+and remaining limits. [Patch preparation](v33/RELEASE-DECISION.md) is selected;
+Priority 10 remains open for final evidence and publication verification.
 
 [V32 publication and closure](v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.

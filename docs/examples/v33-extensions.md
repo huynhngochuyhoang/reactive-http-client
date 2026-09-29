@@ -1,7 +1,7 @@
-# V33 Extension Example (Development Only)
+# V33 Extension Example (Candidate Only)
 
-This example targets the current `4.5.0-SNAPSHOT` source, **not published `4.4.1`**.
-It exercises the accepted F001/F002/F003 corrections; no next release is selected.
+This example targets the current `4.4.2` source, **not published `4.4.1`**.
+It exercises the accepted F001/F002/F003 corrections; patch publication is pending.
 See the [migration table](../../roadmaps/v33/MAINTAINER-GUIDANCE.md#migration-by-finding)
 for published workarounds. Do not use reflection to construct internal metadata.
 
@@ -9,8 +9,8 @@ for published workarounds. Do not use reflection to construct internal metadata.
 
 Use Java 21 and a supported Spring Boot 4 parent/BOM. Build this checkout with
 `mvn -B -ntp -s .mvn/maven-central-settings.xml -DskipTests install` before using
-its development coordinates locally; this is not Central consumption. Add
-`io.github.huynhngochuyhoang:reactive-http-client-starter:4.5.0-SNAPSHOT` and the
+its candidate coordinates locally; this is not Central consumption. Add
+`io.github.huynhngochuyhoang:reactive-http-client-starter:4.4.2` and the
 following explicit cache runtime dependency (its version comes from Boot):
 
 ```xml

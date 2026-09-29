@@ -68,7 +68,7 @@ def artifacts(command, boot, minimal=False):
     assert jars and all(p.is_file() and p.suffix == ".jar" for p in jars)
     boots = [p for p in jars if "/org/springframework/boot/" in str(p)]
     assert boots and all(p.parent.name == boot for p in boots), boots
-    starters = [p for p in jars if p.name == "reactive-http-client-starter-4.5.0-SNAPSHOT.jar"]
+    starters = [p for p in jars if p.name == "reactive-http-client-starter-4.4.2.jar"]
     assert len(starters) == 1
     if minimal:
         assert not any(part in str(p) for p in jars for part in
@@ -106,7 +106,7 @@ else:
     source = ".github/native-smoke" if jvm else (
         ".github/boot4-cache-disabled-consumer" if minimal else ".github/boot4-consumer")
     fixture = overlay(source, boot)
-    command = maven + ["-f", str(fixture / "pom.xml"), "-Dreactive-http-client.version=4.5.0-SNAPSHOT"]
+    command = maven + ["-f", str(fixture / "pom.xml"), "-Dreactive-http-client.version=4.4.2"]
     if not jvm:
         command += ["-Dconsumer.v31.parity=true"]
         if not minimal:
