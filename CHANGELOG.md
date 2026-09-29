@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.2] - Unreleased
+
+- **`4.4.2` release candidate (pending publication).** V33's approved F001/F002/F003
+  corrections only. No new public API, dependency, property/default or outbound
+  operator; no public performance or deployment-memory claim. Signing, publication
+  and fresh Central consumption remain separate gates. See the
+  [release decision](roadmaps/v33/RELEASE-DECISION.md) and
+  [migration limits](roadmaps/v33/MAINTAINER-GUIDANCE.md).
+
+### Fixed
+- Recognize the proven starter-owned WebClient builder through application-context
+  and owning-factory lookup without a redundant SAFE entry. Application mutations
+  and unknown builder provenance still require explicit classification.
+- Derive missing static routing from complete public MethodMetadata at request
+  planning. Preserve existing derived/API-ref precedence and reject invalid fresh
+  metadata before dispatch; no reflective application workaround is needed.
+- Align AOT properties selection and binding with supported Spring preference and
+  lifecycle paths. Preserve selected failures, non-eager metadata discovery and
+  documented scoped/FactoryBean/processor limitations. Unknown raw product types
+  require predictable metadata; earlier initialization callbacks cannot be replayed.
+
 ## [4.4.1] - 2026-09-19
 
 - **`4.4.1` published patch release.** Bounded V32
@@ -1907,7 +1928,8 @@ This project uses **Semantic Versioning** (`MAJOR.MINOR.PATCH`):
 4. Create a GitHub Release from that tag.
    The `publish-maven-central.yml` workflow will automatically build, sign, and publish the artifacts.
 
-[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.4.1...HEAD
+[Unreleased]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.4.2...HEAD
+[4.4.2]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.4.1...v4.4.2
 [4.4.1]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.4.0...v4.4.1
 [4.4.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.3.0...v4.4.0
 [4.3.0]: https://github.com/huynhngochuyhoang/reactive-http-client/compare/v4.2.0...v4.3.0

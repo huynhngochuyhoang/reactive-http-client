@@ -3,8 +3,8 @@
 > **Recorded:** 2026-09-23
 > **Reviewed source:** `9fd20c3a069ebcc101f8b314d33bb69f0afcf969` (clean)
 > **Published / development:** `4.4.1` / `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; release decision pending
-> **Release scope:** unselected
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; publication pending
+> **Release scope:** patch `4.4.2` selected; publication pending
 
 Companion to [Priority 2](CHECKLIST.md) and the [baseline](BASELINE-SCOPE.md).
 This record reproduces and bounds the three candidates from the
@@ -17,7 +17,9 @@ Subsequent implementation: [Priority 3](BUILDER-OWNERSHIP.md) corrects F001 and
 The reproduction results below describe the pre-fix baseline, not the revised
 fixture or current behavior. Subsequent [parity](PARITY-EVIDENCE.md),
 [compatibility/cost](COMPATIBILITY-COST.md) and [migration guidance](MAINTAINER-GUIDANCE.md)
-record verification and limits; release selection remains pending.
+record verification and limits. The later [release decision](RELEASE-DECISION.md)
+selects patch `4.4.2` preparation; the original implementation approval below
+did not authorize that release or publication.
 
 ## Fresh Reproductions
 

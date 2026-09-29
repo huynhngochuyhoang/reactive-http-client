@@ -2,9 +2,9 @@
 
 > **Status:** active
 > **Published baseline:** `4.4.1`
-> **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; release decision pending
-> **Release scope:** unselected
+> **Candidate coordinate:** `4.4.2`
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; publication pending
+> **Release scope:** patch `4.4.2` selected; publication pending
 > **Adopted:** 2026-09-19
 
 Execution companion to [`ROADMAP.md`](ROADMAP.md). Adoption starts baseline and
@@ -17,7 +17,8 @@ All three corrections are selected for Priorities 3-5; none is implemented by
 the reproduction/decision work. Priority 3 records the F001 correction and its
 verification separately. Priorities 6-8 now record shared verification;
 [Priority 9 guidance](MAINTAINER-GUIDANCE.md) consolidates the delivered limits.
-Release scope remains unselected.
+The [Priority 10 decision](RELEASE-DECISION.md) now selects patch `4.4.2`
+preparation. V33 stays active until the selected publication path is verified.
 
 Execute priorities in order. Record any dependency-based reordering explicitly.
 Production edits require the maintainer decision in **Priority 2.3** first.
@@ -827,37 +828,66 @@ run or release approval is claimed. Priority 10 remains open and V33 active.
 
 ## Priority 10 - Scope Decision and Conditional Release Go/No-Go
 
-### [ ] 10.1 Reconcile implementation scope and release intent
+### [x] 10.1 Reconcile implementation scope and release intent
 
-- [ ] Match approved IDs to delivered corrections, test evidence and explicit
+- [x] Match approved IDs to delivered corrections, test evidence and explicit
       deferrals; resolve accepted blockers or obtain their formal scope removal.
-- [ ] Obtain the maintainer decision for review-only/no-release or release preparation.
+- [x] Obtain the maintainer decision for review-only/no-release or release preparation.
       Evaluate a compatible patch first; `4.5.0-SNAPSHOT` does not select a minor.
-- [ ] Document a no-go when required evidence is missing. Open work remains open
+- [x] Document a no-go when required evidence is missing. Open work remains open
       unless a deliberate no-release/no-go closure with disposition is approved.
 
-### [ ] 10.2 Select the exact candidate or no-release branch
+### [x] 10.2 Select the exact candidate or no-release branch
 
-- [ ] For a release, approve the exact candidate after compatibility and migration
+- [x] For a release, approve the exact candidate after compatibility and migration
       review; no unapproved new API/behavior may enter this branch.
-- [ ] Update reactor/modules/fixtures, version guards, matrix commands, changelog
+- [x] Update reactor/modules/fixtures, version guards, matrix commands, changelog
       and readiness together. Keep `4.4.1` published baselines until publication
       is verified; leave V33 active through the release cut.
-- [ ] For no release, record the rationale and disposition of any implementation;
+- [x] Not applicable (2026-09-29): maintainer selected patch `4.4.2`, not no release.
+      For no release, record the rationale and disposition of any implementation;
       mark candidate/signing/publication tasks explicitly not applicable.
-- [ ] Record the selected branch without treating candidate preparation as GO or
+- [x] Record the selected branch without treating candidate preparation as GO or
       publication, and preserve historical version evidence.
 
 ### [ ] 10.3 Assemble immutable release or review evidence
 
+Decision and evidence inventory: [conditional patch release](RELEASE-DECISION.md).
+
 - [ ] Inventory final reachable source, scope/decision records and all required
       correctness/API/consumer/Boot/AOT/native/cost/guidance results.
-- [ ] Seal commands, actual totals, toolchains, effective dependencies, reports and
+      Candidate patch evidence is assembled; a reviewed clean candidate commit
+      is still required. Do not relabel the pre-cut commit as final `4.4.2` source.
+- [x] Seal commands, actual totals, toolchains, effective dependencies, reports and
       artifact hashes. Keep failed/partial attempts and remaining limitations.
-- [ ] Revalidate relevant evidence after final source/fixture/coordinate changes;
+- [x] Revalidate relevant evidence after final source/fixture/coordinate changes;
       document exact reuse rather than relabeling an older run.
-- [ ] For a release, verify packaging and applicable unsigned/staged checks; keep
+- [x] For a release, verify packaging and applicable unsigned/staged checks; keep
       signing, tag publication and Central verification separate and pending until run.
+
+Prepared 2026-09-29: maintainer selected patch **4.4.2** for F001/F002/F003.
+The reactor/modules/fixtures, matrix guard, current commands, changelog and
+generated readiness agree. Published/API/benchmark baselines remain **4.4.1**;
+V33 is active. The [release decision](RELEASE-DECISION.md) records exact commands,
+hashes, failed attempts and limited evidence reuse over reachable source
+`a43959fee81b9ec5644b81636b5b511574d6a497` plus this candidate patch.
+
+Fresh unsigned verification passes **2,247 reactor cases** (2,105 starter, 80
+helper, 62 OTel), strict root and independent starter API comparisons with
+isolated Central baseline provenance, and all-module generation packaging.
+Current-consumer verification passes **76 helper**, **29 Boot 4.0 consumer** and
+**three cache-disabled** cases; the genuine Boot 4.1 rows pass **29 full** and
+**one minimal** case. Both Boot rows pass **six smoke fixture cases** plus ordinary
+JVM/AOT generation/execution. Final documentation/example verification passes
+**82 cases** (78 + four); counts overlap, all final runs have zero failures/errors/
+skips. The new candidate binaries match preserved implementation entries apart
+from manifest/Maven version metadata. Native and JMH reuse is explicitly scoped,
+not a new `4.4.2` native compile or benchmark claim. The sealed local bundle is
+`target/release-evidence/v33/priority10/`; `git diff --check` passes.
+
+This is **GO for preparation only**. Priority 10.3 remains open for the final
+reviewed clean candidate revision; signing/staged verification, tag/workflow,
+Central publication, published consumption and roadmap closure remain open.
 
 ### [ ] 10.4 Verify publication or no-release closure
 

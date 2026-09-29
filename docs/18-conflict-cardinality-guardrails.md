@@ -49,12 +49,12 @@ Registering a bean with one of these names replaces that built-in while leaving 
 | `defaultErrorDecoder` | `DefaultErrorDecoder` | Replaces default 4xx/5xx response decoding. |
 | `methodMetadataCache` | `MethodMetadataCache` | Replaces method metadata caching/parsing. |
 
-### V33 replacement behavior (development only)
+### V33 replacement behavior (candidate only)
 
 Published `4.4.1` still needs delegated built-in parsing or public API-ref
 configuration for the reviewed fresh-static metadata gap, and a primary
 programmatic properties bean for the reviewed AOT selection gap. In
-`4.5.0-SNAPSHOT`, fresh complete public `MethodMetadata` can supply static routing
+`4.4.2`, fresh complete public `MethodMetadata` can supply static routing
 without an internal derived object; concrete planning rejects invalid/incomplete
 models before dispatch. AOT uses the applicable Spring selection preference,
 not the first initialized properties bean. Ambiguous or invalid selected beans

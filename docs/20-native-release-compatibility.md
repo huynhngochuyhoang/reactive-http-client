@@ -1,7 +1,7 @@
 # Native Image and Release Compatibility
 
-Sections without a version label describe the current `4.5.0-SNAPSHOT`
-development line. Sections labeled V18, V19, V20, V27, or V29 preserve release-era
+Sections without a version label describe the current `4.4.2`
+candidate line (publication pending). Sections labeled V18, V19, V20, V27, or V29 preserve release-era
 evidence and are not current commands. Use the command in the first applicable
 current section; historical sections remain for provenance only.
 
@@ -180,7 +180,7 @@ commands, local signing failure and subsequent successful publication.
 
 Fresh Maven Central artifact and assembled-consumer verification establish
 published `4.4.1` as the public, strict API and benchmark baseline. Reactor-only
-coordinates are `4.5.0-SNAPSHOT`. [V33](../roadmaps/v33/CHECKLIST.md) is active
+coordinates are `4.4.2`. [V33](../roadmaps/v33/CHECKLIST.md) is active
 with [F001/F002/F003 approved for correction](../roadmaps/v33/FIX-DECISION.md);
 [F001](../roadmaps/v33/BUILDER-OWNERSHIP.md),
 [F002](../roadmaps/v33/STATIC-METADATA.md) and
@@ -189,7 +189,9 @@ with [shared compatibility/cost verification](../roadmaps/v33/COMPATIBILITY-COST
 and [mock/consumer/AOT/native evidence](../roadmaps/v33/PARITY-EVIDENCE.md).
 The [V33 migration and operations guide](../roadmaps/v33/MAINTAINER-GUIDANCE.md)
 consolidates current limits and a [checked public example](examples/v33-extensions.md).
-Next release scope remains unselected.
+The maintainer selected patch `4.4.2`; see the
+[V33 release decision](../roadmaps/v33/RELEASE-DECISION.md). This is preparation,
+not signed-artifact verification or publication. Public baselines stay `4.4.1`.
 V1-V32 are completed release records.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records the release tag, successful signing/staging/packaging/deployment workflow,
@@ -212,7 +214,7 @@ configuration property or metric.
 Two reviewed replacement-bean limits remain in published `4.4.1`:
 fresh static `MethodMetadata` built only through public setters can fail before
 returning a publisher (F002); delegate built-in parsing or use the tested public
-API-ref alternative on that version. In `4.5.0-SNAPSHOT`,
+API-ref alternative on that version. In `4.4.2`,
 [static request planning](../roadmaps/v33/STATIC-METADATA.md) now derives the
 missing internal value from public metadata. Supply the method, API name,
 supported uppercase HTTP verb, non-null path (empty intentionally means the base
@@ -225,7 +227,7 @@ to be exposed or accessed reflectively.
 
 In published `4.4.1`, AOT properties selection can still differ from runtime for
 initialized non-primary candidates (F003); designate the intended programmatic
-properties bean primary on that version. In `4.5.0-SNAPSHOT`,
+properties bean primary on that version. In `4.4.2`,
 [AOT selection](../roadmaps/v33/AOT-PROPERTIES-SELECTION.md) delegates to Spring
 instead of choosing the first initialized bean. Ambiguity and invalid selected
 configuration fail; they do not select an inactive bean or environment fallback.
@@ -579,7 +581,7 @@ normal CI and published `2.x` artifacts remain on Boot `3.5.16`.
 
 The `api-compatibility` profile compares the supported public surfaces of all
 three published jars against a published baseline that is intentionally different
-from the current reactor version. The `4.5.0-SNAPSHOT` development reactor compares
+from the current reactor version. The `4.4.2` candidate reactor compares
 strictly against published `4.4.1`:
 
 ```bash
@@ -1070,7 +1072,7 @@ mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -Dsurefire.failIfNoSpecifiedTests=false test
 mvn -B -ntp -s .mvn/maven-central-settings.xml \
   -f .github/native-smoke/pom.xml -Pnative \
-  -Dreactive-http-client.version=4.5.0-SNAPSHOT native:compile
+  -Dreactive-http-client.version=4.4.2 native:compile
 .github/native-smoke/target/reactive-http-client-native-smoke
 ```
 
@@ -1133,8 +1135,9 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V32 is published and archived at `4.4.1`. The current reactor is
-`4.5.0-SNAPSHOT`, with `activeRoadmap=v33`, unselected release scope and
-`plannedFinalVersion=null`. V33 stays active through a release cut until its
+`4.4.2`, with `activeRoadmap=v33`, selected patch scope and
+`plannedFinalVersion=4.4.2`. Signing/publication verification remains pending.
+V33 stays active through a release cut until its
 checklist is closed; a version suffix does not decide roadmap lifecycle. The
 [V32 closure record](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records verified signing and publication separately from the conservative
@@ -1240,7 +1243,7 @@ test/runtime dependencies; its classpath must contain no Caffeine artifact. It r
 reactor `target/classes` leakage in either application and records separate mock,
 weighted/current-consumer, and cache-disabled test reports, both consumer classpaths,
 dependency trees and effective POMs, project artifact hashes, commit state, and provenance under
-`target/release-evidence/current-consumer/current-4.5.0-SNAPSHOT/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
+`target/release-evidence/current-consumer/current-4.4.2/`. Fresh Surefire XML is copied immediately after each successful mock or consumer
 test stage. An `EXIT` trap repeats that filtered copy before preserving the original
 verifier status, including when any test stage fails.
 It also records the last completed stage and exit status when a later

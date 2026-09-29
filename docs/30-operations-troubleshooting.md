@@ -57,11 +57,11 @@ historical evidence.
 
 Published `4.4.1` retains the three extension workarounds in the
 [V32 maintainer guide](../roadmaps/v32/MAINTAINER-GUIDANCE.md).
-The `4.5.0-SNAPSHOT` source corrects starter-builder classification, fresh static
+The `4.4.2` source corrects starter-builder classification, fresh static
 metadata planning and selected AOT properties (V32-F001/F002/F003); use the
 [V33 migration table](../roadmaps/v33/MAINTAINER-GUIDANCE.md#migration-by-finding)
 and [bounded failure triage](../roadmaps/v33/MAINTAINER-GUIDANCE.md#bounded-operational-triage)
-only for that development behavior. It is not a published `4.4.1` capability.
+only for that unpublished candidate behavior. It is not a published `4.4.1` capability.
 Record the actual version and runtime/AOT/diagnostics creation path first.
 Classification, incomplete-metadata, ambiguity and invalid-selected errors are
 pre-dispatch failures; retain sanitized structural outcomes and exception classes,

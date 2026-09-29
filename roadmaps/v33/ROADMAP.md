@@ -3,9 +3,9 @@
 > **Status:** active
 > **Theme:** supported extension and AOT selection parity
 > **Published baseline:** `4.4.1`
-> **Development reactor:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; release decision pending
-> **Release scope:** unselected
+> **Candidate reactor:** `4.4.2`
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; publication pending
+> **Release scope:** patch `4.4.2` selected; publication pending
 > **Draft date:** 2026-09-19
 > **Adopted:** 2026-09-19
 > **Execution:** [checklist](CHECKLIST.md); [Priority 2.3 approval](FIX-DECISION.md#maintainer-decision) recorded
@@ -29,7 +29,9 @@ approval. [Priority 3](BUILDER-OWNERSHIP.md) implements F001 and
 [Parity](PARITY-EVIDENCE.md) and [compatibility/cost](COMPATIBILITY-COST.md)
 verification cover the recorded source. [Current maintainer guidance](MAINTAINER-GUIDANCE.md)
 separates delivered behavior, published workarounds and limits. Priority 10 still
-owns release selection and final evidence reconciliation.
+owns final evidence reconciliation and publication verification. The maintainer
+selected [patch 4.4.2 preparation](RELEASE-DECISION.md) on 2026-09-29; this does
+not close V33 or imply signed/published artifacts.
 
 ## Intent
 

@@ -1,11 +1,12 @@
 # V33 Maintainer, Migration and Operations Guidance
 
 > **Recorded:** 2026-09-28
-> **Published / development:** `4.4.1` / `4.5.0-SNAPSHOT`
+> **Published / candidate:** `4.4.1` / `4.4.2`
 > **Delivered scope:** V32-F001 + V32-F002 + V32-F003
-> **Release scope:** unselected
+> **Release scope:** patch `4.4.2` selected; publication pending
 
-Companion to [Priority 9](CHECKLIST.md). This is current-source guidance, not
+Companion to [Priority 9](CHECKLIST.md). The [Priority 10 decision](RELEASE-DECISION.md)
+selects patch preparation; it does not publish it. This is current-source guidance, not
 publication approval. [V32 findings](../v32/FINDINGS.md) and its
 [decision](../v32/ARCHITECTURE-DECISION.md) retain the original deferrals;
 [V33 approval](FIX-DECISION.md) selected all three for correction. No accepted
@@ -130,9 +131,10 @@ API/regressions, packaging and matched JMH rows. Historical failures and limits
 remain in those records. Priority 9 changes docs/tests only, not production or
 native inputs, and does not claim another native or benchmark run.
 
-V33 stays active; `4.5.0-SNAPSHOT` does not select a minor release. Readiness still
-has `activeRoadmap=v33`, `plannedFinalVersion=null`, deferred/unpublished candidate
-and an unselected lane. Generated pending manual release commands are candidate
+At the Priority 9 checkpoint, `4.5.0-SNAPSHOT` did not select a minor release;
+readiness had `plannedFinalVersion=null` and an unselected lane. The subsequent
+patch selection has `activeRoadmap=v33`, `plannedFinalVersion=4.4.2`, a selected
+patch lane and a pending-publication candidate. Generated pending manual release commands are candidate
 revalidation gates, not a claim that the linked development verification never
 ran. Priority 10 owns scope, exact version, final evidence reconciliation,
 signing/publication or an explicit no-release decision.
