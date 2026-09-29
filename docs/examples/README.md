@@ -4,13 +4,13 @@ These examples are documentation snippets, not a compiled sample module. They ar
 kept small so each block can be copied into an application and adapted to local
 package names, credentials, and upstream URLs.
 
-## V33 Extensions (Candidate Only)
+## V33 Extensions (4.4.2+)
 
 See the [checked public replacement example](v33-extensions.md) for fresh static
 metadata, programmatic properties and explicit cache customization safety in
 `4.4.2`. Its Java block is compiled and exercised by the documentation
 test lane. Published `4.4.1` still needs the linked workarounds; patch `4.4.2`
-is selected but not yet verified published.
+is verified published with the three corrections.
 
 ## Effective Configuration
 

@@ -1,10 +1,10 @@
 # Reactive HTTP Client - Roadmap V33 Execution Checklist
 
-> **Status:** active
+> **Status:** completed and released as `4.4.2`
 > **Published baseline:** `4.4.1`
 > **Candidate coordinate:** `4.4.2`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; publication pending
-> **Release scope:** patch `4.4.2` selected; publication pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented, verified and published
+> **Release scope:** patch `4.4.2` published; V33 closed
 > **Adopted:** 2026-09-19
 
 Execution companion to [`ROADMAP.md`](ROADMAP.md). Adoption starts baseline and
@@ -18,7 +18,8 @@ the reproduction/decision work. Priority 3 records the F001 correction and its
 verification separately. Priorities 6-8 now record shared verification;
 [Priority 9 guidance](MAINTAINER-GUIDANCE.md) consolidates the delivered limits.
 The [Priority 10 decision](RELEASE-DECISION.md) now selects patch `4.4.2`
-preparation. V33 stays active until the selected publication path is verified.
+preparation. [Verified publication](RELEASE-DECISION.md#post-publication-closure)
+subsequently closes V33 at `v4.4.2`; the earlier preparation records below are historical.
 
 Execute priorities in order. Record any dependency-based reordering explicitly.
 Production edits require the maintainer decision in **Priority 2.3** first.
@@ -894,33 +895,44 @@ entries across five evidence manifests** rehash successfully. The separate
 and the **82-case** documentation/example rerun, zero failures/errors/skips.
 The original evidence bundles are unchanged; no new native/JMH run is claimed.
 
-This is **GO for preparation only**. Signing/staged verification, tag/workflow,
-Central publication, published consumption and roadmap closure remain open in 10.4.
+At that checkpoint this was **GO for preparation only**. The then-pending
+signing/staged, tag/workflow, Central and consumption gates are now verified below.
 
-### [ ] 10.4 Verify publication or no-release closure
+### [x] 10.4 Verify publication or no-release closure
 
-- [ ] For the approved release, verify local/workflow signing and staged signatures,
+- [x] For the approved release, verify local/workflow signing and staged signatures,
       version-matched tag/workflow outcome and remotely published Central artifacts.
       Authorize signing locally; never place passphrases in evidence.
-- [ ] Verify published assembled consumption from an isolated repository, preserving
+- [x] Verify published assembled consumption from an isolated repository, preserving
       versions, signatures/hashes and provenance rather than reactor-output leakage.
-- [ ] Alternatively, record an explicitly approved no-release/no-go closure with
-      remaining work and no claim of publication; mark unused release gates N/A.
-- [ ] Only then close V33 consistently in roadmap/checklist/index/readiness; advance
+- [x] No-release/no-go closure is not applicable: the approved patch was published
+      and independently verified. No required release gate is waived.
+- [x] Only then close V33 consistently in roadmap/checklist/index/readiness; advance
       baselines only to a verified publication and leave future scope unselected.
-- [ ] Record the closure revision, decision and artifact/evidence links. No pending
+- [x] Record the closure revision, decision and artifact/evidence links. No pending
       required work may be presented as completed release evidence.
+
+Closed 2026-09-29 against tag `v4.4.2`, commit
+`bdacfc439b7fab7df1b319d057782c3b69ce9676`, tree
+`ca79d48831d59c78e6dfd2a473f80b5f74151867`. The
+[publication record](RELEASE-DECISION.md#post-publication-closure) links the successful
+signing/staging/deployment workflow, 13 independently verified Central artifacts
+and signatures, four ordinary published-consumer cases and 29 all-profile cases.
+Published sources/POMs match the tag. No local signing or redeployment was performed.
+Baselines advance to `4.4.2`; current development is `4.5.0-SNAPSHOT`, with no
+active roadmap or next release scope. Native/JMH evidence is reused within its
+recorded source limits; no new performance or deployment-memory claim is made.
 
 ## Completion Criteria
 
-- [ ] Scope was explicitly selected before production edits, or review-only closure
+- [x] Scope was explicitly selected before production edits, or review-only closure
       was approved with candidate findings still honestly classified.
-- [ ] Selected corrections have baseline and desired-behavior evidence from supported
+- [x] Selected corrections have baseline and desired-behavior evidence from supported
       external entry points, without weakening safety or introducing unapproved APIs.
-- [ ] Cross-path, optional-integration, ownership and F004/F005 guarantees remain
+- [x] Cross-path, optional-integration, ownership and F004/F005 guarantees remain
       intact; deferred gaps and intentional differences are explicit.
-- [ ] Required compatibility/consumer/Boot/AOT/native/cost evidence identifies the
+- [x] Required compatibility/consumer/Boot/AOT/native/cost evidence identifies the
       final tested source, with failures and inapplicable work clearly separated.
-- [ ] Guidance and migration notes distinguish published versions, delivered changes
+- [x] Guidance and migration notes distinguish published versions, delivered changes
       and workarounds without sensitive evidence.
-- [ ] Release or no-release closure is verifiable and archive/readiness state agrees.
+- [x] Release or no-release closure is verifiable and archive/readiness state agrees.

@@ -133,7 +133,7 @@ That gap remains in published `4.4.1`; [V33 Priority 3](../roadmaps/v33/BUILDER-
 corrects the ownership lookup in `4.4.2` without exempting application
 customizers from classification.
 
-For unpublished candidate migration, use the [V33 extension guide](../roadmaps/v33/MAINTAINER-GUIDANCE.md)
+For migration to published `4.4.2`, use the [V33 extension guide](../roadmaps/v33/MAINTAINER-GUIDANCE.md)
 and its [checked example](examples/v33-extensions.md). It includes the optional
 Caffeine dependency, policy/variant prerequisites and a deliberately narrow SAFE
 declaration. F001 removes only a proven starter-builder entry, not the requirement

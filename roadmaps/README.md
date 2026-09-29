@@ -8,10 +8,9 @@ branch after a go decision, or an item explicitly labeled deferred/superseded,
 is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
-`CHECKLIST.md`. V1-V32 are completed release records. V32 was released as `4.4.1`.
-V33 is the active execution roadmap. The reactor is candidate `4.4.2`, with
-F001/F002/F003 selected for a compatible patch; publication remains pending.
-Public/API/consumer/benchmark baselines are verified `4.4.1`.
+`CHECKLIST.md`. V1-V33 are completed release records. V33 was released as `4.4.2`.
+No V34 execution roadmap or next release scope is selected. The reactor is
+`4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are verified `4.4.2`.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.
@@ -22,13 +21,13 @@ corrections. [Priority 3](v33/BUILDER-OWNERSHIP.md) implements F001 and
 [Parity](v33/PARITY-EVIDENCE.md) and [compatibility/cost](v33/COMPATIBILITY-COST.md)
 verification are complete for the recorded source; use the
 [current migration guidance](v33/MAINTAINER-GUIDANCE.md) for delivered behavior
-and remaining limits. [Patch preparation](v33/RELEASE-DECISION.md) is selected;
-Priority 10 remains open for final evidence and publication verification.
+and remaining limits. [Publication and closure](v33/RELEASE-DECISION.md#post-publication-closure)
+complete Priority 10 with verified signatures, tag/workflow and Central consumption.
 
 [V32 publication and closure](v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records signing, Central artifact verification and assembled-consumer evidence.
 F004/F005 are implemented. V32 deferred F001-F003 with documented workarounds;
-V33 now selects them for correction without reopening the V32 release record.
+V33 delivers them without reopening the V32 release record.
 [Priority 10 evidence](v32/COMPATIBILITY-VERIFICATION.md) retains original
 JVM/API/consumer/matrix/AOT/native results and failures. The
 [maintainer entry point](v32/MAINTAINER-GUIDANCE.md) links the reviewed architecture,
@@ -77,4 +76,4 @@ automatically create another execution roadmap or reopen V32.
 | V30 | [Roadmap](v30/ROADMAP.md) | [Checklist](v30/CHECKLIST.md) | Completed and released as `4.3.0` |
 | V31 | [Roadmap](v31/ROADMAP.md) | [Checklist](v31/CHECKLIST.md) | Completed and released as `4.4.0` |
 | V32 | [Roadmap](v32/ROADMAP.md) | [Checklist](v32/CHECKLIST.md) | Completed and released as `4.4.1` |
-| V33 | [Roadmap](v33/ROADMAP.md) | [Checklist](v33/CHECKLIST.md) | Active |
+| V33 | [Roadmap](v33/ROADMAP.md) | [Checklist](v33/CHECKLIST.md) | Completed and released as `4.4.2` |

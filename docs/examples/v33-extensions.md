@@ -1,15 +1,13 @@
-# V33 Extension Example (Candidate Only)
+# V33 Extension Example (4.4.2+)
 
-This example targets the current `4.4.2` source, **not published `4.4.1`**.
-It exercises the accepted F001/F002/F003 corrections; patch publication is pending.
+This example targets published `4.4.2`, **not published `4.4.1`**.
+It exercises the accepted F001/F002/F003 corrections released in that patch.
 See the [migration table](../../roadmaps/v33/MAINTAINER-GUIDANCE.md#migration-by-finding)
 for published workarounds. Do not use reflection to construct internal metadata.
 
 ## Prerequisites
 
-Use Java 21 and a supported Spring Boot 4 parent/BOM. Build this checkout with
-`mvn -B -ntp -s .mvn/maven-central-settings.xml -DskipTests install` before using
-its candidate coordinates locally; this is not Central consumption. Add
+Use Java 21 and a supported Spring Boot 4 parent/BOM. Add the published dependency
 `io.github.huynhngochuyhoang:reactive-http-client-starter:4.4.2` and the
 following explicit cache runtime dependency (its version comes from Boot):
 
@@ -150,7 +148,7 @@ and expect fallback to a valid inactive bean. Environment binding can override
 configuration-properties values; confirm the effective selected configuration.
 Keep configuration construction resource-free and the scope available at build
 time. For FactoryBean type hints, early binding and scoped-target limits, see
-[native guidance](../20-native-release-compatibility.md#post-441-development-lane).
+[native guidance](../20-native-release-compatibility.md#post-442-development-lane).
 
 Metadata is mutable only during parsing. Do not edit a cached model after a plan
 has consumed it; changing setters is not live reconfiguration. Recreate the

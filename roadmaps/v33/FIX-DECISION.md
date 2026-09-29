@@ -3,8 +3,8 @@
 > **Recorded:** 2026-09-23
 > **Reviewed source:** `9fd20c3a069ebcc101f8b314d33bb69f0afcf969` (clean)
 > **Published / development:** `4.4.1` / `4.5.0-SNAPSHOT`
-> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented and verified; publication pending
-> **Release scope:** patch `4.4.2` selected; publication pending
+> **Implementation scope:** V32-F001 + V32-F002 + V32-F003 implemented, verified and published
+> **Release scope:** patch `4.4.2` published; V33 closed
 
 Companion to [Priority 2](CHECKLIST.md) and the [baseline](BASELINE-SCOPE.md).
 This record reproduces and bounds the three candidates from the
@@ -19,7 +19,9 @@ fixture or current behavior. Subsequent [parity](PARITY-EVIDENCE.md),
 [compatibility/cost](COMPATIBILITY-COST.md) and [migration guidance](MAINTAINER-GUIDANCE.md)
 record verification and limits. The later [release decision](RELEASE-DECISION.md)
 selects patch `4.4.2` preparation; the original implementation approval below
-did not authorize that release or publication.
+did not authorize that release or publication. The subsequent
+[publication record](RELEASE-DECISION.md#post-publication-closure) verifies
+`4.4.2` and closes V33; the dated reproduction/approval below remains historical.
 
 ## Fresh Reproductions
 
