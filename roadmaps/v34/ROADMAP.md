@@ -16,7 +16,8 @@ not select `4.5.0` as the next release. Explicit selection of measured findings
 in Priority 4.3 must precede implementation.
 
 The [Priority 1 baseline](BASELINE-SCOPE.md) records the effective profiles,
-published evidence reuse and fresh guards; workload and cost evidence remain open.
+published evidence reuse and fresh guards. The [Priority 2 workload contract](WORKLOAD-CONTRACT.md)
+defines matched phases and pre-measurement rules; scored cost evidence remains open.
 
 ## Intent
 

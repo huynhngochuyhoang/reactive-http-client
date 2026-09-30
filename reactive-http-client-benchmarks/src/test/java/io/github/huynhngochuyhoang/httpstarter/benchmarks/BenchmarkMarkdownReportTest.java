@@ -20,6 +20,18 @@ class BenchmarkMarkdownReportTest {
     Path tempDir;
 
     @Test
+    void distinguishesV34PhasesAndRejectsForeignOwners() throws Exception {
+        for (String phase : java.util.List.of("NoNetwork", "Loopback", "Construction")) {
+            String method = "defaultV34" + phase + "Witness";
+            assertThat(renderReport(result("fixture." + method, "avgt", 1, "ns/op")))
+                    .contains("V34 " + phase + " workload");
+            assertThatThrownBy(() -> BenchmarkFairnessContract.validate(java.util.List.of(
+                    new BenchmarkFairnessContract.BenchmarkMethod("ForeignBenchmark", method))))
+                    .hasMessageContaining("V34 fixture");
+        }
+    }
+
+    @Test
     void classifiesClientSideOverheadRowsIntoComparisonSummary() throws Exception {
         String report = renderReport(
                 result("io.github.huynhngochuyhoang.httpstarter.benchmarks.LoopbackClientComparisonBenchmark.clientSideOverheadRawWebClientPostJson",

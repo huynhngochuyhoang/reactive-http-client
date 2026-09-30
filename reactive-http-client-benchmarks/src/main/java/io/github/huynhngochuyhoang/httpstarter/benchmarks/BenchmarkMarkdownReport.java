@@ -259,6 +259,15 @@ final class BenchmarkMarkdownReport {
     }
 
     private static Classification classification(String benchmarkName) {
+        for (String phase : List.of("NoNetwork", "Loopback", "Construction")) {
+            String prefix = "defaultV34" + phase;
+            if (benchmarkName.startsWith(prefix)) {
+                String scenario = benchmarkName.substring(prefix.length());
+                requireScenario(benchmarkName, scenario);
+                return new Classification("V34 " + phase + " workload", "Starter", scenario,
+                        false, false, sortPrefix("default-v34-" + phase, scenario));
+            }
+        }
         if (benchmarkName.startsWith("contextV31")) {
             String scenario = benchmarkName.substring("contextV31".length());
             requireScenario(benchmarkName, scenario);

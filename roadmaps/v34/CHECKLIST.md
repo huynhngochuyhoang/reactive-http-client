@@ -149,55 +149,76 @@ Central-only settings; ordinary test forks disable explicit GC.
 The earlier 140-case focused run overlaps the combined result. The missing-record
 red test, coordinate-only audit failure and wording-only documentation failure
 remain in the evidence bundle. No benchmark, new native build, new published
-consumer execution or release decision is claimed. Priorities 2-12 remain open.
+consumer execution or release decision is claimed. At Priority 1 completion,
+Priorities 2-12 remained open.
 
 ## Priority 2 - Equivalent Workloads and Measurement Rules
 
-### [ ] 2.1 Build matched phase-specific workloads
+### [x] 2.1 Build matched phase-specific workloads
 
-- [ ] Reuse existing planning, invocation, diagnostics, loopback and fairness
+- [x] Reuse existing planning, invocation, diagnostics, loopback and fairness
       harnesses. Add only rows needed to characterize the defined profiles.
-- [ ] Use identical harness sources and non-starter dependencies for published
+- [x] Use identical harness sources and non-starter dependencies for published
       `4.4.2` and current artifacts. Record expected starter differences and reject
       accidental reactor classes or changed transport/codec versions in baseline runs.
-- [ ] Separate context/proxy construction, first invocation, warm publisher
+- [x] Separate context/proxy construction, first invocation, warm publisher
       assembly, warm subscription and loopback execution. State setup/warmup work
       and what the measured operation actually includes.
-- [ ] Cover no-body GET, path/query/header GET, POST String/JSON, ResponseEntity,
+- [x] Cover no-body GET, path/query/header GET, POST String/JSON, ResponseEntity,
       empty completion and HTTP errors. Keep Flux/streaming and cancellation
       correctness controls; measure them if selected changes affect their cost.
-- [ ] Include minimal and auto-configured paths, selected diagnostics controls and
+- [x] Include minimal and auto-configured paths, selected diagnostics controls and
       production proxy/factory rows. Internal helper timings cannot establish an
       end-to-end improvement. Raw WebClient/Spring comparisons must match semantics.
 
-### [ ] 2.2 Prove workload semantics before timing
+### [x] 2.2 Prove workload semantics before timing
 
-- [ ] Assert method, target, headers, body/result, error contract and dispatch count
+- [x] Assert method, target, headers, body/result, error contract and dispatch count
       outside timed sections where possible; consume/release response bodies equally.
-- [ ] Prove publisher creation dispatches nothing and each ordinary subscription
+- [x] Prove publisher creation dispatches nothing and each ordinary subscription
       performs its expected work. A fast row must not be an accidentally unsubscribed
       publisher, an unintended cache hit or an ignored failure.
-- [ ] Use real API names and representative caller/load states in metered paths;
+- [x] Use real API names and representative caller/load states in metered paths;
       verify enabled counters/events, not just a registry's presence.
-- [ ] Gate concurrent subscriptions and server completion explicitly for any
+- [x] Gate concurrent subscriptions and server completion explicitly for any
       shared-load/cancellation row; fixed delays cannot prove attachment.
-- [ ] Verify fixture setup/teardown releases pools, contexts, registries and worker
+- [x] Verify fixture setup/teardown releases pools, contexts, registries and worker
       resources. Preserve correctness failures before accepting scored samples.
 
-### [ ] 2.3 Freeze measurement and review rules
+### [x] 2.3 Freeze measurement and review rules
 
-- [ ] Record forks, warmup, measurement, heap, threads, JVM flags, CPU/container
+- [x] Record forks, warmup, measurement, heap, threads, JVM flags, CPU/container
       limits, payload sizes, throughput/latency mode and GC allocation profiler.
-- [ ] Adopt or justify per-row review triggers before measurement. Starting
+- [x] Adopt or justify per-row review triggers before measurement. Starting
       proposal: latency above 20% or B/op above max(32 B/op, 5%) against baseline;
       these trigger investigation, not permission for an arbitrary regression.
-- [ ] Preserve raw multi-fork samples, intervals, run order and exact artifacts
+- [x] Preserve raw multi-fork samples, intervals, run order and exact artifacts
       before later builds overwrite them. Profiler investigation is separate from
       scored runs; smoke/discovery is not release-quality performance evidence.
-- [ ] Require flagged results to be checked with another matched pair in reversed
+- [x] Require flagged results to be checked with another matched pair in reversed
       order. Retain all attempts and explain noise, missing data and stop conditions.
-- [ ] Keep timing thresholds and forced collection out of normal unit tests. Use
+- [x] Keep timing thresholds and forced collection out of normal unit tests. Use
       deterministic correctness checks and the controlled reachability lane where needed.
+
+Workload and pre-measurement rules: [WORKLOAD-CONTRACT.md](WORKLOAD-CONTRACT.md).
+Matched build inputs and untimed witnesses are under
+`target/release-evidence/v34/priority2/`: 39 identical benchmark source/POM files,
+120 identical non-starter dependency JARs, independently resolved Central `4.4.2`,
+and the current artifact. Both ordinary benchmark suites pass 75 cases, including
+40 new workload-contract cases and one internal-resolution witness. Eight input/
+result guard tests pass. The controlled reachability lane passes two cases per
+artifact; ordinary runs disable explicit GC. Both smoke runs cover all 54 new
+JMH parameter combinations and allocation samples. Final shaded class/JMH-entry
+equivalence justifies smoke reuse after the test-only addition; failures and
+intermediate runs are retained, not counted again. The final documentation,
+archive and readiness guard passes 81 cases; whitespace checks pass.
+
+**Completed 2026-09-30.** The contract freezes the primary 60-row matrix, two-fork
+scored settings, per-row 20% latency / max(32 B/op, 5%) allocation review triggers,
+reverse-order confirmation and stop rules. Invocation-fixture allocation scope
+and shared JVM resource ownership are explicit. Multi-fork scored collection is
+Priority 3, not represented by these smoke results. No production/runtime or
+dependency-version edit, release selection or performance conclusion is claimed.
 
 ## Priority 3 - Default-Path Cost and Ownership Characterization
 

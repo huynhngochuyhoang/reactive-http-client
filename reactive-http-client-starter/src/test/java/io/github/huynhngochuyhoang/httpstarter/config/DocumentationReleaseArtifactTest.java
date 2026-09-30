@@ -237,13 +237,42 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority).contains("### [x] 1.1", "### [x] 1.2", "### [x] 1.3", "(BASELINE-SCOPE.md)")
                 .doesNotContain("[ ]");
         assertThat(checklist).contains("> **Implementation scope:** unselected", "> **Release scope:** unselected",
-                "### [ ] 2.1", "### [ ] 4.3", "### [ ] 12.1");
+                "### [ ] 4.3", "### [ ] 12.1");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) {
                 assertThat(directory.resolve(target).normalize()).as("V34 baseline link to %s", target).exists();
             }
+        }
+    }
+
+    @Test
+    void v34WorkloadContractSeparatesPhasesAndFreezesReviewBeforeScoredRuns() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String contract = Files.readString(directory.resolve("WORKLOAD-CONTRACT.md"));
+        assertThat(contract.replaceAll("\\s+", " ")).contains(
+                "published `4.4.2` versus current `4.5.0-SNAPSHOT`",
+                "Implementation and release scope:** unselected", "60 benchmark/parameter rows",
+                "54 V34 parameter combinations", "Invocation-level setup and teardown allocations",
+                "not isolated first-call allocation", "zero dispatch", "one dispatch per subscription",
+                "V34-P01", "V34-P02", "V34-P03", "V34-P04", "V34-P05", "V34-P06", "V34-P07", "V34-P08",
+                "above 20%", "above max(32 B/op, 5%)", "reversed order", "two forks",
+                "-prof gc", "-XX:+DisableExplicitGC", "v34-benchmark-reachability",
+                "39", "120", "same shaded");
+        for (String fixture : List.of("V34DefaultPathBenchmark", "V34ConstructionBenchmark", "V34WorkloadFixture")) {
+            assertThat(root.resolve("reactive-http-client-benchmarks/src/main/java/io/github/huynhngochuyhoang/httpstarter/benchmarks/"
+                    + fixture + ".java")).exists();
+        }
+        assertThat(root.resolve("scripts/verify-v34-benchmark-inputs.py")).exists();
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(checklist).contains("### [x] 2.1", "### [x] 2.2", "(WORKLOAD-CONTRACT.md)",
+                "### [ ] 3.1", "### [ ] 4.3", "> **Release scope:** unselected");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(contract);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
         }
     }
 

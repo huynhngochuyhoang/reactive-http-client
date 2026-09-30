@@ -112,6 +112,13 @@
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>cache-reachability</excludedGroups>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
                     <annotationProcessorPaths>
@@ -180,6 +187,25 @@
     </build>
 
     <profiles>
+        <profile>
+            <id>v34-benchmark-reachability</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <configuration>
+                            <excludedGroups combine.self="override"/>
+                            <groups>cache-reachability</groups>
+                            <argLine>-Xms128m -Xmx128m -XX:+UseSerialGC -XX:-DisableExplicitGC -XX:ActiveProcessorCount=2</argLine>
+                            <forkCount>1</forkCount>
+                            <reuseForks>false</reuseForks>
+                            <reportsDirectory>${project.build.directory}/cache-reachability-reports</reportsDirectory>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <id>benchmark-discovery</id>
             <build>
