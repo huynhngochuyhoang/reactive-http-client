@@ -575,6 +575,28 @@ class ReactiveHttpClientAutoConfigurationTest {
     }
 
     @Test
+    void defaultObservabilityWithoutRegistryDoesNotCreateBuiltInObserver() {
+        runner.run(context -> {
+            assertThat(context).hasNotFailed().doesNotHaveBean(MeterRegistry.class);
+            assertThat(context.getBean(ReactiveHttpClientProperties.class).getObservability().isEnabled()).isTrue();
+            assertThat(context).doesNotHaveBean(HttpClientObserver.class);
+            assertThat(context).doesNotHaveBean(Boot4HttpClientHealthIndicator.class);
+            assertThat(context).hasSingleBean(WebClient.Builder.class);
+        });
+    }
+
+    @Test
+    void applicationObserverWithoutRegistryRemainsAvailableWithExportsDisabled() {
+        runner.withUserConfiguration(CustomObserverConfig.class)
+                .withPropertyValues("reactive.http.observability.enabled=false")
+                .run(context -> {
+                    assertThat(context).hasNotFailed().doesNotHaveBean(MeterRegistry.class);
+                    assertThat(context).doesNotHaveBean("micrometerHttpClientObserver");
+                    assertThat(context.getBeansOfType(HttpClientObserver.class)).containsOnlyKeys("customHttpClientObserver");
+                });
+    }
+
+    @Test
     void userObserverDoesNotSuppressNamedMicrometerObserver() {
         runner.withUserConfiguration(SimpleMeterRegistryConfig.class, CustomObserverConfig.class)
                 .run(context -> {

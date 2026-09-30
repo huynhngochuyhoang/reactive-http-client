@@ -19,6 +19,8 @@ cost/ownership findings and explicitly selected bounded improvements. Adoption
 completes no execution priority; production edits require Priority 4.3 approval,
 and release selection remains separate in Priority 12. Configuration defaults
 and the published baseline are unchanged.
+The [Priority 1 baseline](v34/BASELINE-SCOPE.md) records effective profiles,
+revalidated `4.4.2` evidence and fresh guards without approving an optimization.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.

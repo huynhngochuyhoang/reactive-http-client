@@ -2,6 +2,7 @@ package io.github.huynhngochuyhoang.httpstarter.core;
 
 import io.github.huynhngochuyhoang.httpstarter.exception.CacheWorkRejectedException;
 import org.junit.jupiter.api.Timeout;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import reactor.util.context.Context;
@@ -75,6 +76,7 @@ class V30CacheWorkPerformanceBenchmarkTest {
 
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
+    @Tag("cache-reachability")
     void saturatedCallersDoNotRetainRejectedContextsWhileAdmittedSourceStaysLive(boolean metered) {
         try (var fixture = new V30CacheWorkPerformanceBenchmark.Fixture(metered, true, false, false)) {
             var gate = fixture.hold();

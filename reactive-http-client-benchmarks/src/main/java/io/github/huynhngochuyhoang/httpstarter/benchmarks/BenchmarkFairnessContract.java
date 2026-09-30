@@ -58,6 +58,13 @@ final class BenchmarkFairnessContract {
         Map<String, Map<String, Integer>> comparisonScenarios = new LinkedHashMap<>();
         for (BenchmarkMethod method : methods) {
             BenchmarkMarkdownReport.validateClassification(method.name());
+            if (method.name().startsWith("defaultV34")) {
+                String expectedOwner = method.name().startsWith("defaultV34Construction")
+                        ? V34ConstructionBenchmark.class.getName() : V34DefaultPathBenchmark.class.getName();
+                if (!expectedOwner.equals(method.owner())) {
+                    throw new IllegalStateException("V34 workload must be owned by its phase-specific V34 fixture");
+                }
+            }
             if (method.name().startsWith("contextV31")
                     && !Set.of("io.github.huynhngochuyhoang.httpstarter.core.V31ContextSnapshotBenchmark",
                     "io.github.huynhngochuyhoang.httpstarter.core.V31NamedHeaderBenchmark").contains(method.owner())) {

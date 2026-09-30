@@ -29,8 +29,16 @@ class ReactiveHttpClientPropertiesTest {
         assertEquals(2, config.getCodecMaxInMemorySizeMb());
         assertFalse(config.isCompressionEnabled());
         assertFalse(config.isHttp2Enabled());
+        assertFalse(config.isFollowRedirects());
         assertFalse(config.isLogExchange());
         assertFalse(config.isExchangeLoggingEnabled());
+        assertNull(config.getCache().getPolicy());
+        assertTrue(config.getCache().getPolicies().isEmpty());
+        assertTrue(config.getCache().getCustomizations().isEmpty());
+        assertNull(config.getResilience().getRetry());
+        assertNull(config.getResilience().getCircuitBreaker());
+        assertNull(config.getResilience().getBulkhead());
+        assertNull(config.getResilience().getRateLimiter());
         ReactiveHttpClientProperties.CachePolicyConfig cachePolicy =
                 new ReactiveHttpClientProperties.CachePolicyConfig();
         assertFalse(cachePolicy.isSingleFlight());
@@ -51,6 +59,9 @@ class ReactiveHttpClientPropertiesTest {
         ReactiveHttpClientProperties defaults = new ReactiveHttpClientProperties();
         assertTrue(defaults.getObservability().isEnabled());
         assertFalse(defaults.getObservability().getCache().isEnabled());
+        assertFalse(defaults.getObservability().getHistogram().isEnabled());
+        assertFalse(defaults.getObservability().getDiagnosticsEndpoint().isEnabled());
+        assertTrue(defaults.getObservability().getHealth().isEnabled());
 
         ReactiveHttpClientProperties bound = bind(Map.of(
                 "reactive.http.observability.enabled", true,
