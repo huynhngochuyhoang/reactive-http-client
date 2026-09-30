@@ -192,7 +192,9 @@ consolidates current limits and a [checked public example](examples/v33-extensio
 Patch `4.4.2` is published; see the
 [V33 publication evidence](../roadmaps/v33/RELEASE-DECISION.md#post-publication-closure)
 for signing, tag/workflow and fresh Central consumption. Public baselines are `4.4.2`.
-V1-V33 are completed release records. No V34 execution roadmap or next release scope is selected.
+V1-V33 are completed release records. [V34](../roadmaps/v34/CHECKLIST.md) is active
+for performance/default-path characterization; implementation and release scope
+remain unselected. Adoption changes no runtime defaults or release coordinates.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records the release tag, successful signing/staging/packaging/deployment workflow,
 13 verified signed Central artifacts and published-consumer results.
@@ -1135,8 +1137,8 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V32 is published and archived at `4.4.1`; V33 is published and archived at `4.4.2`.
-The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=null`, unselected
-future release scope and `plannedFinalVersion=null`. V33 remained active through
+The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=v34`, unselected
+implementation/release scope and `plannedFinalVersion=null`. V33 remained active through
 the release cut until verified publication and checklist closure; a version suffix
 does not decide roadmap lifecycle. The
 [V32 closure record](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
