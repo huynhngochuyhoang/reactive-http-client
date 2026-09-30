@@ -1,0 +1,544 @@
+# Reactive HTTP Client - Roadmap V34 Execution Checklist
+
+> **Status:** active
+> **Theme:** performance and default-path hardening
+> **Published baseline:** `4.4.2`
+> **Development coordinate:** `4.5.0-SNAPSHOT`
+> **Implementation scope:** unselected
+> **Release scope:** unselected
+> **Adopted:** 2026-09-30
+
+Execution companion to [`ROADMAP.md`](ROADMAP.md). Adoption authorizes baseline,
+workload and characterization work, not production changes, a version bump or a
+release. V1-V33 remain completed release records; their evidence is not rewritten.
+Creating this checklist completes no execution item and claims no new benchmark.
+
+Execute priorities in order. Record any dependency-based reordering explicitly.
+Production edits require the maintainer decision in **Priority 4.3** first.
+Priorities 5-8 apply only to selected findings; no selection means documented
+production work N/A with relevant regression controls retained, not an obligation
+to implement every candidate. A characterization-only/no-release result is valid.
+
+## Completion and Evidence Rules
+
+- Check an item only after its work, verification and disposition are recorded
+  under that priority. An approved plan is not evidence of execution.
+- Record exact commands, actual test totals, toolchain/settings, reachable source,
+  clean/dirty state, resolved dependencies, classpaths and artifact/report hashes
+  under `target/release-evidence/v34/priority<N>/`. Preserve failed and partial runs.
+- Put durable conclusions in tracked V34 records. Generated bundles under `target`
+  are not durable source history; retain their integrity anchors and commands.
+  Do not cite squash-local commits unavailable from the reviewed history.
+- Distinguish inspected source, correctness witnesses, helper microbenchmarks,
+  real proxy/transport workloads, JVM AOT, native execution and published consumption.
+- Native and release-quality cost evidence must identify clean reachable source
+  containing the final implementation and fixture. Relevant later edits require
+  a rerun or an exact unchanged-input reuse statement with narrower limitations.
+- Freeze matched workload semantics and measurement criteria before scored runs.
+  A skipped row, missing allocation sample or failed native build is not a pass.
+- **Not applicable** requires a dated decision identifying the item, reason and
+  evidence. Label it beside the checked item. Deferred findings retain an owner,
+  workaround, trigger and missing evidence; removing approved work needs approval.
+- Allocation rate, retained heap, direct/native memory and RSS are different
+  signals. Do not infer a leak fix, pod-memory reduction or universal speedup.
+- Keep request targets, headers, bodies, credentials, identities, cache key
+  material and arbitrary exception messages out of committed evidence. Use
+  synthetic fixtures and bounded structural observations.
+
+## Execution Gates
+
+| Gate | Requirement |
+|---|---|
+| Priority 1 | Verify adoption, published/development baselines and effective profiles without a version bump |
+| Priority 2 | Freeze equivalent workloads, correctness witnesses and measurement rules |
+| Priority 3 | Characterize actual cost and ownership before production edits |
+| Priority 4.3 | Approve specific findings, acceptance and stop conditions; review-only is valid |
+| Priorities 5-8 | Implement only approved local changes and preserve their contracts |
+| Priorities 9-10 | Verify affected paths and final matched cost/API/packaging evidence |
+| Priority 11 | Document measured behavior, retained costs and operational limits |
+| Priority 12 | Select release or no-release, then close only with corresponding evidence |
+
+No performance-mode switch, new public feature/SPI, module, dependency upgrade,
+scheduler/pool/default change, retry/cache rule, automatic propagation or broad
+handler rewrite is selected. Supported dynamic providers, optional class loading,
+body cleanup, validation and isolation cannot be removed to improve a score.
+
+## Intended Records
+
+Create records only as work produces evidence. These are suggested filenames,
+not existing results or a requirement to duplicate matrices.
+
+| Suggested record | Contents |
+|---|---|
+| `BASELINE-SCOPE.md` | Provenance, effective profiles, versions and exclusions |
+| `WORKLOAD-CONTRACT.md` | Equivalent phases/rows, correctness witnesses and frozen measurement rules |
+| `COST-OWNERSHIP.md` | Baseline costs, attributed sites, lifetimes and ranked hypotheses/findings |
+| `IMPROVEMENT-DECISION.md` | Alternatives, selected IDs, approval, acceptance and rollback |
+| `HARDENING-EVIDENCE.md` | Delivered local changes, regression controls and ownership results |
+| `VERIFICATION.md` | Actual mock/consumer/Boot/AOT/native/API/cost results and limitations |
+| `MAINTAINER-GUIDANCE.md` | Retained semantics, reproducible investigation and safe operational interpretation |
+| `RELEASE-DECISION.md` | Exact release/no-release choice, immutable evidence and closure provenance |
+
+---
+
+## Priority 1 - Post-`4.4.2` Baseline and V34 Scope Integrity
+
+### [ ] 1.1 Verify adoption and version state
+
+- [ ] Verify roadmap, checklist, index and archive guard report active V34 while
+      V1-V33 remain completed; adoption has selected neither fixes nor a release.
+- [ ] Verify reactor/module/current-consumer/native/benchmark coordinates remain
+      `4.5.0-SNAPSHOT` and published/API/consumer/benchmark baselines remain `4.4.2`.
+- [ ] Verify readiness follows checklist lifecycle through a final-version cut;
+      current `plannedFinalVersion` remains unset and release scope unselected.
+- [ ] Preserve historical evidence, configuration defaults, dependency versions
+      and public behavior; no adoption-only production change.
+
+### [ ] 1.2 Establish source and published provenance
+
+- [ ] Record reachable source/release tag, clean/dirty state, Java/Maven/GraalVM
+      where applicable, settings and effective dependencies. Identify reusable V33
+      results without relabeling them as fresh V34 verification.
+- [ ] Verify published `4.4.2` artifacts and assembled consumption using isolated
+      Central provenance, or explicitly revalidate exact reusable evidence. Reactor
+      installation cannot substitute for a published baseline.
+- [ ] Retain POMs, dependency trees, artifact/classpath hashes, actual test totals
+      and the existing Java 21/Boot 4.0.0/4.1.0 lanes without silently upgrading them.
+- [ ] Run applicable version, documentation, archive and readiness guards; record
+      real results and any pending baseline evidence.
+
+### [ ] 1.3 Freeze effective profile boundaries
+
+- [ ] Inventory minimal ordinary calls, auto-configured defaults with/without a
+      MeterRegistry, classpath-present/unselected and physically absent optional
+      integrations, plus selected-feature controls from the roadmap.
+- [ ] Record effective client settings, bean inventory/materialization, selected
+      operators, filters, codecs, transport/timeouts and pool metrics for each row.
+      A hand-built no-observer proxy is not the Spring default profile.
+- [ ] Keep resilience `enabled=true` without operator intent separate from minimal
+      calls. Keep application observers/hooks without a registry and independent
+      pool telemetry visible; absent exports do not mean absent behavior.
+- [ ] Map V34-C001 through V34-C005 to inspection questions, not confirmed defects.
+      Record exclusions and retain V32 cleanup/reachability and V33 extension/AOT
+      corrections as existing safeguards.
+
+## Priority 2 - Equivalent Workloads and Measurement Rules
+
+### [ ] 2.1 Build matched phase-specific workloads
+
+- [ ] Reuse existing planning, invocation, diagnostics, loopback and fairness
+      harnesses. Add only rows needed to characterize the defined profiles.
+- [ ] Use identical harness sources and non-starter dependencies for published
+      `4.4.2` and current artifacts. Record expected starter differences and reject
+      accidental reactor classes or changed transport/codec versions in baseline runs.
+- [ ] Separate context/proxy construction, first invocation, warm publisher
+      assembly, warm subscription and loopback execution. State setup/warmup work
+      and what the measured operation actually includes.
+- [ ] Cover no-body GET, path/query/header GET, POST String/JSON, ResponseEntity,
+      empty completion and HTTP errors. Keep Flux/streaming and cancellation
+      correctness controls; measure them if selected changes affect their cost.
+- [ ] Include minimal and auto-configured paths, selected diagnostics controls and
+      production proxy/factory rows. Internal helper timings cannot establish an
+      end-to-end improvement. Raw WebClient/Spring comparisons must match semantics.
+
+### [ ] 2.2 Prove workload semantics before timing
+
+- [ ] Assert method, target, headers, body/result, error contract and dispatch count
+      outside timed sections where possible; consume/release response bodies equally.
+- [ ] Prove publisher creation dispatches nothing and each ordinary subscription
+      performs its expected work. A fast row must not be an accidentally unsubscribed
+      publisher, an unintended cache hit or an ignored failure.
+- [ ] Use real API names and representative caller/load states in metered paths;
+      verify enabled counters/events, not just a registry's presence.
+- [ ] Gate concurrent subscriptions and server completion explicitly for any
+      shared-load/cancellation row; fixed delays cannot prove attachment.
+- [ ] Verify fixture setup/teardown releases pools, contexts, registries and worker
+      resources. Preserve correctness failures before accepting scored samples.
+
+### [ ] 2.3 Freeze measurement and review rules
+
+- [ ] Record forks, warmup, measurement, heap, threads, JVM flags, CPU/container
+      limits, payload sizes, throughput/latency mode and GC allocation profiler.
+- [ ] Adopt or justify per-row review triggers before measurement. Starting
+      proposal: latency above 20% or B/op above max(32 B/op, 5%) against baseline;
+      these trigger investigation, not permission for an arbitrary regression.
+- [ ] Preserve raw multi-fork samples, intervals, run order and exact artifacts
+      before later builds overwrite them. Profiler investigation is separate from
+      scored runs; smoke/discovery is not release-quality performance evidence.
+- [ ] Require flagged results to be checked with another matched pair in reversed
+      order. Retain all attempts and explain noise, missing data and stop conditions.
+- [ ] Keep timing thresholds and forced collection out of normal unit tests. Use
+      deterministic correctness checks and the controlled reachability lane where needed.
+
+## Priority 3 - Default-Path Cost and Ownership Characterization
+
+### [ ] 3.1 Measure the unchanged implementation
+
+- [ ] Run the frozen workloads against `4.4.2` and the current pre-fix source;
+      preserve exact baseline inputs before making production edits.
+- [ ] Separate cold and warm results, allocation and elapsed cost, client and
+      downstream time. Attribute planning/provider/state/body/reporting/Reactor/
+      transport costs instead of claiming all B/op is starter overhead.
+- [ ] Profile dominant sites when scores alone cannot explain a finding; retain
+      sanitized aggregate evidence and do not mix profiler timings into scored rows.
+- [ ] Investigate flagged variance using the frozen confirmation rule. Do not
+      convert V33's earlier cold-plan observation into a new unmeasured regression.
+
+### [ ] 3.2 Characterize preparation and retention ownership
+
+- [ ] Count observer/hook lookups, provider materializations, plan/projection work,
+      reporting/body holders and actual feature preparation for each effective profile.
+- [ ] Observe cache/registry/meter leases, tasks and transport subscriptions on
+      inactive paths; distinguish dormant objects from acquired resources.
+- [ ] Record owners and lifetimes through construction, invocation, subscription,
+      terminal completion/cancel and factory close, including failed construction.
+- [ ] Identify whether proposed reuse would retain request/context/auth data,
+      freeze dynamic providers or introduce synchronization/contention. Treat such
+      tradeoffs as part of the finding, not as free allocation savings.
+
+### [ ] 3.3 Classify findings before selecting fixes
+
+- [ ] Rank C001-C005 and any newly reproduced finding by affected profiles, source
+      anchors, measured magnitude, confidence and user impact.
+- [ ] Distinguish intentional cost, repeatable regression, correctness/ownership
+      defect and unresolved hypothesis. No-change is a legitimate result.
+- [ ] Record reproductions, negative controls, known limitations and missing
+      evidence; do not assume a memory leak or a need to optimize every allocation.
+- [ ] Publish the characterization and preserve raw evidence before requesting
+      implementation approval. Priority 3 alone authorizes no production fix.
+
+## Priority 4 - Explicit Bounded Improvement Selection
+
+### [ ] 4.1 Bound alternatives and acceptance
+
+- [ ] For each actionable finding, describe the smallest local correction,
+      no-change alternative, expected benefit and compatibility/ownership cost.
+- [ ] Name exact changed owners, effective profiles, public behavior constraints,
+      acceptance tests and benchmark rows; define failure and rollback conditions.
+- [ ] Prefer reproduced correctness/default-off ownership problems, then material
+      repeatable costs. Reject broad rewrites or added abstractions without need.
+- [ ] Identify dependencies and evidence budget; stop for a new scope decision if
+      a new public API, default, dependency or unsupported contract is required.
+
+### [ ] 4.2 Prepare retained and deferred dispositions
+
+- [ ] Mark intentional cost, disproved hypotheses and insufficient evidence
+      explicitly. Record workaround, owner and reconsideration trigger for deferrals.
+- [ ] Map proposed IDs to Priorities 5-8 and shared regressions; avoid implementing
+      the same cross-cutting change under several priorities.
+- [ ] Describe a characterization-only/no-release alternative and its required
+      evidence. Do not make roadmap completion depend on a positive speedup.
+
+### [ ] 4.3 Record the maintainer scope decision
+
+- [ ] Obtain explicit approval of specific finding IDs and boundaries, or an
+      explicit review-only decision. Candidate questions are not blanket approval.
+- [ ] Record date, rationale, acceptance, verification and rollback conditions;
+      distinguish implementation selection from release selection.
+- [ ] Mark unselected production work N/A with its dated disposition while
+      retaining relevant regression controls. Do not claim those findings were fixed.
+- [ ] Align implementation status and intended order; stop production edits until
+      this decision exists. Release scope remains unselected.
+
+## Priority 5 - Planning and Ordinary Invocation Hardening
+
+Conditional on Priority 4.3 selection affecting planning or request materialization.
+
+### [ ] 5.1 Implement only the selected local correction
+
+- [ ] Add desired-behavior and baseline cost witnesses for selected IDs before
+      changing repeated static work, argument/default/header projection or collections.
+- [ ] Keep the existing plan/resolver ownership boundary and invocation/subscription
+      timing. Do not introduce another metadata model or deep-freeze ordinary calls
+      merely to enable reuse.
+- [ ] Avoid retaining arguments, bodies or Reactor context in cached plans; preserve
+      sufficient concrete method/generic identity for shared metadata.
+
+### [ ] 5.2 Preserve request planning and wire semantics
+
+- [ ] Exercise annotation parsing, complete fresh public metadata, retained derived
+      values, API-ref precedence and inherited concrete/generic methods.
+- [ ] Verify null versus empty, ordered query/header values, escaping/URI projection,
+      default headers, body presence, final charset and context idempotency.
+- [ ] Preserve dynamic per-call/subscription values and reject invalid metadata at
+      the existing boundary. No body pre-serialization or normalization solely for cost.
+- [ ] Cover cold/repeated/concurrent subscriptions where touched; inspect exact
+      requests and results rather than helper state alone.
+
+### [ ] 5.3 Verify and record the bounded outcome
+
+- [ ] Run focused planning/resolution/public-entry regressions and selected cost
+      rows; label exploratory timings separately from final Priority 10 evidence.
+- [ ] Record each delivered ID, semantic checks, remaining costs and rollback
+      disposition. Remove an unhelpful optimization instead of expanding its scope.
+- [ ] If no relevant ID was selected, record production work N/A and the retained
+      controls without claiming a planning improvement.
+
+## Priority 6 - Diagnostics and Optional-Feature Cost Isolation
+
+Conditional on Priority 4.3 selection affecting discovery, reporting or feature preparation.
+
+### [ ] 6.1 Preserve dynamic discovery while reducing proven work
+
+- [ ] Change provider discovery/composition only for selected findings; preserve
+      late observer/hook registration, order and per-client support checks.
+- [ ] Cover empty-to-present, single/multiple, prototype/provider products and
+      first-call concurrency. Do not introduce a permanent empty-result cache.
+- [ ] Verify no-registry application consumers and classpath/bean absence; disabled
+      built-in exports cannot suppress requested observer or lifecycle behavior.
+
+### [ ] 6.2 Keep state for every required semantic path
+
+- [ ] Preserve state required by auth, explicit resilience, generated idempotency
+      and logical deadlines when logging/metrics are absent. Retain the separate
+      enabled-only/no-operator resilience control.
+- [ ] Remove snapshots/body inspection/events/meter work only on genuinely
+      unconsumed paths; keep independently enabled pool gauges independent.
+- [ ] Verify terminal-once reporting, attempts/dispatches, retry/auth replay/
+      redirects, timeout phase, cache outcome and downstream health sampling for
+      touched paths. Request evidence must reflect final filter mutations.
+- [ ] Keep sensitive data and unbounded labels out of all reporting surfaces.
+
+### [ ] 6.3 Verify cost isolation and selected integrations
+
+- [ ] Run profile-paired discovery/reporting tests with disabled exports, absent
+      MeterRegistry and actual selected metrics/OTel/logger/hook controls as applicable.
+- [ ] Compare selected diagnostic rows against the same effective behavior;
+      omitted telemetry is not an optimization.
+- [ ] Record delivered IDs and retained costs, or dated production N/A with relevant
+      controls. Keep final scored confirmation for Priority 10.
+
+## Priority 7 - Body, Context and Terminal Ownership
+
+Apply to selected changes that touch execution or state; retain shared safety controls.
+
+### [ ] 7.1 Preserve body ownership and reactive delivery
+
+- [ ] Verify exactly-once release/transfer for DataBuffer, streams/readers/channels
+      and response bodies on success, empty, error, decode/serialization failure,
+      pre-dispatch rejection and cancellation where supported.
+- [ ] Exercise no-body/immutable-body fast paths without removing resource-body
+      guards. Preserve cold publishers, backpressure and streaming behavior.
+- [ ] Test replayable repeated/concurrent subscriptions; keep one-shot input limits
+      explicit. No cost change may promise replay of consumed resources.
+- [ ] Cover cancellation after a value is buffered and after cancellation races
+      with delivery; assert Reactor discard cleanup, not just reference clearing.
+
+### [ ] 7.2 Preserve caller context and terminal isolation
+
+- [ ] Verify supported scheduler hops, explicit async handoff, named case-insensitive
+      inbound access and independent subscriber/tenant snapshots where touched.
+- [ ] Prevent request/context/auth retention in reusable state; no mutable reporting
+      holder pooling across callers or observations after that caller terminates.
+- [ ] If affected, keep admission until guarded synchronous/async preparation and
+      cleanup unwind; prevent continuations advancing after the relevant terminal.
+- [ ] If affected, keep shared-load lifecycle separate from caller deadlines, and
+      refresh hard bounds, eviction and shutdown cancellation owned correctly.
+
+### [ ] 7.3 Prove cleanup without timing or GC assumptions
+
+- [ ] Use gates, controlled time and observable cleanup acknowledgements; do not
+      assert race completion immediately after cancellation or rely on fixed sleeps.
+- [ ] Run applicable regular regressions with explicit GC disabled. Use the existing
+      controlled JVM reachability lane only for actual collection claims.
+- [ ] Record state/resource owners, exact terminal outcomes and selected scope;
+      document N/A for untouched scenarios with evidence, not a broad safety waiver.
+
+## Priority 8 - Inactive Resources and Framework Lifecycle
+
+Conditional production work follows Priority 4.3; inactive-path controls remain required.
+
+### [ ] 8.1 Verify unselected features do not acquire resources
+
+- [ ] Compare present/unselected and physically absent dependency profiles; observe
+      actual cache/auth/operator/telemetry preparation and resource acquisition.
+- [ ] Verify no unneeded background tasks, registry/meter leases or transport
+      subscriptions; a dormant holder alone is not a leak.
+- [ ] Preserve optional class loading, explicit activation and default behavior;
+      do not replace absence tests with a no-op implementation on a full classpath.
+
+### [ ] 8.2 Preserve construction and framework ownership
+
+- [ ] Verify validation precedes acquisition with caching/telemetry actually selected;
+      observe real leases/resources, not only an unassigned factory field.
+- [ ] Exercise failed-construction rollback, successful ownership transfer and
+      destroy/recreate, including overlapping live metric owners where applicable.
+- [ ] Do not dispose application-owned connectors, pools or executors. Keep
+      factory-owned cleanup and independent caller work explicitly distinguished.
+- [ ] For selected lifecycle changes, preserve runtime/AOT ordering, supported
+      properties/metadata selection and non-instantiating diagnostics; prevent
+      AOT-only tracking from accumulating runtime observations or creating unrelated factories.
+
+### [ ] 8.3 Record resource and lifecycle acceptance
+
+- [ ] Run focused disabled-path and lifecycle regressions for selected changes;
+      inspect resources through terminal and close, not process RSS alone.
+- [ ] Record any measured cost/retention tradeoff and retained framework work;
+      zero allocation and immediate RSS reduction are not acceptance promises.
+- [ ] Record delivered IDs or dated production N/A; preserve V32/V33 guarantees
+      and route broader selection problems to a new explicit scope decision.
+
+## Priority 9 - Cross-Path and Assembled Parity
+
+### [ ] 9.1 Verify supported entry points and assembled consumers
+
+- [ ] Cover mocks, public handler entry points and Spring factory creation for
+      the accepted diff, including intentional differences in available integration state.
+- [ ] Verify external consumers use built artifacts, not reactor classes; record
+      selected profiles, effective dependencies, hashes and real test totals.
+- [ ] Run genuine Boot 4.0.0 and 4.1.0 consumer parents with tracked fixtures or exact
+      reproducible overlay commands. A mixed dependency tree is not a second Boot lane.
+- [ ] Exercise minimal, selected-feature and physical optional-absence controls
+      after relevant changes. Mock results do not prove transport release semantics.
+
+### [ ] 9.2 Verify AOT and native execution where affected
+
+- [ ] Run JVM/AOT witnesses for accepted production changes affecting execution,
+      selection or lifecycle; preserve request and terminal/ownership assertions.
+- [ ] Compile and run required native evidence from clean reachable source with
+      final fixtures. Record toolchain, build resources, command exits and binary hash.
+- [ ] Count all relevant loopback dispatches and use bounded quiet/terminal
+      evidence; an unregistered route or immediate counter read is not zero-dispatch proof.
+- [ ] Preserve failed/partial attempts. Resource exhaustion, stale binaries or
+      JVM-only verification leave required native work pending.
+
+### [ ] 9.3 Reconcile parity and evidence applicability
+
+- [ ] Map results to each selected boundary and retain any uncovered shapes or
+      supported limitations; do not infer universal coverage from representative cases.
+- [ ] For unchanged inputs/review-only scope, record exact evidence reuse or dated
+      N/A with limitations. Changed native inputs require the relevant rerun.
+- [ ] Seal commands, classpaths, reports and source/artifact hashes; fix regressions
+      before promoting a cost result or accepting the implementation.
+
+## Priority 10 - Matched Performance and Compatibility Evidence
+
+### [ ] 10.1 Run final matched cost and allocation verification
+
+- [ ] Run selected before/after rows plus minimal/default and enabled-feature
+      sentinels with final fixtures and frozen Priority 2 rules.
+- [ ] Preserve identical non-starter stacks and semantic witnesses, isolated
+      published provenance, raw JMH/GC samples, intervals, order and artifact hashes.
+- [ ] Confirm flagged rows with a reversed-order matched pair; retain original
+      flags and failures. Explain missing samples or workload differences explicitly.
+- [ ] Require demonstrated benefit for optimizations or reproduced safety/ownership
+      benefit for hardening, with honest cost. Roll back unhelpful optimization;
+      a repeatable regression needs an explicit bounded correctness tradeoff decision.
+
+### [ ] 10.2 Verify API, behavior and packaging
+
+- [ ] Run strict root and independent starter source/binary API comparisons against
+      Central `4.4.2`, each with isolated provenance and separate reports/exits.
+      Run the second comparison even if the first fails; retain failures.
+- [ ] Review behavioral and extension compatibility beyond japicmp, including
+      defaults, provider lifecycles, metadata/builder/AOT and optional linkage.
+- [ ] Run applicable complete module suites and focused regressions, generated
+      docs/metadata, packaging and version/fixture guards. Report actual totals.
+- [ ] Run/reconcile supported Boot and affected mock/consumer/AOT/native evidence
+      from Priority 9; preserve native collection controls and avoid double-counting cases.
+
+### [ ] 10.3 Seal results and constrain performance claims
+
+- [ ] Inventory final source, fixtures, dependencies, environment, commands,
+      actual outcomes, raw samples/reports and artifact/evidence hashes.
+- [ ] Rerun evidence affected by later implementation or fixture edits; explain
+      exact unchanged-input reuse instead of substituting old totals.
+- [ ] Separate microbenchmark, startup, throughput, tail latency and deployment
+      memory conclusions. B/op or mean no-network time supports only that measured claim.
+- [ ] Follow the existing release-quality report promotion process for public
+      numbers. No claim is required; smoke runs or unresolved noise cannot justify one.
+
+## Priority 11 - Maintainer and Operations Guidance
+
+### [ ] 11.1 Document delivered behavior and intentional costs
+
+- [ ] Link effective profiles, findings, approved IDs, delivered changes and
+      retained/deferred work. Explain why required discovery/state/cleanup remains.
+- [ ] Document unchanged defaults and extension/ownership guarantees; avoid a
+      universal zero-overhead claim or invented performance-mode configuration.
+- [ ] Distinguish candidate behavior from published `4.4.2` until publication;
+      keep V33's historical results and unresolved incident conclusions intact.
+
+### [ ] 11.2 Publish reproducible investigation guidance
+
+- [ ] Provide tracked commands/fixtures for phase-specific matched workloads,
+      correctness controls and repeatable confirmation of cost flags.
+- [ ] Explain CPU/allocation versus retention/direct memory/RSS, profiler overhead,
+      workload/classpath differences and measurement noise.
+- [ ] Keep support capture bounded and sanitized; no new meter/dashboard or
+      production payload capture is implied by this roadmap.
+
+### [ ] 11.3 Reconcile guidance and documentation guards
+
+- [ ] Update relevant benchmark, performance, customizer/context/ownership and
+      operations guidance only where delivered findings require changes.
+- [ ] Verify examples, local links, scope/status consistency, generated references
+      and current commands with actual test totals; preserve historical evidence.
+- [ ] Record remaining owners, workarounds, triggers and explicit limitations.
+      Guidance cannot turn an unselected candidate or noisy score into a delivered fix.
+
+## Priority 12 - Scope Decision and Conditional Release Go/No-Go
+
+### [ ] 12.1 Reconcile implementation scope and release intent
+
+- [ ] Match approved IDs to delivered/rolled-back changes, acceptance evidence
+      and deferrals; resolve blockers or obtain explicit scope removal.
+- [ ] Obtain the maintainer decision for release preparation or review-only/no-release.
+      Evaluate a compatible patch first; `4.5.0-SNAPSHOT` does not select a minor.
+- [ ] Record unresolved evidence as no-go/pending, not completed work. Review-only
+      closure needs explicit disposition of all findings and any implementation.
+
+### [ ] 12.2 Select the exact candidate or no-release branch
+
+- [ ] For a release, approve the exact candidate after compatibility/migration and
+      performance-claim review. No new feature/default enters by implication.
+- [ ] Update reactor/modules/fixtures, supported-matrix/version guards, current
+      commands, changelog and readiness together; keep baseline `4.4.2` until
+      publication is verified and keep V34 active through the final-version cut.
+- [ ] For no release, record rationale, accepted findings and implementation
+      disposition; label candidate/signing/publication work N/A explicitly.
+- [ ] Record the branch without treating preparation as publication or final GO;
+      preserve earlier evidence coordinates and source limits.
+
+### [ ] 12.3 Assemble immutable release or review evidence
+
+- [ ] Inventory clean reachable final source, decisions and required correctness,
+      API, consumer, Boot/AOT/native, cost, ownership and guidance evidence.
+- [ ] Seal exact commands, actual totals, toolchains, effective dependencies,
+      artifacts/reports and hashes; keep failures and remaining limitations.
+- [ ] Revalidate after final source/fixture/coordinate changes; document exact
+      unchanged-input reuse without calling it a new final-coordinate run.
+- [ ] For a release, verify applicable packaging/unsigned/staged checks; signing,
+      tag/workflow publication and Central consumption stay separate until verified.
+
+### [ ] 12.4 Verify publication or no-release closure
+
+- [ ] For the approved release, verify signing/staged signatures, version-matched
+      tag/workflow and Central artifact provenance. Authorize signing locally;
+      never include passphrases in evidence.
+- [ ] Verify published assembled consumption from an isolated repository with
+      versions/signatures/hashes, not a reactor install or local repository shadow.
+- [ ] For approved no-release/no-go closure, record explicit final disposition
+      and evidence limits; unrun required release gates cannot be called passes.
+- [ ] Only then close roadmap/checklist/index/readiness together; advance baselines
+      only after verified publication and leave future scope unselected.
+- [ ] Record closure revision and evidence links. No pending required work may
+      be presented as completed release evidence.
+
+## Completion Criteria
+
+- [ ] Effective profiles and equivalent workloads are measured against published
+      `4.4.2` under rules frozen before scoring.
+- [ ] Findings have explicit dispositions and production work was approved before
+      edits; no regression/leak premise or positive speedup was assumed.
+- [ ] Selected improvements demonstrate benefit or reproduced hardening while
+      preserving defaults, supported extensions, optional behavior and ownership.
+- [ ] Request/context/terminal semantics and cleanup remain verified; allocation
+      reduction has not introduced retention, hidden work or cross-caller state.
+- [ ] Required matched cost, API, module, mock/consumer, Boot/AOT/native and
+      packaging results identify final inputs, actual outcomes and evidence limits.
+- [ ] Guidance and public claims match the measured workload and release availability.
+- [ ] Release/no-release choice and final archive/readiness state are verifiable.
+
+No execution item is complete merely because this checklist exists. Production
+scope still requires Priority 4.3 approval; release scope still requires Priority 12.

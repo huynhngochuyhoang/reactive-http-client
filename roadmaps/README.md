@@ -9,8 +9,16 @@ is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V33 are completed release records. V33 was released as `4.4.2`.
-No V34 execution roadmap or next release scope is selected. The reactor is
-`4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are verified `4.4.2`.
+V34 is active for characterization; implementation and release scope are unselected.
+The reactor is `4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are
+verified `4.4.2`.
+
+[V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
+performance and default-path hardening: equivalent workloads, measured
+cost/ownership findings and explicitly selected bounded improvements. Adoption
+completes no execution priority; production edits require Priority 4.3 approval,
+and release selection remains separate in Priority 12. Configuration defaults
+and the published baseline are unchanged.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.
@@ -77,3 +85,4 @@ automatically create another execution roadmap or reopen V32.
 | V31 | [Roadmap](v31/ROADMAP.md) | [Checklist](v31/CHECKLIST.md) | Completed and released as `4.4.0` |
 | V32 | [Roadmap](v32/ROADMAP.md) | [Checklist](v32/CHECKLIST.md) | Completed and released as `4.4.1` |
 | V33 | [Roadmap](v33/ROADMAP.md) | [Checklist](v33/CHECKLIST.md) | Completed and released as `4.4.2` |
+| V34 | [Roadmap](v34/ROADMAP.md) | [Checklist](v34/CHECKLIST.md) | Active |
