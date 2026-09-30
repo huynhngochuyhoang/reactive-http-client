@@ -83,44 +83,73 @@ not existing results or a requirement to duplicate matrices.
 
 ## Priority 1 - Post-`4.4.2` Baseline and V34 Scope Integrity
 
-### [ ] 1.1 Verify adoption and version state
+### [x] 1.1 Verify adoption and version state
 
-- [ ] Verify roadmap, checklist, index and archive guard report active V34 while
+- [x] Verify roadmap, checklist, index and archive guard report active V34 while
       V1-V33 remain completed; adoption has selected neither fixes nor a release.
-- [ ] Verify reactor/module/current-consumer/native/benchmark coordinates remain
+- [x] Verify reactor/module/current-consumer/native/benchmark coordinates remain
       `4.5.0-SNAPSHOT` and published/API/consumer/benchmark baselines remain `4.4.2`.
-- [ ] Verify readiness follows checklist lifecycle through a final-version cut;
+- [x] Verify readiness follows checklist lifecycle through a final-version cut;
       current `plannedFinalVersion` remains unset and release scope unselected.
-- [ ] Preserve historical evidence, configuration defaults, dependency versions
+- [x] Preserve historical evidence, configuration defaults, dependency versions
       and public behavior; no adoption-only production change.
 
-### [ ] 1.2 Establish source and published provenance
+### [x] 1.2 Establish source and published provenance
 
-- [ ] Record reachable source/release tag, clean/dirty state, Java/Maven/GraalVM
+- [x] Record reachable source/release tag, clean/dirty state, Java/Maven/GraalVM
       where applicable, settings and effective dependencies. Identify reusable V33
       results without relabeling them as fresh V34 verification.
-- [ ] Verify published `4.4.2` artifacts and assembled consumption using isolated
+- [x] Verify published `4.4.2` artifacts and assembled consumption using isolated
       Central provenance, or explicitly revalidate exact reusable evidence. Reactor
       installation cannot substitute for a published baseline.
-- [ ] Retain POMs, dependency trees, artifact/classpath hashes, actual test totals
+- [x] Retain POMs, dependency trees, artifact/classpath hashes, actual test totals
       and the existing Java 21/Boot 4.0.0/4.1.0 lanes without silently upgrading them.
-- [ ] Run applicable version, documentation, archive and readiness guards; record
+- [x] Run applicable version, documentation, archive and readiness guards; record
       real results and any pending baseline evidence.
 
-### [ ] 1.3 Freeze effective profile boundaries
+### [x] 1.3 Freeze effective profile boundaries
 
-- [ ] Inventory minimal ordinary calls, auto-configured defaults with/without a
+- [x] Inventory minimal ordinary calls, auto-configured defaults with/without a
       MeterRegistry, classpath-present/unselected and physically absent optional
       integrations, plus selected-feature controls from the roadmap.
-- [ ] Record effective client settings, bean inventory/materialization, selected
+- [x] Record effective client settings, bean inventory/materialization, selected
       operators, filters, codecs, transport/timeouts and pool metrics for each row.
       A hand-built no-observer proxy is not the Spring default profile.
-- [ ] Keep resilience `enabled=true` without operator intent separate from minimal
+- [x] Keep resilience `enabled=true` without operator intent separate from minimal
       calls. Keep application observers/hooks without a registry and independent
       pool telemetry visible; absent exports do not mean absent behavior.
-- [ ] Map V34-C001 through V34-C005 to inspection questions, not confirmed defects.
+- [x] Map V34-C001 through V34-C005 to inspection questions, not confirmed defects.
       Record exclusions and retain V32 cleanup/reachability and V33 extension/AOT
       corrections as existing safeguards.
+
+Baseline and profile inventory: [BASELINE-SCOPE.md](BASELINE-SCOPE.md).
+Evidence: `target/release-evidence/v34/priority1/`. Reviewed clean source
+`d246e70798e43d60a66d4e213ca08d13ba34ddf7`; fresh verification includes this
+documentation/test-only patch. Source inspection freezes eight effective profile
+boundaries, not benchmark workloads or measured materialization costs. All
+implementation candidates and release scope remain unselected.
+
+The reuse audit rehashes 1,822 entries across V33's preparation/publication
+bundles, 13 published artifacts and their isolated-consumer provenance. Recounted
+ordinary/all-profile published results are four/29 cases; genuine upper-row
+candidate results are 29 full and one minimal case. These are reused results,
+not new consumer or Central executions. The record links original hashes,
+commands, toolchains, source applicability and limitations.
+
+**Completed 2026-09-30.** Oracle JDK 21.0.8, Maven 3.9.9, Boot 4.0.0 and
+Central-only settings; ordinary test forks disable explicit GC.
+
+| Fresh verification | Actual result |
+|---|---|
+| Combined focused verification | 220 cases in 11 classes: 80 documentation/archive/readiness, 136 configuration/activation/lifecycle/ownership, four compiled guidance cases; zero failures/errors/skips |
+| Reactor validation and dependency inventory | Passed; effective POM, starter tree/classpath and unchanged Java 21/Boot rows retained |
+| Provenance and API fixture guards | Passed, including expected local/mismatched/missing artifact and source/binary incompatibility rejections; not a fresh strict project comparison |
+| Script syntax and scope/whitespace | Passed; production, POMs, defaults and V1-V33/proposals unchanged |
+
+The earlier 140-case focused run overlaps the combined result. The missing-record
+red test, coordinate-only audit failure and wording-only documentation failure
+remain in the evidence bundle. No benchmark, new native build, new published
+consumer execution or release decision is claimed. Priorities 2-12 remain open.
 
 ## Priority 2 - Equivalent Workloads and Measurement Rules
 

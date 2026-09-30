@@ -216,6 +216,38 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v34BaselineRecordsProfilesAndUnselectedScope() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v34");
+        String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(baseline)
+                .contains("> **Published baseline:** `4.4.2`", "> **Development coordinate:** `4.5.0-SNAPSHOT`",
+                        "> **Implementation and release scope:** unselected",
+                        "V34-P01", "V34-P02", "V34-P03", "V34-P04", "V34-P05", "V34-P06", "V34-P07", "V34-P08",
+                        "V34-C001", "V34-C002", "V34-C003", "V34-C004", "V34-C005",
+                        "activeRoadmap=v34", "plannedFinalVersion=null",
+                        "target/release-evidence/v34/priority1/", "## Revalidated Evidence",
+                        "## Effective Profiles", "## Verification and Limits", "Priority 4.3")
+                .containsPattern("(?m)^Reviewed clean source: `[0-9a-f]{40}`\\.$");
+        assertThat(baseline.replaceAll("\\s+", " "))
+                .contains("not fresh Central downloads", "not a benchmark", "no MeterRegistry",
+                        "physical optional absence", "Pool metrics are independent", "prototype",
+                        "V32-F004", "V32-F005", "V33", "no production changes");
+        String priority = checklist.split("## Priority 1 - ", 2)[1].split("## Priority 2 - ", 2)[0];
+        assertThat(priority).contains("### [x] 1.1", "### [x] 1.2", "### [x] 1.3", "(BASELINE-SCOPE.md)")
+                .doesNotContain("[ ]");
+        assertThat(checklist).contains("> **Implementation scope:** unselected", "> **Release scope:** unselected",
+                "### [ ] 2.1", "### [ ] 4.3", "### [ ] 12.1");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) {
+                assertThat(directory.resolve(target).normalize()).as("V34 baseline link to %s", target).exists();
+            }
+        }
+    }
+
+    @Test
     void v33ExecutionChecklistMatchesRoadmapAndPreservesScopeApproval() throws IOException {
         Path directory = projectRoot().resolve("roadmaps/v33");
         String roadmap = Files.readString(directory.resolve("ROADMAP.md"));

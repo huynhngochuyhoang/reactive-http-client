@@ -15,6 +15,9 @@ execution item, approves no production changes, changes no defaults, and does
 not select `4.5.0` as the next release. Explicit selection of measured findings
 in Priority 4.3 must precede implementation.
 
+The [Priority 1 baseline](BASELINE-SCOPE.md) records the effective profiles,
+published evidence reuse and fresh guards; workload and cost evidence remain open.
+
 ## Intent
 
 Make ordinary calls pay only for work their effective contract requires, while
