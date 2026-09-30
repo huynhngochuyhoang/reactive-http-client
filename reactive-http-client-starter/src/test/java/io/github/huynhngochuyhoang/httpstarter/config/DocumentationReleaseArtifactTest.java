@@ -268,8 +268,36 @@ class DocumentationReleaseArtifactTest {
         assertThat(root.resolve("scripts/verify-v34-benchmark-inputs.py")).exists();
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         assertThat(checklist).contains("### [x] 2.1", "### [x] 2.2", "(WORKLOAD-CONTRACT.md)",
-                "### [ ] 3.1", "### [ ] 4.3", "> **Release scope:** unselected");
+                "### [ ] 4.3", "> **Release scope:** unselected");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(contract);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+        }
+    }
+
+    @Test
+    void v34CostCharacterizationPreservesUnresolvedFlagsAndImplementationApproval() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 3 - ", 2)[1].split("## Priority 4 - ", 2)[0];
+        assertThat(priority).contains("### [x] 3.1", "### [x] 3.2", "### [x] 3.3", "(COST-OWNERSHIP.md)")
+                .doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 4.3", "> **Implementation scope:** unselected",
+                "> **Release scope:** unselected");
+        String record = Files.readString(directory.resolve("COST-OWNERSHIP.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains("All 60 primary rows", "reverse-order confirmation",
+                "Allocation flag remains unresolved", "All 310 starter class files are byte-identical",
+                "Profiler timings are not scored evidence", "108 tests in ten classes", "75 each",
+                "V34-C001", "V34-C002", "V34-C003", "V34-C004", "V34-C005",
+                "No correctness or ownership defect", "not a newly approved optimization", "SHA256SUMS");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(COST-OWNERSHIP.md)");
+        assertThat(root.resolve("scripts/review-v34-benchmark-results.py")).exists();
+        assertThat(root.resolve("scripts/test_review_v34_benchmark_results.py")).exists();
+        assertThat(root.resolve("reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/core/DefaultPathCostOwnershipTest.java"))
+                .exists();
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();

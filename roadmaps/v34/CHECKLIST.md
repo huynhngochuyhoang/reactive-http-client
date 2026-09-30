@@ -222,40 +222,67 @@ dependency-version edit, release selection or performance conclusion is claimed.
 
 ## Priority 3 - Default-Path Cost and Ownership Characterization
 
-### [ ] 3.1 Measure the unchanged implementation
+### [x] 3.1 Measure the unchanged implementation
 
-- [ ] Run the frozen workloads against `4.4.2` and the current pre-fix source;
+- [x] Run the frozen workloads against `4.4.2` and the current pre-fix source;
       preserve exact baseline inputs before making production edits.
-- [ ] Separate cold and warm results, allocation and elapsed cost, client and
+- [x] Separate cold and warm results, allocation and elapsed cost, client and
       downstream time. Attribute planning/provider/state/body/reporting/Reactor/
       transport costs instead of claiming all B/op is starter overhead.
-- [ ] Profile dominant sites when scores alone cannot explain a finding; retain
+- [x] Profile dominant sites when scores alone cannot explain a finding; retain
       sanitized aggregate evidence and do not mix profiler timings into scored rows.
-- [ ] Investigate flagged variance using the frozen confirmation rule. Do not
+- [x] Investigate flagged variance using the frozen confirmation rule. Do not
       convert V33's earlier cold-plan observation into a new unmeasured regression.
 
-### [ ] 3.2 Characterize preparation and retention ownership
+### [x] 3.2 Characterize preparation and retention ownership
 
-- [ ] Count observer/hook lookups, provider materializations, plan/projection work,
+- [x] Count observer/hook lookups, provider materializations, plan/projection work,
       reporting/body holders and actual feature preparation for each effective profile.
-- [ ] Observe cache/registry/meter leases, tasks and transport subscriptions on
+- [x] Observe cache/registry/meter leases, tasks and transport subscriptions on
       inactive paths; distinguish dormant objects from acquired resources.
-- [ ] Record owners and lifetimes through construction, invocation, subscription,
+- [x] Record owners and lifetimes through construction, invocation, subscription,
       terminal completion/cancel and factory close, including failed construction.
-- [ ] Identify whether proposed reuse would retain request/context/auth data,
+- [x] Identify whether proposed reuse would retain request/context/auth data,
       freeze dynamic providers or introduce synchronization/contention. Treat such
       tradeoffs as part of the finding, not as free allocation savings.
 
-### [ ] 3.3 Classify findings before selecting fixes
+### [x] 3.3 Classify findings before selecting fixes
 
-- [ ] Rank C001-C005 and any newly reproduced finding by affected profiles, source
+- [x] Rank C001-C005 and any newly reproduced finding by affected profiles, source
       anchors, measured magnitude, confidence and user impact.
-- [ ] Distinguish intentional cost, repeatable regression, correctness/ownership
+- [x] Distinguish intentional cost, repeatable regression, correctness/ownership
       defect and unresolved hypothesis. No-change is a legitimate result.
-- [ ] Record reproductions, negative controls, known limitations and missing
+- [x] Record reproductions, negative controls, known limitations and missing
       evidence; do not assume a memory leak or a need to optimize every allocation.
-- [ ] Publish the characterization and preserve raw evidence before requesting
+- [x] Publish the characterization and preserve raw evidence before requesting
       implementation approval. Priority 3 alone authorizes no production fix.
+
+**Evidence:** [cost and ownership characterization](COST-OWNERSHIP.md),
+`DefaultPathCostOwnershipTest`, and the frozen-rule analysis/negative guards in
+`scripts/review-v34-benchmark-results.py`. Both scored artifacts were built from
+clean reachable `ec225b8ed93ab0d1bd461d4eda7a38f23a2579e1` before test/documentation
+edits. The 39 harness files, 120 non-starter JARs and all 310 starter class bytes
+match; Central `4.4.2` provenance is revalidated in the separate P2 repository.
+Raw evidence is preserved under `target/release-evidence/v34/priority3/`.
+
+**Completed 2026-10-01.** All 60 scored rows per artifact have two forks and ten
+measurement samples. The first pair flags zero latency and two allocation rows;
+reverse-order confirmation clears the registry flag but leaves the enabled-only
+publisher's bimodal allocation flag unresolved. Seven separate JFR profiles
+provide bounded attribution, not scored timings or reliable CPU-share estimates.
+The 14 new structural cases and nine existing classes pass 108 focused tests
+with explicit GC disabled; benchmark builds pass 75 tests each. Python evidence
+guards pass 14 cases and documentation/archive/readiness passes 82 cases, with
+zero failures/errors/skips. Whitespace and unchanged production/packaging checks pass.
+Failed fixture cleanup evidence is retained. No production edit, attributed
+regression, leak fix, new native result or speedup is claimed. C001-C005 are ranked
+but unselected; Priority 4.3 and release selection remain open.
+
+The 500-file bundle inventory is `target/release-evidence/v34/priority3/SHA256SUMS`,
+SHA-256 `9efede4bdc30739a4a9992c4062b56d09f598632ce5c048656b42e6836917509`.
+It includes scored/profiler inputs, raw attempts, reports and the final test/script/
+characterization sources. This checklist is the integrity index, excluded from
+the source-copy seal to avoid a self-referential checksum.
 
 ## Priority 4 - Explicit Bounded Improvement Selection
 

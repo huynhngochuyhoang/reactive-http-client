@@ -17,7 +17,9 @@ in Priority 4.3 must precede implementation.
 
 The [Priority 1 baseline](BASELINE-SCOPE.md) records the effective profiles,
 published evidence reuse and fresh guards. The [Priority 2 workload contract](WORKLOAD-CONTRACT.md)
-defines matched phases and pre-measurement rules; scored cost evidence remains open.
+defines matched phases and pre-measurement rules. The [Priority 3 characterization](COST-OWNERSHIP.md)
+records the scored pair, reverse-order confirmation, ownership controls and ranked
+findings; one allocation flag remains unresolved. Priority 4.3 selection remains open.
 
 ## Intent
 
