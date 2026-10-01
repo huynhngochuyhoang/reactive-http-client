@@ -87,7 +87,8 @@ class DocumentationReleaseArtifactTest {
                 .contains("acceptance boxes preserve the proposal")
                 .contains("V2 predates the separate execution-checklist convention")
                 .contains("V1-V33 are completed release records. V33 was released as `4.4.2`.")
-                .contains("V34 is active for characterization; implementation and release scope are unselected.");
+                .contains("V34 is active; C004's bounded disabled-policy value reuse is approved, implementation pending.")
+                .contains("Release scope remains unselected.");
 
         for (int version : versions) {
             Path directory = archive.resolve("v" + version);
@@ -119,7 +120,8 @@ class DocumentationReleaseArtifactTest {
                 assertThat(Files.readString(roadmap).replaceAll("\\s+", " ")).contains(
                         "> **Published baseline:** `4.4.2`",
                         "> **Development coordinate:** `4.5.0-SNAPSHOT`",
-                        "> **Implementation and release scope:** unselected",
+                        "> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending",
+                        "> **Release scope:** unselected",
                         "## What Default Path Means", "## 4. Explicit Bounded Improvement Selection",
                         "before production edits", "late observer/hook registration",
                         "## 12. Scope Decision and Conditional Release Go/No-Go", "(CHECKLIST.md)");
@@ -196,7 +198,8 @@ class DocumentationReleaseArtifactTest {
                 .hasSize(37);
         assertThat(checklist)
                 .contains("> **Published baseline:** `4.4.2`", "> **Development coordinate:** `4.5.0-SNAPSHOT`",
-                        "> **Implementation scope:** unselected", "> **Release scope:** unselected",
+                        "> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending",
+                        "> **Release scope:** unselected",
                         "target/release-evidence/v34/priority<N>/")
                 .containsPattern("(?m)^### \\[[ x]\\] 2\\.3 Freeze measurement and review rules$")
                 .containsPattern("(?m)^### \\[[ x]\\] 4\\.3 Record the maintainer scope decision$")
@@ -236,8 +239,7 @@ class DocumentationReleaseArtifactTest {
         String priority = checklist.split("## Priority 1 - ", 2)[1].split("## Priority 2 - ", 2)[0];
         assertThat(priority).contains("### [x] 1.1", "### [x] 1.2", "### [x] 1.3", "(BASELINE-SCOPE.md)")
                 .doesNotContain("[ ]");
-        assertThat(checklist).contains("> **Implementation scope:** unselected", "> **Release scope:** unselected",
-                "### [ ] 4.3", "### [ ] 12.1");
+        assertThat(checklist).contains("> **Release scope:** unselected", "### [ ] 12.1");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
         while (links.find()) {
             String target = links.group(1);
@@ -268,7 +270,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(root.resolve("scripts/verify-v34-benchmark-inputs.py")).exists();
         String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
         assertThat(checklist).contains("### [x] 2.1", "### [x] 2.2", "(WORKLOAD-CONTRACT.md)",
-                "### [ ] 4.3", "> **Release scope:** unselected");
+                "> **Release scope:** unselected");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(contract);
         while (links.find()) {
             String target = links.group(1);
@@ -284,8 +286,7 @@ class DocumentationReleaseArtifactTest {
         String priority = checklist.split("## Priority 3 - ", 2)[1].split("## Priority 4 - ", 2)[0];
         assertThat(priority).contains("### [x] 3.1", "### [x] 3.2", "### [x] 3.3", "(COST-OWNERSHIP.md)")
                 .doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 4.3", "> **Implementation scope:** unselected",
-                "> **Release scope:** unselected");
+        assertThat(checklist).contains("> **Release scope:** unselected");
         String record = Files.readString(directory.resolve("COST-OWNERSHIP.md"));
         assertThat(record.replaceAll("\\s+", " ")).contains("All 60 primary rows", "reverse-order confirmation",
                 "Allocation flag remains unresolved", "All 310 starter class files are byte-identical",
@@ -301,6 +302,81 @@ class DocumentationReleaseArtifactTest {
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+        }
+    }
+
+    @Test
+    void v34ImprovementDecisionSelectsOnlyDisabledValueReuseAndNotARelease() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String roadmap = Files.readString(directory.resolve("ROADMAP.md"));
+        String decision = Files.readString(directory.resolve("IMPROVEMENT-DECISION.md"));
+        String priority = checklist.split("## Priority 4 - ", 2)[1].split("## Priority 5 - ", 2)[0];
+        assertThat(priority).contains("### [x] 4.1", "### [x] 4.2", "### [x] 4.3",
+                "(IMPROVEMENT-DECISION.md)", "2026-10-01").doesNotContain("[ ]");
+        for (String current : List.of(checklist, roadmap)) {
+            assertThat(current.lines().filter(line -> line.startsWith("> **Implementation scope:**")).toList())
+                    .containsExactly("> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending");
+            assertThat(current.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                    .containsExactly("> **Release scope:** unselected");
+        }
+        assertThat(checklist).contains("### [ ] 6.1", "### [ ] 7.1", "### [ ] 8.1",
+                "### [ ] 12.1", "C004 is implemented once in Priority 6");
+        assertThat(decision.replaceAll("\\s+", " ")).contains(
+                "C004 only, within that boundary (Recommended)", "implementation work only",
+                "DISABLED", "METHOD_DISABLED", "Retain the complete per-invocation scan",
+                "No production fix is delivered here", "enabled-only allocation flag remains unresolved",
+                "## Alternatives and Dispositions", "## Acceptance and Rollback", "## Execution and Evidence Budget",
+                "## Review-Only Alternative", "2026-10-01", "C001", "C002", "C003", "C004", "C005",
+                "EffectiveCachePolicy", "class loader", "null policy name", "one bounded refinement",
+                "all six profiles x GET/TARGET (12 rows)", "complete frozen 60-row matrix",
+                "No repeatable measured benefit above fork noise: roll back", "not an isolated savings estimate",
+                "target/release-evidence/v34/priority4/");
+        assertThat(Files.readString(root.resolve("roadmaps/README.md")))
+                .contains("(v34/IMPROVEMENT-DECISION.md)");
+        assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
+                .contains("(../roadmaps/v34/IMPROVEMENT-DECISION.md)", "plannedFinalVersion=null");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+        }
+    }
+
+    @Test
+    void v34PlanningControlsCloseWithoutClaimingADeferredOptimization() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0];
+        assertThat(priority).contains("### [x] 5.1", "### [x] 5.2", "### [x] 5.3",
+                "(PLANNING-INVOCATION.md)", "Production N/A", "Cost rerun N/A", "2026-10-01")
+                .doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 6.1", "### [ ] 7.1", "### [ ] 8.1",
+                "### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
+        String record = Files.readString(directory.resolve("PLANNING-INVOCATION.md"));
+        assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
+                .containsExactly("> **Delivered production IDs:** none");
+        assertThat(record.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                .containsExactly("> **Release scope:** unselected");
+        assertThat(record.replaceAll("\\s+", " ")).contains("C004 implementation remains pending in Priority 6",
+                "Deferred planning candidate:** V34-C003", "## Scope and Ownership", "## Retained Controls",
+                "## Cost Disposition", "## Verification and Reproduction", "No new JMH/scored or exploratory timings",
+                "enabled-only allocation flag remains unresolved", "renewed approval", "null-versus-empty",
+                "ISO-8859-1", "170 tests in 13 classes", "target/release-evidence/v34/priority5/",
+                "MethodMetadataValidationTest", "PublicStaticMetadataContractTest", "V33CrossPathContractTest",
+                "IdempotencyKeySupportTest", "CacheWorkPolicyEnforcementTest");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(PLANNING-INVOCATION.md)");
+        for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
+                Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
+            Matcher links = pattern.matcher(record);
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) {
+                    assertThat(directory.resolve(target).normalize()).as("P5 link to %s", target).exists();
+                }
+            }
         }
     }
 
