@@ -9,7 +9,8 @@ is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V33 are completed release records. V33 was released as `4.4.2`.
-V34 is active for characterization; implementation and release scope are unselected.
+V34 is active; C004's bounded disabled-policy value reuse is approved, implementation pending.
+Release scope remains unselected.
 The reactor is `4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are
 verified `4.4.2`.
 
@@ -21,6 +22,9 @@ and release selection remains separate in Priority 12. Configuration defaults
 and the published baseline are unchanged.
 The [Priority 1 baseline](v34/BASELINE-SCOPE.md) records effective profiles,
 revalidated `4.4.2` evidence and fresh guards without approving an optimization.
+The [Priority 4 decision](v34/IMPROVEMENT-DECISION.md) now selects only immutable
+disabled cache-policy decision reuse, retaining every mutation check. C001-C003,
+C005 and broader C004 resource work are deferred; no improvement is delivered yet.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.

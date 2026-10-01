@@ -4,7 +4,7 @@
 > **Theme:** performance and default-path hardening
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** unselected
+> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending
 > **Release scope:** unselected
 > **Adopted:** 2026-09-30
 
@@ -286,40 +286,74 @@ the source-copy seal to avoid a self-referential checksum.
 
 ## Priority 4 - Explicit Bounded Improvement Selection
 
-### [ ] 4.1 Bound alternatives and acceptance
+### [x] 4.1 Bound alternatives and acceptance
 
-- [ ] For each actionable finding, describe the smallest local correction,
+- [x] For each actionable finding, describe the smallest local correction,
       no-change alternative, expected benefit and compatibility/ownership cost.
-- [ ] Name exact changed owners, effective profiles, public behavior constraints,
+- [x] Name exact changed owners, effective profiles, public behavior constraints,
       acceptance tests and benchmark rows; define failure and rollback conditions.
-- [ ] Prefer reproduced correctness/default-off ownership problems, then material
+- [x] Prefer reproduced correctness/default-off ownership problems, then material
       repeatable costs. Reject broad rewrites or added abstractions without need.
-- [ ] Identify dependencies and evidence budget; stop for a new scope decision if
+- [x] Identify dependencies and evidence budget; stop for a new scope decision if
       a new public API, default, dependency or unsupported contract is required.
 
-### [ ] 4.2 Prepare retained and deferred dispositions
+### [x] 4.2 Prepare retained and deferred dispositions
 
-- [ ] Mark intentional cost, disproved hypotheses and insufficient evidence
+- [x] Mark intentional cost, disproved hypotheses and insufficient evidence
       explicitly. Record workaround, owner and reconsideration trigger for deferrals.
-- [ ] Map proposed IDs to Priorities 5-8 and shared regressions; avoid implementing
+- [x] Map proposed IDs to Priorities 5-8 and shared regressions; avoid implementing
       the same cross-cutting change under several priorities.
-- [ ] Describe a characterization-only/no-release alternative and its required
+- [x] Describe a characterization-only/no-release alternative and its required
       evidence. Do not make roadmap completion depend on a positive speedup.
 
-### [ ] 4.3 Record the maintainer scope decision
+### [x] 4.3 Record the maintainer scope decision
 
-- [ ] Obtain explicit approval of specific finding IDs and boundaries, or an
+- [x] Obtain explicit approval of specific finding IDs and boundaries, or an
       explicit review-only decision. Candidate questions are not blanket approval.
-- [ ] Record date, rationale, acceptance, verification and rollback conditions;
+- [x] Record date, rationale, acceptance, verification and rollback conditions;
       distinguish implementation selection from release selection.
-- [ ] Mark unselected production work N/A with its dated disposition while
+- [x] Mark unselected production work N/A with its dated disposition while
       retaining relevant regression controls. Do not claim those findings were fixed.
-- [ ] Align implementation status and intended order; stop production edits until
+- [x] Align implementation status and intended order; stop production edits until
       this decision exists. Release scope remains unselected.
+
+**Decision, 2026-10-01:** the maintainer selected **C004 only, within that boundary**:
+reuse immutable disabled cache-policy selections/decisions, preserving every
+mutation check. [Bounded improvement decision](IMPROVEMENT-DECISION.md) records
+the exact approved owner (`EffectiveCachePolicy`), acceptance/rollback gates,
+alternatives, dated production N/A, retained controls, deferral owners and triggers.
+C001-C003, C005 and broader C004 resource changes are deferred. No production
+edit or measured benefit is delivered by Priority 4; release scope is unselected.
+
+Priority 6 is the only implementation owner. Execute Priority 5's retained
+controls/disposition first, then 6, then the shared ownership/resource controls
+in 7-8. Disabled results may be reused, but the complete per-invocation method
+scan and live configuration checks remain. The enabled-only allocation flag
+remains unresolved for final matched investigation, not cleared by approval.
+The no-change/no-release alternative remains valid after an explicit later
+decision.
+
+**Completed 2026-10-01.** Decision/contract verification passes 194 tests in six
+classes (83 documentation plus 111 existing contract cases), with zero failures,
+errors or skips and explicit GC disabled. The 14 Python evidence guards pass;
+the P3 500-file inventory revalidates unchanged. Source review and whitespace
+checks confirm no production, benchmark, dependency/coordinate or historical
+record edit. Evidence: `target/release-evidence/v34/priority4/`. These are scope
+and regression guards, not implementation, new benchmarks or native/API results.
+
+The 62-file `priority4/SHA256SUMS` inventory has SHA-256
+`0f3ab58da9fa117432561d386974c03c8102bfd901bcd19bf8fcf15e57204760`.
+It retains both overlapping verification runs, final reports/readiness and the
+decision/test/current-guidance sources; this checklist remains the external
+integrity index and is excluded from the source-copy seal.
 
 ## Priority 5 - Planning and Ordinary Invocation Hardening
 
 Conditional on Priority 4.3 selection affecting planning or request materialization.
+
+**Scope disposition, 2026-10-01:** production planning/projection changes N/A;
+C003 is deferred. Retain planning/selection controls and the execution disposition
+below. Their unchecked boxes do not authorize a planning optimization.
 
 ### [ ] 5.1 Implement only the selected local correction
 
@@ -355,6 +389,11 @@ Conditional on Priority 4.3 selection affecting planning or request materializat
 
 Conditional on Priority 4.3 selection affecting discovery, reporting or feature preparation.
 
+**Selected scope, 2026-10-01:** deliver C004's disabled-value reuse only, as bounded
+in [the decision](IMPROVEMENT-DECISION.md). Production discovery/reporting changes
+N/A (C001/C002 deferred); retain their controls. Do not remove state or skip
+selection validation to lower allocation. Implementation and verification remain pending.
+
 ### [ ] 6.1 Preserve dynamic discovery while reducing proven work
 
 - [ ] Change provider discovery/composition only for selected findings; preserve
@@ -388,6 +427,10 @@ Conditional on Priority 4.3 selection affecting discovery, reporting or feature 
 ## Priority 7 - Body, Context and Terminal Ownership
 
 Apply to selected changes that touch execution or state; retain shared safety controls.
+
+**Scope disposition, 2026-10-01:** production body/context/terminal changes N/A;
+C002 is deferred. Retain applicable ownership regressions for the selected diff
+and explicitly record applicability/reuse when executing this priority.
 
 ### [ ] 7.1 Preserve body ownership and reactive delivery
 
@@ -424,6 +467,10 @@ Apply to selected changes that touch execution or state; retain shared safety co
 ## Priority 8 - Inactive Resources and Framework Lifecycle
 
 Conditional production work follows Priority 4.3; inactive-path controls remain required.
+
+**Scope disposition, 2026-10-01:** production resource/framework changes N/A;
+broader C004 and C005 changes are deferred. Retain inactive-path, physical absence,
+failed-construction and lifecycle controls; C004 is implemented once in Priority 6.
 
 ### [ ] 8.1 Verify unselected features do not acquire resources
 
@@ -618,4 +665,5 @@ Conditional production work follows Priority 4.3; inactive-path controls remain 
 - [ ] Release/no-release choice and final archive/readiness state are verifiable.
 
 No execution item is complete merely because this checklist exists. Production
-scope still requires Priority 4.3 approval; release scope still requires Priority 12.
+scope is limited to the recorded decision; broader work requires renewed
+Priority 4.3 approval. Release scope still requires Priority 12.

@@ -4,7 +4,8 @@
 > **Theme:** performance and default-path hardening
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation and release scope:** unselected
+> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending
+> **Release scope:** unselected
 > **Draft date:** 2026-09-30
 > **Adopted:** 2026-09-30
 
@@ -19,7 +20,10 @@ The [Priority 1 baseline](BASELINE-SCOPE.md) records the effective profiles,
 published evidence reuse and fresh guards. The [Priority 2 workload contract](WORKLOAD-CONTRACT.md)
 defines matched phases and pre-measurement rules. The [Priority 3 characterization](COST-OWNERSHIP.md)
 records the scored pair, reverse-order confirmation, ownership controls and ranked
-findings; one allocation flag remains unresolved. Priority 4.3 selection remains open.
+findings; one allocation flag remains unresolved. The [Priority 4 decision](IMPROVEMENT-DECISION.md)
+approves only C004's immutable disabled-value reuse, preserving every mutation
+check. Other candidates and broader C004 resource changes are deferred;
+implementation is pending and release scope remains unselected.
 
 ## Intent
 
@@ -104,7 +108,8 @@ merely because built-in metric exports are absent.
 
 ## Candidate Questions
 
-These IDs identify hypotheses, not confirmed defects or approved fixes.
+These IDs record the original hypotheses, not confirmed defects. Only the narrow
+C004 subset in [the decision](IMPROVEMENT-DECISION.md) is approved for implementation.
 
 | ID | Inspection boundary | Question and limiting contract |
 |---|---|---|
@@ -356,7 +361,8 @@ These are proposed acceptance criteria, not execution evidence:
 
 The [execution checklist](CHECKLIST.md) is authoritative for execution status.
 Adoption does not authorize production edits, select a release or claim new
-benchmark results; approval and evidence gates remain open.
+benchmark results; the recorded C004 approval is bounded, and implementation,
+verification and release gates remain open.
 
 [handler]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
 [plan]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/RequestPlan.java
