@@ -24,6 +24,9 @@ findings; one allocation flag remains unresolved. The [Priority 4 decision](IMPR
 approves only C004's immutable disabled-value reuse, preserving every mutation
 check. Other candidates and broader C004 resource changes are deferred;
 implementation is pending and release scope remains unselected.
+The [Priority 5 planning controls](PLANNING-INVOCATION.md) record production N/A
+for deferred C003 and fresh metadata/wire/selection regressions, not a planning
+optimization. C004 remains pending in Priority 6.
 
 ## Intent
 

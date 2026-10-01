@@ -353,37 +353,60 @@ Conditional on Priority 4.3 selection affecting planning or request materializat
 
 **Scope disposition, 2026-10-01:** production planning/projection changes N/A;
 C003 is deferred. Retain planning/selection controls and the execution disposition
-below. Their unchecked boxes do not authorize a planning optimization.
+below. Completed controls do not authorize a planning optimization.
 
-### [ ] 5.1 Implement only the selected local correction
+### [x] 5.1 Implement only the selected local correction
 
-- [ ] Add desired-behavior and baseline cost witnesses for selected IDs before
+- [x] Add desired-behavior and baseline cost witnesses for selected IDs before
       changing repeated static work, argument/default/header projection or collections.
-- [ ] Keep the existing plan/resolver ownership boundary and invocation/subscription
+      **Production N/A:** no planning ID selected; existing cost witnesses retained.
+- [x] Keep the existing plan/resolver ownership boundary and invocation/subscription
       timing. Do not introduce another metadata model or deep-freeze ordinary calls
       merely to enable reuse.
-- [ ] Avoid retaining arguments, bodies or Reactor context in cached plans; preserve
+- [x] Avoid retaining arguments, bodies or Reactor context in cached plans; preserve
       sufficient concrete method/generic identity for shared metadata.
 
-### [ ] 5.2 Preserve request planning and wire semantics
+### [x] 5.2 Preserve request planning and wire semantics
 
-- [ ] Exercise annotation parsing, complete fresh public metadata, retained derived
+- [x] Exercise annotation parsing, complete fresh public metadata, retained derived
       values, API-ref precedence and inherited concrete/generic methods.
-- [ ] Verify null versus empty, ordered query/header values, escaping/URI projection,
+- [x] Verify null versus empty, ordered query/header values, escaping/URI projection,
       default headers, body presence, final charset and context idempotency.
-- [ ] Preserve dynamic per-call/subscription values and reject invalid metadata at
+- [x] Preserve dynamic per-call/subscription values and reject invalid metadata at
       the existing boundary. No body pre-serialization or normalization solely for cost.
-- [ ] Cover cold/repeated/concurrent subscriptions where touched; inspect exact
+- [x] Cover cold/repeated/concurrent subscriptions where touched; inspect exact
       requests and results rather than helper state alone.
 
-### [ ] 5.3 Verify and record the bounded outcome
+### [x] 5.3 Verify and record the bounded outcome
 
-- [ ] Run focused planning/resolution/public-entry regressions and selected cost
+- [x] Run focused planning/resolution/public-entry regressions and selected cost
       rows; label exploratory timings separately from final Priority 10 evidence.
-- [ ] Record each delivered ID, semantic checks, remaining costs and rollback
+      **Cost rerun N/A:** no selected planning correction; exact unchanged-input
+      P3 evidence reuse, not new scoring or exploratory timing.
+- [x] Record each delivered ID, semantic checks, remaining costs and rollback
       disposition. Remove an unhelpful optimization instead of expanding its scope.
-- [ ] If no relevant ID was selected, record production work N/A and the retained
+- [x] If no relevant ID was selected, record production work N/A and the retained
       controls without claiming a planning improvement.
+
+**Completed 2026-10-01.** [Planning and invocation controls](PLANNING-INVOCATION.md)
+record production N/A, no delivered production ID and C003's deferral/reopening
+boundary. Two null/empty wire cases and a strengthened materialized-charset
+assertion supplement retained metadata, URI, selection and caller-isolation tests.
+The final focused run passes 170 cases in 13 classes; documentation/archive/
+readiness passes 84, for 254 Java cases with zero failures/errors/skips and explicit
+GC disabled. Python evidence guards pass 14. Historical P3 (500 files) and P4
+(62 files) inventories revalidate unchanged; no new performance claim or planning
+optimization is delivered. C004 remains pending in Priority 6, release scope
+unselected, and the enabled-only allocation flag remains unresolved.
+
+Evidence: `target/release-evidence/v34/priority5/`. The earlier overlapping core
+run is retained, not added to final totals. Production, benchmark, dependency,
+coordinate and historical-record inputs are unchanged.
+
+The 99-file `priority5/SHA256SUMS` inventory has SHA-256
+`4a2136f069632f8d3e4e7de0ae84ab19df97e5fe962ed0b1375b5baacedfe8b6`.
+It includes final reports, readiness and source copies; this checklist remains
+the external integrity index and is excluded from the source-copy seal.
 
 ## Priority 6 - Diagnostics and Optional-Feature Cost Isolation
 

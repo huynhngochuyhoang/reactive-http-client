@@ -321,7 +321,7 @@ class DocumentationReleaseArtifactTest {
             assertThat(current.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
                     .containsExactly("> **Release scope:** unselected");
         }
-        assertThat(checklist).contains("### [ ] 5.1", "### [ ] 6.1", "### [ ] 7.1", "### [ ] 8.1",
+        assertThat(checklist).contains("### [ ] 6.1", "### [ ] 7.1", "### [ ] 8.1",
                 "### [ ] 12.1", "C004 is implemented once in Priority 6");
         assertThat(decision.replaceAll("\\s+", " ")).contains(
                 "C004 only, within that boundary (Recommended)", "implementation work only",
@@ -341,6 +341,42 @@ class DocumentationReleaseArtifactTest {
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+        }
+    }
+
+    @Test
+    void v34PlanningControlsCloseWithoutClaimingADeferredOptimization() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0];
+        assertThat(priority).contains("### [x] 5.1", "### [x] 5.2", "### [x] 5.3",
+                "(PLANNING-INVOCATION.md)", "Production N/A", "Cost rerun N/A", "2026-10-01")
+                .doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 6.1", "### [ ] 7.1", "### [ ] 8.1",
+                "### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
+        String record = Files.readString(directory.resolve("PLANNING-INVOCATION.md"));
+        assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
+                .containsExactly("> **Delivered production IDs:** none");
+        assertThat(record.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                .containsExactly("> **Release scope:** unselected");
+        assertThat(record.replaceAll("\\s+", " ")).contains("C004 implementation remains pending in Priority 6",
+                "Deferred planning candidate:** V34-C003", "## Scope and Ownership", "## Retained Controls",
+                "## Cost Disposition", "## Verification and Reproduction", "No new JMH/scored or exploratory timings",
+                "enabled-only allocation flag remains unresolved", "renewed approval", "null-versus-empty",
+                "ISO-8859-1", "170 tests in 13 classes", "target/release-evidence/v34/priority5/",
+                "MethodMetadataValidationTest", "PublicStaticMetadataContractTest", "V33CrossPathContractTest",
+                "IdempotencyKeySupportTest", "CacheWorkPolicyEnforcementTest");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(PLANNING-INVOCATION.md)");
+        for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
+                Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
+            Matcher links = pattern.matcher(record);
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) {
+                    assertThat(directory.resolve(target).normalize()).as("P5 link to %s", target).exists();
+                }
+            }
         }
     }
 

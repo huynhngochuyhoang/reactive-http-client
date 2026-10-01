@@ -8,6 +8,8 @@ import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperti
 import io.github.huynhngochuyhoang.httpstarter.exception.AuthProviderException;
 import io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserver;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.buffer.DataBuffer;
@@ -33,6 +35,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -45,6 +48,40 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class ReactiveClientInvocationHandlerBehaviorTest {
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    void ordinaryNullAndEmptyValuesKeepDistinctWireShapesOnRepeatedSubscriptions(String value) throws Throwable {
+        AtomicReference<ClientRequest> captured = new AtomicReference<>();
+        AtomicInteger dispatches = new AtomicInteger();
+        WebClient webClient = WebClient.builder().baseUrl("http://test.local")
+                .exchangeFunction(request -> {
+                    dispatches.incrementAndGet();
+                    captured.set(request);
+                    return Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build());
+                }).build();
+        ReactiveClientInvocationHandler handler = createHandler(webClient,
+                new ReactiveHttpClientProperties.ClientConfig(), TestJsonCodecs.jsonCodec(), NullableValuesClient.class);
+        try {
+            Method method = NullableValuesClient.class.getMethod("post", String.class, String.class, String.class);
+            @SuppressWarnings("unchecked")
+            Mono<String> cold = (Mono<String>) handler.invoke(null, method, new Object[]{value, value, value});
+            assertEquals(0, dispatches.get());
+            for (int subscription = 1; subscription <= 2; subscription++) {
+                assertEquals("ok", cold.block(Duration.ofSeconds(5)));
+                assertEquals(subscription, dispatches.get());
+                ClientRequest request = captured.get();
+                assertEquals(HttpMethod.POST, request.method());
+                assertEquals("http://test.local/nullable" + (value == null ? "" : "?q="), request.url().toString());
+                assertEquals(value == null ? null : List.of(""), request.headers().get("X-Value"));
+                MockClientHttpRequest wire = materialize(request);
+                assertEquals(value == null ? null : MediaType.APPLICATION_JSON, wire.getHeaders().getContentType());
+                assertEquals("", wire.getBodyAsString().defaultIfEmpty("").block(Duration.ofSeconds(5)));
+            }
+        } finally {
+            handler.responseCacheManager().close();
+        }
+    }
 
     @Test
     void diagnosticsDisabledUnaryRequestDoesNotInstallSubscriptionReportingState() {
@@ -559,6 +596,9 @@ class ReactiveClientInvocationHandlerBehaviorTest {
 
         assertEquals(sha256Hex("café".getBytes(StandardCharsets.ISO_8859_1)),
                 captured.get().headers().getFirst("x-amz-content-sha256"));
+        MockClientHttpRequest wire = materialize(captured.get());
+        assertEquals(MediaType.parseMediaType("text/plain;charset=ISO-8859-1"), wire.getHeaders().getContentType());
+        assertEquals("café", wire.getBodyAsString().block(Duration.ofSeconds(5)));
     }
 
     @Test
@@ -1021,6 +1061,11 @@ class ReactiveClientInvocationHandlerBehaviorTest {
     interface ClientWithBodyHeaders {
         @POST("/body")
         Mono<String> post(@HeaderParam("Content-Type") String contentType, @Body String body);
+    }
+
+    interface NullableValuesClient {
+        @POST("/nullable")
+        Mono<String> post(@QueryParam("q") String query, @HeaderParam("X-Value") String header, @Body String body);
     }
 
     interface ClientWithJsonBodyHeaders {
