@@ -1,5 +1,6 @@
 package io.github.huynhngochuyhoang.httpstarter.core;
 
+import io.github.huynhngochuyhoang.httpstarter.annotation.CacheDisabled;
 import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.PathVar;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
@@ -35,6 +36,42 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @org.junit.jupiter.api.Timeout(30)
 class CacheWorkPolicyEnforcementTest {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void excludedInvocationStillRejectsItsSiblingsSelectionMutation(boolean initiallySelected) {
+        var config = config(true);
+        if (!initiallySelected) { config.getCache().setPolicy(null); }
+        AtomicInteger dispatches = new AtomicInteger();
+        try (var context = new GenericApplicationContext()) {
+            context.refresh();
+            var handler = ReactiveClientInvocationHandler.create(
+                    WebClient.builder().baseUrl("http://localhost").exchangeFunction(request -> {
+                        dispatches.incrementAndGet();
+                        return Mono.just(response(request.url().getPath()));
+                    }).build(), new MethodMetadataCache(), new RequestArgumentResolver(), new DefaultErrorDecoder(),
+                    config, "work", SiblingClient.class, context, new NoopResilienceOperatorApplier(), null, null);
+            try (var manager = handler.responseCacheManager()) {
+                SiblingClient client = (SiblingClient) Proxy.newProxyInstance(getClass().getClassLoader(),
+                        new Class[]{SiblingClient.class}, handler);
+                assertThat(client.ordinary().block(Duration.ofSeconds(5))).isEqualTo("/ordinary");
+                if (initiallySelected) {
+                    config.getCache().getPolicies().get("work").getWork().setMaximumConcurrentCallers(3L);
+                } else {
+                    assertThat(manager).isNull();
+                    config.getCache().setPolicy("work");
+                }
+                assertThatThrownBy(client::ordinary).isInstanceOf(IllegalStateException.class)
+                        .hasMessage("Cache work selection changed after startup; recreate the client factory");
+                assertThat(dispatches).hasValue(1);
+            }
+        }
+    }
+
+    interface SiblingClient {
+        @GET("/ordinary") @CacheDisabled Mono<String> ordinary();
+        @GET("/selected") Mono<String> selected();
+    }
+
     @ParameterizedTest
     @ValueSource(booleans = {false, true})
     void publicSelectionEnforcesAllThreeDimensionsAndPreservesExpiry(boolean single) {

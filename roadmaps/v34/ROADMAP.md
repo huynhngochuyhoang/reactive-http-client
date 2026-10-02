@@ -4,7 +4,7 @@
 > **Theme:** performance and default-path hardening
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending
+> **Implementation scope:** V34-C004 evaluated and rolled back; no production change retained
 > **Release scope:** unselected
 > **Draft date:** 2026-09-30
 > **Adopted:** 2026-09-30
@@ -23,10 +23,12 @@ records the scored pair, reverse-order confirmation, ownership controls and rank
 findings; one allocation flag remains unresolved. The [Priority 4 decision](IMPROVEMENT-DECISION.md)
 approves only C004's immutable disabled-value reuse, preserving every mutation
 check. Other candidates and broader C004 resource changes are deferred;
-implementation is pending and release scope remains unselected.
+release scope remains unselected.
 The [Priority 5 planning controls](PLANNING-INVOCATION.md) record production N/A
 for deferred C003 and fresh metadata/wire/selection regressions, not a planning
-optimization. C004 remains pending in Priority 6.
+optimization. [Priority 6 hardening](HARDENING-EVIDENCE.md) records the C004
+experiment and rollback after its benefit gate failed; behavioral controls remain.
+Priorities 7-12 remain open, including the unresolved allocation investigation.
 
 ## Intent
 
@@ -364,8 +366,8 @@ These are proposed acceptance criteria, not execution evidence:
 
 The [execution checklist](CHECKLIST.md) is authoritative for execution status.
 Adoption does not authorize production edits, select a release or claim new
-benchmark results; the recorded C004 approval is bounded, and implementation,
-verification and release gates remain open.
+benchmark results; the bounded C004 experiment was rolled back. Remaining
+verification and release/no-release decision gates remain open.
 
 [handler]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
 [plan]: ../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/RequestPlan.java

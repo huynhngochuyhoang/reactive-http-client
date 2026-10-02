@@ -195,8 +195,10 @@ for signing, tag/workflow and fresh Central consumption. Public baselines are `4
 V1-V33 are completed release records. [V34](../roadmaps/v34/CHECKLIST.md) is active
 for performance/default-path hardening. Its [Priority 4 decision](../roadmaps/v34/IMPROVEMENT-DECISION.md)
 approves only C004's immutable disabled cache-policy decision reuse while retaining
-all mutation checks; implementation is pending and release scope is unselected.
-The decision changes no runtime defaults or release coordinates.
+all mutation checks. [Priority 6 hardening](../roadmaps/v34/HARDENING-EVIDENCE.md)
+records its failed benefit gate and rollback, with behavioral regressions retained.
+Remaining verification is pending and release scope is unselected. Runtime
+defaults and release coordinates are unchanged.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records the release tag, successful signing/staging/packaging/deployment workflow,
 13 verified signed Central artifacts and published-consumer results.

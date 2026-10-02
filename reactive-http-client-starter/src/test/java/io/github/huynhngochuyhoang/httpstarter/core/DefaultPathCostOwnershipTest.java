@@ -36,7 +36,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -148,6 +150,50 @@ class DefaultPathCostOwnershipTest {
             assertThat(supported).hasValue(2);
             assertThat(observed).hasValue(3);
             assertThat(owners).containsExactly(1, 1, 2);
+        }
+    }
+
+    @Test
+    void concurrentFirstInvocationsStillMaterializeIndependentPrototypeConsumers() throws Exception {
+        try (var fixture = new Fixture(Profile.AUTO_NO_REGISTRY);
+             var executor = Executors.newFixedThreadPool(4)) {
+            AtomicInteger creations = new AtomicInteger();
+            CountDownLatch preparing = new CountDownLatch(4);
+            List<Integer> owners = new ArrayList<>();
+            fixture.context.registerBean("concurrentObserver", HttpClientObserver.class, () -> {
+                int owner = creations.incrementAndGet();
+                preparing.countDown();
+                try {
+                    assertThat(preparing.await(5, TimeUnit.SECONDS)).isTrue();
+                } catch (InterruptedException error) {
+                    Thread.currentThread().interrupt();
+                    throw new AssertionError(error);
+                }
+                return event -> owners.add(owner);
+            }, definition -> definition.setScope("prototype"));
+            fixture.resetCounts();
+            var tasks = java.util.stream.IntStream.range(0, 4).<Callable<Mono<String>>>mapToObj(
+                    index -> () -> fixture.client.target("caller-" + index, "summary", "scope")).toList();
+            var calls = executor.invokeAll(tasks, 10, TimeUnit.SECONDS);
+            assertThat(creations).hasValue(4);
+            assertThat(fixture.dispatches).hasValue(0);
+            verify(fixture.context.observers, times(4)).orderedStream();
+            verify(fixture.context.observers, never()).getIfAvailable();
+            verify(fixture.context.hooks, times(4)).orderedStream();
+            for (var call : calls) {
+                Mono<String> publisher = call.get(5, TimeUnit.SECONDS);
+                assertThat(publisher.block(WAIT)).isEqualTo("ok");
+                assertThat(publisher.block(WAIT)).isEqualTo("ok");
+            }
+            assertThat(creations).hasValue(4);
+            assertThat(owners).hasSize(8);
+            assertThat(owners.stream().distinct().toList()).hasSize(4);
+            for (int index = 0; index < owners.size(); index += 2) {
+                assertThat(owners.get(index)).isEqualTo(owners.get(index + 1));
+            }
+            assertThat(fixture.states).hasSize(8).doesNotHaveDuplicates();
+            assertThat(fixture.handler.responseCacheManager()).isNull();
+            fixture.assertInactiveResources();
         }
     }
 

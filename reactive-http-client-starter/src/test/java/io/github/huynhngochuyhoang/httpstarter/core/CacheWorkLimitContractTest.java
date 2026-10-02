@@ -120,6 +120,23 @@ class CacheWorkLimitContractTest {
     }
 
     @Test
+    void liveValidatorRetainsConcreteApiRefAndDisabledSourceChecks() {
+        var config = config();
+        var snapshot = CacheWorkPolicy.freeze(Client.class, "work-contract", metadata, config);
+        var validate = CacheWorkPolicy.validator(snapshot, Client.class, metadata, config);
+        validate.run();
+        assertThat(selection(snapshot, "disabled").source()).isEqualTo(EffectiveCachePolicy.Source.METHOD_DISABLED);
+        assertThat(selection(snapshot, "inherited").source()).isEqualTo(EffectiveCachePolicy.Source.CLIENT);
+        config.getApis().get("search").setMethod(null);
+        assertThatThrownBy(validate::run).hasMessageContaining("changed after startup");
+        config.getApis().get("search").setMethod("POST");
+        validate.run();
+        config.getCache().setPolicy(null);
+        assertThatThrownBy(validate::run).hasMessageContaining("changed after startup");
+        assertThat(selection(snapshot, "inherited").source()).isEqualTo(EffectiveCachePolicy.Source.CLIENT);
+    }
+
+    @Test
     void invalidUnusedWorkDoesNotEnableCacheOrRefresh() {
         var config = config();
         config.getCache().setPolicy(null);

@@ -87,7 +87,7 @@ class DocumentationReleaseArtifactTest {
                 .contains("acceptance boxes preserve the proposal")
                 .contains("V2 predates the separate execution-checklist convention")
                 .contains("V1-V33 are completed release records. V33 was released as `4.4.2`.")
-                .contains("V34 is active; C004's bounded disabled-policy value reuse is approved, implementation pending.")
+                .contains("V34 is active; C004's bounded disabled-policy value reuse was evaluated and rolled back.")
                 .contains("Release scope remains unselected.");
 
         for (int version : versions) {
@@ -120,7 +120,7 @@ class DocumentationReleaseArtifactTest {
                 assertThat(Files.readString(roadmap).replaceAll("\\s+", " ")).contains(
                         "> **Published baseline:** `4.4.2`",
                         "> **Development coordinate:** `4.5.0-SNAPSHOT`",
-                        "> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending",
+                        "> **Implementation scope:** V34-C004 evaluated and rolled back; no production change retained",
                         "> **Release scope:** unselected",
                         "## What Default Path Means", "## 4. Explicit Bounded Improvement Selection",
                         "before production edits", "late observer/hook registration",
@@ -198,7 +198,7 @@ class DocumentationReleaseArtifactTest {
                 .hasSize(37);
         assertThat(checklist)
                 .contains("> **Published baseline:** `4.4.2`", "> **Development coordinate:** `4.5.0-SNAPSHOT`",
-                        "> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending",
+                        "> **Implementation scope:** V34-C004 evaluated and rolled back; no production change retained",
                         "> **Release scope:** unselected",
                         "target/release-evidence/v34/priority<N>/")
                 .containsPattern("(?m)^### \\[[ x]\\] 2\\.3 Freeze measurement and review rules$")
@@ -317,11 +317,11 @@ class DocumentationReleaseArtifactTest {
                 "(IMPROVEMENT-DECISION.md)", "2026-10-01").doesNotContain("[ ]");
         for (String current : List.of(checklist, roadmap)) {
             assertThat(current.lines().filter(line -> line.startsWith("> **Implementation scope:**")).toList())
-                    .containsExactly("> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending");
+                    .containsExactly("> **Implementation scope:** V34-C004 evaluated and rolled back; no production change retained");
             assertThat(current.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
                     .containsExactly("> **Release scope:** unselected");
         }
-        assertThat(checklist).contains("### [ ] 6.1", "### [ ] 7.1", "### [ ] 8.1",
+        assertThat(checklist).contains("### [ ] 7.1", "### [ ] 8.1",
                 "### [ ] 12.1", "C004 is implemented once in Priority 6");
         assertThat(decision.replaceAll("\\s+", " ")).contains(
                 "C004 only, within that boundary (Recommended)", "implementation work only",
@@ -353,7 +353,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority).contains("### [x] 5.1", "### [x] 5.2", "### [x] 5.3",
                 "(PLANNING-INVOCATION.md)", "Production N/A", "Cost rerun N/A", "2026-10-01")
                 .doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 6.1", "### [ ] 7.1", "### [ ] 8.1",
+        assertThat(checklist).contains("### [ ] 7.1", "### [ ] 8.1",
                 "### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("PLANNING-INVOCATION.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
@@ -376,6 +376,46 @@ class DocumentationReleaseArtifactTest {
                 if (!target.contains(":")) {
                     assertThat(directory.resolve(target).normalize()).as("P5 link to %s", target).exists();
                 }
+            }
+        }
+    }
+
+    @Test
+    void v34CostIsolationRecordsRollbackAndRetainedVerificationGates() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0];
+        assertThat(priority).contains("### [x] 6.1", "### [x] 6.2", "### [x] 6.3",
+                "(HARDENING-EVIDENCE.md)", "Production discovery N/A", "Production reporting N/A")
+                .doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 7.1", "### [ ] 8.1", "### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
+        String record = Files.readString(directory.resolve("HARDENING-EVIDENCE.md"));
+        assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
+                .containsExactly("> **Delivered production IDs:** none; V34-C004 rolled back after failed benefit gate");
+        assertThat(record.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                .containsExactly("> **Release scope:** unselected");
+        assertThat(record.replaceAll("\\s+", " ")).contains("Priority 6 complete", "four private constants",
+                "selected and invalid decisions were not interned", "complete per-invocation",
+                "CacheWorkPolicy.validator", "303 tests in 18 classes", "62 tests", "exploratory",
+                "not clean-commit release evidence", "enabled-only allocation flag remains unresolved",
+                "final matched 60-row matrix", "no old native binary", "rollback", "120 non-starter",
+                "Both orders fail the benefit gate", "No production change remains", "310 starter class files",
+                "target/release-evidence/v34/priority6/");
+        for (String name : List.of("DeclarativeCachePolicyTest", "CacheWorkLimitContractTest",
+                "CacheWorkPolicyEnforcementTest", "DefaultPathCostOwnershipTest")) {
+            assertThat(root.resolve("reactive-http-client-starter/src/test/java/io/github/huynhngochuyhoang/httpstarter/core/"
+                    + name + ".java")).exists();
+        }
+        for (String name : List.of("ROADMAP.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(directory.resolve(name))).contains("(HARDENING-EVIDENCE.md)");
+        }
+        for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
+                Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
+            Matcher links = pattern.matcher(record);
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
             }
         }
     }

@@ -4,7 +4,7 @@
 > **Theme:** performance and default-path hardening
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
-> **Implementation scope:** V34-C004 only: immutable disabled cache-policy decision reuse; implementation pending
+> **Implementation scope:** V34-C004 evaluated and rolled back; no production change retained
 > **Release scope:** unselected
 > **Adopted:** 2026-09-30
 
@@ -415,37 +415,68 @@ Conditional on Priority 4.3 selection affecting discovery, reporting or feature 
 **Selected scope, 2026-10-01:** deliver C004's disabled-value reuse only, as bounded
 in [the decision](IMPROVEMENT-DECISION.md). Production discovery/reporting changes
 N/A (C001/C002 deferred); retain their controls. Do not remove state or skip
-selection validation to lower allocation. Implementation and verification remain pending.
+selection validation to lower allocation.
+The candidate was confined to `EffectiveCachePolicy` and rolled back after the
+benefit gate failed; see [hardening evidence](HARDENING-EVIDENCE.md). No production
+ID is delivered. Priorities 7-10 still own remaining ownership, parity and matched
+cost/compatibility verification; release scope remains unselected.
 
-### [ ] 6.1 Preserve dynamic discovery while reducing proven work
+### [x] 6.1 Preserve dynamic discovery while reducing proven work
 
-- [ ] Change provider discovery/composition only for selected findings; preserve
+- [x] Change provider discovery/composition only for selected findings; preserve
       late observer/hook registration, order and per-client support checks.
-- [ ] Cover empty-to-present, single/multiple, prototype/provider products and
+      **Production discovery N/A:** C001 deferred; C004 reuse tested, then rolled back.
+- [x] Cover empty-to-present, single/multiple, prototype/provider products and
       first-call concurrency. Do not introduce a permanent empty-result cache.
-- [ ] Verify no-registry application consumers and classpath/bean absence; disabled
+- [x] Verify no-registry application consumers and classpath/bean absence; disabled
       built-in exports cannot suppress requested observer or lifecycle behavior.
 
-### [ ] 6.2 Keep state for every required semantic path
+### [x] 6.2 Keep state for every required semantic path
 
-- [ ] Preserve state required by auth, explicit resilience, generated idempotency
+- [x] Preserve state required by auth, explicit resilience, generated idempotency
       and logical deadlines when logging/metrics are absent. Retain the separate
       enabled-only/no-operator resilience control.
-- [ ] Remove snapshots/body inspection/events/meter work only on genuinely
+- [x] Remove snapshots/body inspection/events/meter work only on genuinely
       unconsumed paths; keep independently enabled pool gauges independent.
-- [ ] Verify terminal-once reporting, attempts/dispatches, retry/auth replay/
+      **Production reporting N/A:** C002 deferred; no state or telemetry removed.
+- [x] Verify terminal-once reporting, attempts/dispatches, retry/auth replay/
       redirects, timeout phase, cache outcome and downstream health sampling for
       touched paths. Request evidence must reflect final filter mutations.
-- [ ] Keep sensitive data and unbounded labels out of all reporting surfaces.
+- [x] Keep sensitive data and unbounded labels out of all reporting surfaces.
 
-### [ ] 6.3 Verify cost isolation and selected integrations
+### [x] 6.3 Verify cost isolation and selected integrations
 
-- [ ] Run profile-paired discovery/reporting tests with disabled exports, absent
+- [x] Run profile-paired discovery/reporting tests with disabled exports, absent
       MeterRegistry and actual selected metrics/OTel/logger/hook controls as applicable.
-- [ ] Compare selected diagnostic rows against the same effective behavior;
+- [x] Compare selected diagnostic rows against the same effective behavior;
       omitted telemetry is not an optimization.
-- [ ] Record delivered IDs and retained costs, or dated production N/A with relevant
+- [x] Record delivered IDs and retained costs, or dated production N/A with relevant
       controls. Keep final scored confirmation for Priority 10.
+
+**Completed 2026-10-02.** C004's disabled-value reuse passed semantic controls but
+failed the required repeatable P02 allocation-benefit gate. All 12 warm-publisher
+rows were compared; P02 GET was repeated in reversed order. Initial P02 allocation
+is approximately 832 B/op for both artifacts; the reversed baseline's 832/1,088
+B/op fork split does not establish a repeatable reduction. The optimization was
+removed without broadening scope. Seven new behavioral cases remain; mutation,
+provider discovery and terminal-state checks are unchanged. No delivered
+production improvement, new native result or public speedup is claimed.
+
+Final rollback verification passes 303 starter cases in 18 classes, 62 OTel cases,
+one assembled minimal-consumer case and 85 documentation/archive/readiness cases;
+14 Python evidence guards pass. Both candidate benchmark builds pass 75 cases
+each (overlapping, not 150 distinct tests). Exact commands, failed attempts,
+artifacts, raw forks and final-source checks are retained under
+`target/release-evidence/v34/priority6/`. P3's enabled-only allocation flag remains
+unresolved; Priorities 7-12 and release selection remain open.
+
+The 463-file `priority6/SHA256SUMS` inventory has SHA-256
+`3a8137c57ee0db61a238b8634951ee01e6c9f26e65d7aa620c9115c28a131995`.
+It includes rejected candidate and rebuilt rollback artifacts, matched inputs,
+raw measurements, commands, failed attempts, final reports/readiness and source
+copies. P3/P4/P5 inventories revalidate unchanged; all 310 rebuilt starter class
+files match Central `4.4.2`. This checklist remains the external integrity index,
+excluded from final source-copy sealing to avoid a self-referential checksum.
 
 ## Priority 7 - Body, Context and Terminal Ownership
 

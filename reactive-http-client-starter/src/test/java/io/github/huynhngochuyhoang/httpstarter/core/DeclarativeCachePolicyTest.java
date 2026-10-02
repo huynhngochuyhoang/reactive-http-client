@@ -18,6 +18,9 @@ import java.io.Reader;
 import java.nio.channels.ReadableByteChannel;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.*;
@@ -25,6 +28,79 @@ import static org.assertj.core.api.Assertions.*;
 class DeclarativeCachePolicyTest {
 
     private final MethodMetadataCache metadataCache = new MethodMetadataCache();
+
+    @Test
+    void disabledValuesPreserveTheirOwnSourceWithoutRetainingConfiguration() throws Exception {
+        var disabled = decision(UnselectedClient.class, "get", null);
+        var excluded = decision(PrecedenceClient.class, "excluded", selectedPolicy(1_000L, 10L));
+        assertThat(excluded).isNotEqualTo(disabled);
+        for (var value : List.of(disabled, excluded)) {
+            assertThat(value.eligibility()).isEqualTo(EffectiveCachePolicy.Eligibility.DISABLED);
+            assertThat(value.cacheable()).isFalse();
+            assertThat(value.semanticRead()).isFalse();
+            assertThat(value.invalidReason()).isNull();
+            assertThat(value.selection().enabled()).isFalse();
+            assertThat(value.selection().policyName()).isNull();
+            assertThat(value.selection().policy()).isNull();
+            assertThat(EffectiveCachePolicy.Selection.disabled(value.selection().source())).isEqualTo(value.selection());
+        }
+        assertThat(disabled.selection().source()).isEqualTo(EffectiveCachePolicy.Source.DISABLED);
+        assertThat(excluded.selection().source()).isEqualTo(EffectiveCachePolicy.Source.METHOD_DISABLED);
+        var noCache = new ReactiveHttpClientProperties.ClientConfig();
+        noCache.setCache(null);
+        for (var config : List.of(noCache, new ReactiveHttpClientProperties.ClientConfig(),
+                configWithPolicy("inert", -1L, -1L))) {
+            for (int invocation = 0; invocation < 3; invocation++) {
+                assertThat(decision(UnselectedClient.class, "get", config)).isEqualTo(disabled);
+                assertThat(decision(ConcreteInheritedClient.class, "inherited", config)).isEqualTo(disabled);
+                assertThat(decision(PrecedenceClient.class, "excluded", config)).isEqualTo(excluded);
+            }
+        }
+    }
+
+    @Test
+    void independentConcurrentDecisionsPreserveDisabledSources() throws Exception {
+        var plain = RequestPlan.from(metadataCache.get(UnselectedClient.class.getMethod("get")), UnselectedClient.class);
+        var excluded = RequestPlan.from(metadataCache.get(PrecedenceClient.class.getMethod("excluded")), PrecedenceClient.class);
+        var expected = List.of(EffectiveCachePolicy.decide(plain, null, "GET"),
+                EffectiveCachePolicy.decide(excluded, null, "GET"));
+        try (var executor = Executors.newFixedThreadPool(4)) {
+            var tasks = java.util.stream.IntStream.range(0, 32).<Callable<List<EffectiveCachePolicy.Decision>>>mapToObj(
+                    index -> () -> {
+                        var config = configWithPolicy("client-" + index, 1_000L, 10L);
+                        var first = EffectiveCachePolicy.decide(plain, config, "GET");
+                        config.getCache().setPolicy("client-" + index);
+                        return List.of(first, EffectiveCachePolicy.decide(excluded, config, "GET"));
+                    }).toList();
+            for (var future : executor.invokeAll(tasks, 5, TimeUnit.SECONDS)) {
+                var values = future.get(5, TimeUnit.SECONDS);
+                assertThat(values.get(0)).isEqualTo(expected.get(0));
+                assertThat(values.get(1)).isEqualTo(expected.get(1));
+            }
+        }
+    }
+
+    @Test
+    void selectedAndInvalidDecisionsStillReadCurrentPolicyMappings() throws Exception {
+        var config = configWithPolicy("selected", 1_000L, 10L);
+        var disabled = decision(UnselectedClient.class, "get", config);
+        config.getCache().setPolicy("selected");
+        var selected = decision(UnselectedClient.class, "get", config);
+        assertThat(selected.selection().policy()).isSameAs(config.getCache().getPolicies().get("selected"));
+        assertThat(selected.selection().source()).isEqualTo(EffectiveCachePolicy.Source.CLIENT);
+        assertThat(decision(UnselectedClient.class, "get", config)).isNotSameAs(selected);
+        addPolicy(config, "selected", 2_000L, 20L);
+        var replaced = decision(UnselectedClient.class, "get", config);
+        assertThat(replaced.selection().policy()).isNotSameAs(selected.selection().policy());
+        assertThat(replaced.selection().policy().getTtlMs()).isEqualTo(2_000L);
+        config.getCache().getPolicies().clear();
+        var invalid = decision(UnselectedClient.class, "get", config);
+        assertThat(invalid.eligibility()).isEqualTo(EffectiveCachePolicy.Eligibility.INVALID);
+        assertThat(invalid.invalidReason()).isEqualTo("the selected policy is not declared under cache.policies");
+        assertThat(decision(UnselectedClient.class, "get", config)).isNotSameAs(invalid);
+        config.getCache().setPolicy(null);
+        assertThat(decision(UnselectedClient.class, "get", config)).isEqualTo(disabled);
+    }
 
     @Test
     void policyDefinitionsAreInertUntilExplicitlySelected() {
