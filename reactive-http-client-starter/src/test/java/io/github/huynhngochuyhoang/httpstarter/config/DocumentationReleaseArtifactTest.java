@@ -352,7 +352,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority).contains("### [x] 5.1", "### [x] 5.2", "### [x] 5.3",
                 "(PLANNING-INVOCATION.md)", "Production N/A", "Cost rerun N/A", "2026-10-01")
                 .doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("PLANNING-INVOCATION.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
                 .containsExactly("> **Delivered production IDs:** none");
@@ -387,7 +387,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority).contains("### [x] 6.1", "### [x] 6.2", "### [x] 6.3",
                 "(HARDENING-EVIDENCE.md)", "Production discovery N/A", "Production reporting N/A")
                 .doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("HARDENING-EVIDENCE.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
                 .containsExactly("> **Delivered production IDs:** none; V34-C004 rolled back after failed benefit gate");
@@ -426,7 +426,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority).contains("### [x] 7.1", "### [x] 7.2", "### [x] 7.3",
                 "(BODY-CONTEXT-OWNERSHIP.md)", "no retained production diff", "2026-10-03")
                 .doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("BODY-CONTEXT-OWNERSHIP.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
                 .containsExactly("> **Delivered production IDs:** none");
@@ -459,7 +459,7 @@ class DocumentationReleaseArtifactTest {
         String priority = checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0];
         assertThat(priority).contains("### [x] 8.1", "### [x] 8.2", "### [x] 8.3",
                 "(INACTIVE-LIFECYCLE.md)", "production N/A", "2026-10-03").doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 9.1", "### [ ] 10.1", "### [ ] 11.1", "### [ ] 12.1");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 11.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("INACTIVE-LIFECYCLE.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
                 .containsExactly("> **Delivered production IDs:** none");
@@ -476,6 +476,45 @@ class DocumentationReleaseArtifactTest {
             assertThat(Files.readString(directory.resolve(name))).contains("(INACTIVE-LIFECYCLE.md)");
         }
         assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v34/INACTIVE-LIFECYCLE.md)");
+        for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
+                Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
+            Matcher links = pattern.matcher(record);
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+            }
+        }
+    }
+
+    @Test
+    void v34ParitySeparatesAssembledBootRowsNativeEvidenceAndRemainingGates() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0];
+        assertThat(priority).contains("### [x] 9.1", "### [x] 9.2", "### [x] 9.3",
+                "(PARITY-EVIDENCE.md)", "2026-10-03").doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 11.1", "### [ ] 12.1");
+        String record = Files.readString(directory.resolve("PARITY-EVIDENCE.md"));
+        assertThat(record.lines().filter(line -> line.startsWith("> **Status:**")).toList())
+                .containsExactly("> **Status:** Priority 9 complete, 2026-10-03");
+        assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
+                .containsExactly("> **Delivered production IDs:** none");
+        assertThat(record.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                .containsExactly("> **Release scope:** unselected");
+        assertThat(record.replaceAll("\\s+", " ")).contains("C004 rolled back", "714 JUnit executions",
+                "not 714 unique test definitions", "29 passed each", "283 passed each", "76 passed",
+                "**actual parent**", "Dependency classpaths contain JARs only",
+                "public handler is not registered as a Spring factory", "independent foreground load",
+                "profile flag adds no handoff cases", "Boot 4.1 is JVM/AOT evidence only",
+                "## Native Execution", "Binary SHA-256", "one-second quiet period", "20 dispatches",
+                "fc98e58b9d5154a0ba539ea878b05c532b379554", "--parallelism=2",
+                "No old native binary", "enabled-only allocation flag remains unresolved",
+                "target/release-evidence/v34/priority9/", "P11 guidance and P12 release selection remain open");
+        for (String name : List.of("ROADMAP.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(directory.resolve(name))).contains("(PARITY-EVIDENCE.md)");
+        }
+        assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v34/PARITY-EVIDENCE.md)");
         for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
                 Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
             Matcher links = pattern.matcher(record);

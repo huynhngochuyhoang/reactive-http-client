@@ -32,8 +32,11 @@ experiment and rollback after its benefit gate failed; behavioral controls remai
 caller isolation and guarded terminal behavior without production changes.
 [Priority 8 lifecycle controls](INACTIVE-LIFECYCLE.md) verify inactive integrations,
 physical optional absence, construction rollback and framework/application ownership.
-No production resource or framework change is retained. Priorities 9-12 remain
-open, including the unresolved allocation investigation.
+No production resource or framework change is retained.
+[Priority 9 parity](PARITY-EVIDENCE.md) records fresh mock/public/factory witnesses,
+genuine Boot 4.0.0/4.1.0 consumers and JVM/AOT execution, plus a clean-source Boot
+4.0.0 native compile and executable. Priorities 10-12 remain open, including the
+unresolved allocation investigation and release selection.
 
 ## Intent
 

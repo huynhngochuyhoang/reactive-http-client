@@ -620,36 +620,79 @@ final source-copy sealing to avoid a self-referential checksum.
 
 ## Priority 9 - Cross-Path and Assembled Parity
 
-### [ ] 9.1 Verify supported entry points and assembled consumers
+### [x] 9.1 Verify supported entry points and assembled consumers
 
-- [ ] Cover mocks, public handler entry points and Spring factory creation for
+- [x] Cover mocks, public handler entry points and Spring factory creation for
       the accepted diff, including intentional differences in available integration state.
-- [ ] Verify external consumers use built artifacts, not reactor classes; record
+- [x] Verify external consumers use built artifacts, not reactor classes; record
       selected profiles, effective dependencies, hashes and real test totals.
-- [ ] Run genuine Boot 4.0.0 and 4.1.0 consumer parents with tracked fixtures or exact
+- [x] Run genuine Boot 4.0.0 and 4.1.0 consumer parents with tracked fixtures or exact
       reproducible overlay commands. A mixed dependency tree is not a second Boot lane.
-- [ ] Exercise minimal, selected-feature and physical optional-absence controls
+- [x] Exercise minimal, selected-feature and physical optional-absence controls
       after relevant changes. Mock results do not prove transport release semantics.
 
-### [ ] 9.2 Verify AOT and native execution where affected
+### [x] 9.2 Verify AOT and native execution where affected
 
-- [ ] Run JVM/AOT witnesses for accepted production changes affecting execution,
+- [x] Run JVM/AOT witnesses for accepted production changes affecting execution,
       selection or lifecycle; preserve request and terminal/ownership assertions.
-- [ ] Compile and run required native evidence from clean reachable source with
+- [x] Compile and run required native evidence from clean reachable source with
       final fixtures. Record toolchain, build resources, command exits and binary hash.
-- [ ] Count all relevant loopback dispatches and use bounded quiet/terminal
+- [x] Count all relevant loopback dispatches and use bounded quiet/terminal
       evidence; an unregistered route or immediate counter read is not zero-dispatch proof.
-- [ ] Preserve failed/partial attempts. Resource exhaustion, stale binaries or
+- [x] Preserve failed/partial attempts. Resource exhaustion, stale binaries or
       JVM-only verification leave required native work pending.
 
-### [ ] 9.3 Reconcile parity and evidence applicability
+### [x] 9.3 Reconcile parity and evidence applicability
 
-- [ ] Map results to each selected boundary and retain any uncovered shapes or
+- [x] Map results to each selected boundary and retain any uncovered shapes or
       supported limitations; do not infer universal coverage from representative cases.
-- [ ] For unchanged inputs/review-only scope, record exact evidence reuse or dated
+- [x] For unchanged inputs/review-only scope, record exact evidence reuse or dated
       N/A with limitations. Changed native inputs require the relevant rerun.
-- [ ] Seal commands, classpaths, reports and source/artifact hashes; fix regressions
+- [x] Seal commands, classpaths, reports and source/artifact hashes; fix regressions
       before promoting a cost result or accepting the implementation.
+
+**Completed 2026-10-03:** [cross-path and assembled parity](PARITY-EVIDENCE.md)
+records no delivered production IDs and fresh verification from clean starting
+commit `fc98e58b9d5154a0ba539ea878b05c532b379554`. The tracked overlay runner
+uses genuine Boot 4.0.0/4.1.0 parents and verifies built-JAR dependency classpaths.
+Mock helpers pass 76 cases; each Boot row passes 29 selected-consumer cases,
+one physical-absence case, 283 focused AOT/cross-path cases and six smoke fixture
+cases. Both ordinary and AOT-enabled smoke executions pass on each Boot row.
+These total 714 JUnit executions, not unique test definitions across rows.
+
+Fresh Boot 4.0.0 native compilation and execution both exit 0 from a clean
+detached checkout of that commit; six fixture tests pass during compilation.
+The binary SHA-256 is
+`a3476f5f749d0cb546e4c175f371ea070291923d5621d92cb819758ab9a3b10e`.
+Full native evidence is in
+`target/v34-priority9-native-runs/native-feynp9yy/evidence/`; parity commands,
+reports, copied overlays and dependencies are under
+`target/release-evidence/v34/priority9/`. No failed runtime attempt or native
+retry occurred in this priority. Earlier failed attempts remain in their original
+bundles, not counted as current passes.
+
+P8 remains earlier resource evidence, not a second set of new tests here.
+Mock versus transport, public-handler diagnostics, minimal-profile source and
+native-versus-upper-Boot limits are explicit in the record. No production,
+fixture, dependency, coordinate or runner change is retained. C004 stays rolled
+back; the allocation flag, Priorities 10-12 and release selection remain open.
+
+Final documentation/archive/readiness passes 88 cases: **808 Java test executions**
+including the 714 JVM-row cases and six native-build fixture cases above, all
+with zero failures/errors/skips. V34 evidence guards pass 14 Python cases and
+native-runner guards pass five. Final readiness remains V34 active, release
+lane/scope unselected and `plannedFinalVersion=null`. The audit verifies the
+current starter's 310 class files still match the archived published baseline;
+this is not the pending strict API lane or a new Central-consumer result.
+
+The 1,213-file `priority9/SHA256SUMS` inventory has SHA-256
+`596d511a2683fad7bbdd76fccf4779b9e80a9f7045883739cd023c0b0a22c5b7`.
+It retains commands/exits, copied fixture outputs, reports, module artifacts,
+source copies and final provenance, plus fresh P3-P8 inventory verification.
+The native-reference audit verifies its separate inventory with SHA-256
+`d62ac7cd25d3f9eb816595b9ef6b07d0af431dfa53e4781c8d7968dd9a4c6821`.
+This checklist remains the external integrity index, excluded from final
+source-copy sealing to avoid a self-referential checksum.
 
 ## Priority 10 - Matched Performance and Compatibility Evidence
 
