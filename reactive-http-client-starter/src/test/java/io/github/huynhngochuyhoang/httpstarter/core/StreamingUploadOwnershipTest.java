@@ -7,18 +7,20 @@ import io.github.resilience4j.retry.RetryConfig;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.netty.buffer.PooledByteBufAllocator;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.context.support.StaticApplicationContext;
 import org.springframework.core.io.AbstractResource;
-import org.springframework.core.io.buffer.DataBuffer;
-import org.springframework.core.io.buffer.DefaultDataBufferFactory;
-import org.springframework.core.io.buffer.NettyDataBuffer;
-import org.springframework.core.io.buffer.NettyDataBufferFactory;
+import org.springframework.core.io.buffer.*;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
+import reactor.core.publisher.Sinks;
 import reactor.netty.DisposableServer;
 import reactor.netty.http.HttpProtocol;
 import reactor.netty.http.server.HttpServer;
@@ -34,19 +36,112 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.catchThrowable;
+import static org.assertj.core.api.Assertions.*;
 
 class StreamingUploadOwnershipTest {
 
     private static final Duration CALL_TIMEOUT = Duration.ofSeconds(5);
     private static final DefaultDataBufferFactory BUFFER_FACTORY = new DefaultDataBufferFactory();
+
+    @ParameterizedTest
+    @CsvSource({"BUFFER,false", "BUFFER,true", "STREAM,false", "STREAM,true",
+            "READER,false", "READER,true", "CHANNEL,false", "CHANNEL,true"})
+    void preDispatchAuthFailureOrCancellationReleasesEagerBodyOnce(String shape, boolean cancel) throws Exception {
+        Sinks.One<AuthContext> authorization = Sinks.one();
+        CountDownLatch attached = new CountDownLatch(1);
+        CountDownLatch authTerminated = new CountDownLatch(1);
+        CountDownLatch callerTerminated = new CountDownLatch(1);
+        List<SignalType> terminals = new CopyOnWriteArrayList<>();
+        InvalidatableAuthProvider auth = new InvalidatableAuthProvider() {
+            @Override public Mono<AuthContext> getAuth(AuthRequest request) {
+                return authorization.asMono().doOnSubscribe(ignored -> attached.countDown())
+                        .doFinally(ignored -> authTerminated.countDown());
+            }
+            @Override public Mono<Void> invalidate() { return Mono.empty(); }
+        };
+        Object body = switch (shape) {
+            case "BUFFER" -> new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT)
+                    .allocateBuffer(8).write(new byte[]{1, 2, 3});
+            case "STREAM" -> new CountingInputStream("pending");
+            case "READER" -> new CountingReader("pending");
+            case "CHANNEL" -> new CountingChannel("pending");
+            default -> throw new AssertionError(shape);
+        };
+        try (UploadServer server = new UploadServer();
+             ClientFixture fixture = ClientFixture.create(server, false, false, auth)) {
+            Mono<String> call = switch (body) {
+                case NettyDataBuffer buffer -> fixture.client().uploadDataBuffer(buffer);
+                case CountingInputStream stream -> fixture.client().uploadInputStream(stream);
+                case CountingReader reader -> fixture.client().uploadReader(reader);
+                case CountingChannel channel -> fixture.client().uploadChannel(channel);
+                default -> throw new AssertionError(shape);
+            };
+            assertThat(attached.getCount()).isEqualTo(1);
+            var result = call.doFinally(signal -> {
+                terminals.add(signal);
+                callerTerminated.countDown();
+            }).toFuture();
+            try {
+                assertThat(attached.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(result).isNotDone();
+                assertThat(server.requests()).isEmpty();
+                if (cancel) {
+                    assertThat(result.cancel(true)).isTrue();
+                } else {
+                    authorization.tryEmitError(new IllegalStateException("synthetic-auth-failure")).orThrow();
+                    assertThatThrownBy(() -> result.get(5, TimeUnit.SECONDS))
+                            .hasRootCauseInstanceOf(IllegalStateException.class);
+                }
+                assertThat(authTerminated.await(5, TimeUnit.SECONDS)).isTrue();
+                assertThat(callerTerminated.await(5, TimeUnit.SECONDS)).isTrue();
+                result.cancel(true);
+                assertThat(terminals).containsExactly(cancel ? SignalType.CANCEL : SignalType.ON_ERROR);
+                switch (body) {
+                    case NettyDataBuffer buffer -> assertThat(buffer.getNativeBuffer().refCnt()).isZero();
+                    case CountingInputStream stream -> assertThat(stream.closes).hasValue(1);
+                    case CountingReader reader -> assertThat(reader.closes).hasValue(1);
+                    case CountingChannel channel -> assertThat(channel.closes).hasValue(1);
+                    default -> throw new AssertionError(shape);
+                }
+                assertThat(server.requests()).isEmpty();
+            } finally {
+                result.cancel(true);
+            }
+        } finally {
+            if (body instanceof NettyDataBuffer buffer) { DataBufferUtils.release(buffer); }
+            else if (body instanceof CountingInputStream stream && stream.closes.get() == 0) { stream.close(); }
+            else if (body instanceof CountingReader reader && reader.closes.get() == 0) { reader.close(); }
+            else if (body instanceof CountingChannel channel && channel.closes.get() == 0) { channel.close(); }
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void immutableAndApplicationReplayableBodiesSupportRepeatedSubscriptions(boolean publisherBody) {
+        try (UploadServer server = new UploadServer(); ClientFixture fixture = ClientFixture.create(server)) {
+            AtomicInteger subscriptions = new AtomicInteger();
+            Mono<String> call = publisherBody
+                    ? fixture.client().upload(requestBody("replayable", subscriptions))
+                    : fixture.client().uploadText("replayable");
+            assertThat(subscriptions).hasValue(0);
+            assertThat(server.requests()).isEmpty();
+            assertThat(call.block(CALL_TIMEOUT)).isEqualTo("replayable");
+            var values = Mono.zip(call, call).block(CALL_TIMEOUT);
+            assertThat(values).isNotNull();
+            assertThat(values.getT1()).isEqualTo("replayable");
+            assertThat(values.getT2()).isEqualTo("replayable");
+            assertThat(subscriptions).hasValue(publisherBody ? 3 : 0);
+            assertThat(server.bodiesFor("/upload")).containsExactly("replayable", "replayable", "replayable");
+        }
+    }
 
     @Test
     void publisherBodyStaysColdAndHasOneSubscriptionForOneTransportAttempt() {
@@ -476,6 +571,9 @@ class StreamingUploadOwnershipTest {
     interface UploadClient {
         @POST("/upload")
         Mono<String> upload(@Body Flux<DataBuffer> body);
+
+        @POST("/upload")
+        Mono<String> uploadText(@Body String body);
 
         @POST("/data-buffer")
         Mono<String> uploadDataBuffer(@Body DataBuffer body);

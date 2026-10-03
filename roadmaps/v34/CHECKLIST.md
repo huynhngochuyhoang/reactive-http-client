@@ -486,37 +486,67 @@ Apply to selected changes that touch execution or state; retain shared safety co
 C002 is deferred. Retain applicable ownership regressions for the selected diff
 and explicitly record applicability/reuse when executing this priority.
 
-### [ ] 7.1 Preserve body ownership and reactive delivery
+**Execution disposition, 2026-10-03:** C004 was rolled back in Priority 6, so
+there is no retained production diff to optimize here. Keep the shared ownership
+controls and the exact applicability/limitations in
+[body, context and terminal ownership](BODY-CONTEXT-OWNERSHIP.md); no new
+production ID or release scope is selected.
 
-- [ ] Verify exactly-once release/transfer for DataBuffer, streams/readers/channels
+### [x] 7.1 Preserve body ownership and reactive delivery
+
+- [x] Verify exactly-once release/transfer for DataBuffer, streams/readers/channels
       and response bodies on success, empty, error, decode/serialization failure,
       pre-dispatch rejection and cancellation where supported.
-- [ ] Exercise no-body/immutable-body fast paths without removing resource-body
+- [x] Exercise no-body/immutable-body fast paths without removing resource-body
       guards. Preserve cold publishers, backpressure and streaming behavior.
-- [ ] Test replayable repeated/concurrent subscriptions; keep one-shot input limits
+- [x] Test replayable repeated/concurrent subscriptions; keep one-shot input limits
       explicit. No cost change may promise replay of consumed resources.
-- [ ] Cover cancellation after a value is buffered and after cancellation races
+- [x] Cover cancellation after a value is buffered and after cancellation races
       with delivery; assert Reactor discard cleanup, not just reference clearing.
 
-### [ ] 7.2 Preserve caller context and terminal isolation
+### [x] 7.2 Preserve caller context and terminal isolation
 
-- [ ] Verify supported scheduler hops, explicit async handoff, named case-insensitive
+- [x] Verify supported scheduler hops, explicit async handoff, named case-insensitive
       inbound access and independent subscriber/tenant snapshots where touched.
-- [ ] Prevent request/context/auth retention in reusable state; no mutable reporting
+- [x] Prevent request/context/auth retention in reusable state; no mutable reporting
       holder pooling across callers or observations after that caller terminates.
-- [ ] If affected, keep admission until guarded synchronous/async preparation and
+- [x] If affected, keep admission until guarded synchronous/async preparation and
       cleanup unwind; prevent continuations advancing after the relevant terminal.
-- [ ] If affected, keep shared-load lifecycle separate from caller deadlines, and
+- [x] If affected, keep shared-load lifecycle separate from caller deadlines, and
       refresh hard bounds, eviction and shutdown cancellation owned correctly.
 
-### [ ] 7.3 Prove cleanup without timing or GC assumptions
+### [x] 7.3 Prove cleanup without timing or GC assumptions
 
-- [ ] Use gates, controlled time and observable cleanup acknowledgements; do not
+- [x] Use gates, controlled time and observable cleanup acknowledgements; do not
       assert race completion immediately after cancellation or rely on fixed sleeps.
-- [ ] Run applicable regular regressions with explicit GC disabled. Use the existing
+- [x] Run applicable regular regressions with explicit GC disabled. Use the existing
       controlled JVM reachability lane only for actual collection claims.
-- [ ] Record state/resource owners, exact terminal outcomes and selected scope;
+- [x] Record state/resource owners, exact terminal outcomes and selected scope;
       document N/A for untouched scenarios with evidence, not a broad safety waiver.
+
+**Completed 2026-10-03.** Ten new loopback/upload cases verify pre-dispatch
+auth-failure/cancellation cleanup and immutable/application-replayable repeated
+subscriptions. Three gated discard cases now assert actual pooled-buffer release
+or caller transfer, with admission held through blocked cancellation cleanup.
+The ownership matrix passes 366 cases in 23 classes with explicit GC disabled;
+five repeated targeted runs pass 14 cases each (70 overlapping executions).
+Documentation/archive/readiness passes 86 cases; Python evidence guards pass 14.
+All final tests have zero failures/errors/skips. The earlier test-compilation
+failure and its explicitly excluded stale reports remain recorded, not counted.
+
+Production work and new collection/cost claims are N/A. Cleanup counters,
+reference counts and acknowledged terminal boundaries are not heap-collection or
+RSS evidence. Existing controlled reachability lanes were not rerun. P3-P6
+inventories and production/benchmark/packaging inputs are unchanged. Evidence:
+`target/release-evidence/v34/priority7/`. C002 remains deferred, the enabled-only
+allocation flag unresolved, and Priorities 8-12/release selection remain open.
+
+The 192-file `priority7/SHA256SUMS` inventory has SHA-256
+`070b2b06023d880a5af5268a8c02c0f55f1d3bfce408c5734ba2494764a30285`.
+It preserves the failed compile/stale-report classification, focused and repeated
+runs, final reports/readiness, source copies and P3-P6 inventory verification.
+This checklist is the external integrity index, excluded from final source-copy
+sealing to avoid a self-referential checksum.
 
 ## Priority 8 - Inactive Resources and Framework Lifecycle
 
@@ -524,37 +554,69 @@ Conditional production work follows Priority 4.3; inactive-path controls remain 
 
 **Scope disposition, 2026-10-01:** production resource/framework changes N/A;
 broader C004 and C005 changes are deferred. Retain inactive-path, physical absence,
-failed-construction and lifecycle controls; C004 is implemented once in Priority 6.
+failed-construction and lifecycle controls; C004 was evaluated once in Priority 6
+and rolled back.
 
-### [ ] 8.1 Verify unselected features do not acquire resources
+### [x] 8.1 Verify unselected features do not acquire resources
 
-- [ ] Compare present/unselected and physically absent dependency profiles; observe
+- [x] Compare present/unselected and physically absent dependency profiles; observe
       actual cache/auth/operator/telemetry preparation and resource acquisition.
-- [ ] Verify no unneeded background tasks, registry/meter leases or transport
+- [x] Verify no unneeded background tasks, registry/meter leases or transport
       subscriptions; a dormant holder alone is not a leak.
-- [ ] Preserve optional class loading, explicit activation and default behavior;
+- [x] Preserve optional class loading, explicit activation and default behavior;
       do not replace absence tests with a no-op implementation on a full classpath.
 
-### [ ] 8.2 Preserve construction and framework ownership
+### [x] 8.2 Preserve construction and framework ownership
 
-- [ ] Verify validation precedes acquisition with caching/telemetry actually selected;
+- [x] Verify validation precedes acquisition with caching/telemetry actually selected;
       observe real leases/resources, not only an unassigned factory field.
-- [ ] Exercise failed-construction rollback, successful ownership transfer and
+- [x] Exercise failed-construction rollback, successful ownership transfer and
       destroy/recreate, including overlapping live metric owners where applicable.
-- [ ] Do not dispose application-owned connectors, pools or executors. Keep
+- [x] Do not dispose application-owned connectors, pools or executors. Keep
       factory-owned cleanup and independent caller work explicitly distinguished.
-- [ ] For selected lifecycle changes, preserve runtime/AOT ordering, supported
+- [x] For selected lifecycle changes, preserve runtime/AOT ordering, supported
       properties/metadata selection and non-instantiating diagnostics; prevent
       AOT-only tracking from accumulating runtime observations or creating unrelated factories.
 
-### [ ] 8.3 Record resource and lifecycle acceptance
+### [x] 8.3 Record resource and lifecycle acceptance
 
-- [ ] Run focused disabled-path and lifecycle regressions for selected changes;
+- [x] Run focused disabled-path and lifecycle regressions for selected changes;
       inspect resources through terminal and close, not process RSS alone.
-- [ ] Record any measured cost/retention tradeoff and retained framework work;
+- [x] Record any measured cost/retention tradeoff and retained framework work;
       zero allocation and immediate RSS reduction are not acceptance promises.
-- [ ] Record delivered IDs or dated production N/A; preserve V32/V33 guarantees
+- [x] Record delivered IDs or dated production N/A; preserve V32/V33 guarantees
       and route broader selection problems to a new explicit scope decision.
+
+**Completed 2026-10-03:** [inactive-resource and lifecycle evidence](INACTIVE-LIFECYCLE.md)
+records production N/A and no delivered IDs. Two new cases cover unselected
+definitions (including weighted/refresh/work configuration) without materializing
+lazy auth/registry beans or acquiring cache meter owners. The external connector
+control now also verifies the application's auth scheduler/executor survives
+factory/context close. Existing controls cover selected-cache validation,
+construction rollback, overlapping live owners, caller-owned independent loads,
+runtime tracking shutdown, AOT selection/order and non-instantiating diagnostics.
+C004 remains rolled back; broader C004/C005 work remains deferred.
+
+Fresh resource/diagnostics tests pass 219 cases in 12 classes; framework/AOT tests
+pass 323 in seven. The isolated Boot 4.0.0 optional-absence consumer passes one
+case against the installed starter JAR, with two real GET dispatches and
+resilience enabled but no selected operators. Documentation/archive/readiness
+passes 87 cases and V34 Python evidence guards pass 14: **630 distinct Java cases**,
+zero failures/errors/skips in the final runs. All Java runs disable explicit GC. The initial
+focused failure is retained as a corrected test-fixture setup error, not a
+production failure. No new JMH, collection, native or RSS claim is made;
+Priorities 9-12, the allocation flag and release selection remain open.
+
+Evidence: `target/release-evidence/v34/priority8/`. The 118-file `SHA256SUMS`
+inventory has SHA-256
+`fc871bd90fcbd7562e8b0f3e036286a6056f4535bc333ef85511ecc0a6085297`.
+It retains the failed focused attempt, corrected suites, consumer artifacts,
+source/patch, readiness and fresh P3-P7 inventory checks. The consumer starter JAR
+has SHA-256 `134f64c361bea6066ff6eff72bbf8d7dc64102f7887fad5131a6f0b29f284037`;
+all 310 class files match the previously verified published `4.4.2` artifact.
+Production, benchmark, dependency, coordinate and consumer/native fixture inputs
+are unchanged. This checklist is the external integrity index, excluded from
+final source-copy sealing to avoid a self-referential checksum.
 
 ## Priority 9 - Cross-Path and Assembled Parity
 
