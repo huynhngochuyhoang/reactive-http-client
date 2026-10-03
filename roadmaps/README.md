@@ -30,6 +30,9 @@ improvement is delivered; remaining verification is not final release acceptance
 The [Priority 7 ownership record](v34/BODY-CONTEXT-OWNERSHIP.md) adds deterministic
 body cleanup/discard controls and verifies caller/terminal isolation without
 production changes or a new collection/performance claim.
+The [Priority 8 lifecycle record](v34/INACTIVE-LIFECYCLE.md) separates unselected
+integrations from physically absent dependencies and verifies construction,
+application-resource and framework ownership without a production change.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.

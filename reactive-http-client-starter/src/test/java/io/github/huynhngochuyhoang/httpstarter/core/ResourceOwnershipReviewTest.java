@@ -4,6 +4,7 @@ import io.github.huynhngochuyhoang.httpstarter.annotation.GET;
 import io.github.huynhngochuyhoang.httpstarter.annotation.ReactiveHttpClient;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.auth.AuthProvider;
+import io.github.huynhngochuyhoang.httpstarter.auth.AuthProviderFactory;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -19,6 +20,7 @@ import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.web.reactive.function.client.ClientResponse;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 import reactor.netty.http.client.HttpClient;
 import reactor.netty.http.server.HttpServer;
 import reactor.netty.resources.ConnectionProvider;
@@ -30,6 +32,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -40,6 +43,85 @@ import static org.mockito.Mockito.*;
 class ResourceOwnershipReviewTest {
     private static final String NAME = "ownership-review";
     private static final Duration WAIT = Duration.ofSeconds(5);
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void unselectedDefinitionsDoNotAcquireOptionalResources(boolean policyDefined) throws Exception {
+        assertThat(org.springframework.util.ClassUtils.isPresent(
+                "com.github.benmanes.caffeine.cache.Caffeine", getClass().getClassLoader())).isTrue();
+        var registry = new SimpleMeterRegistry();
+        try (var context = new GenericApplicationContext()) {
+            var properties = properties(policyDefined);
+            var config = properties.getClients().get(NAME);
+            config.getCache().setPolicy(null);
+            config.getResilience().setEnabled(true);
+            if (policyDefined) {
+                var policy = config.getCache().getPolicies().get("read");
+                policy.setMaximumTotalDecodedResponseBytes(1024L);
+                policy.setRefreshAfterMs(1_000L);
+                policy.setRefreshTimeoutMs(500L);
+                policy.setWork(new ReactiveHttpClientProperties.CacheWorkConfig());
+                policy.getWork().setMaximumConcurrentCallers(1L);
+                policy.getWork().setMaximumConcurrentLoads(1L);
+                policy.getWork().setMaximumConcurrentRefreshes(1L);
+            }
+            AtomicInteger optionalCreations = new AtomicInteger();
+            List<Class<?>> optionalTypes = List.of(AuthProvider.class, AuthProviderFactory.class,
+                    io.github.resilience4j.retry.RetryRegistry.class,
+                    io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry.class,
+                    io.github.resilience4j.bulkhead.BulkheadRegistry.class,
+                    io.github.resilience4j.ratelimiter.RateLimiterRegistry.class);
+            for (Class<?> type : optionalTypes) {
+                var definition = new RootBeanDefinition(type);
+                definition.setLazyInit(true);
+                definition.setInstanceSupplier(() -> {
+                    optionalCreations.incrementAndGet();
+                    throw new AssertionError("Unselected integration was materialized: " + type.getSimpleName());
+                });
+                context.registerBeanDefinition(type.getSimpleName(), definition);
+            }
+            AtomicInteger dispatches = new AtomicInteger();
+            AtomicInteger registrations = new AtomicInteger();
+            registry.config().onMeterAdded(ignored -> registrations.incrementAndGet());
+            context.getBeanFactory().registerSingleton("registry", registry);
+            context.registerBean(ReactiveHttpClientProperties.class, () -> properties);
+            context.registerBean(ReactiveHttpClientCustomizer.class, () -> builder -> builder.exchangeFunction(
+                    request -> Mono.defer(() -> {
+                        dispatches.incrementAndGet();
+                        return Mono.just(ClientResponse.create(HttpStatus.OK).body("ok").build());
+                    })));
+            context.refresh();
+            var factory = new ReactiveHttpClientFactoryBean<Client>();
+            factory.setType(Client.class);
+            factory.setApplicationContext(context);
+            try {
+                Client client = factory.getObject();
+                Mono<String> call = client.get();
+                assertThat(dispatches).hasValue(0);
+                assertThat(call.block(WAIT)).isEqualTo("ok");
+                assertThat(call.block(WAIT)).isEqualTo("ok");
+                assertThat(dispatches).hasValue(2);
+                assertThat(factory.responseCacheSnapshot()).isNull();
+                assertThat(factory.responseCacheWorkSnapshot()).isNull();
+                assertThat(field(factory, "tokenServiceConnectionProvider")).isNull();
+                assertThat(field(factory, "connectionPoolMeterRegistrar")).isNull();
+                assertThat((Set<?>) field(factory, "ownedConnections")).isEmpty();
+                assertThat(metricOwners(registry)).isEmpty();
+            } finally {
+                factory.destroy();
+            }
+            assertThat(optionalCreations).hasValue(0);
+            for (Class<?> type : optionalTypes) {
+                assertThat(context.getBeanFactory().containsSingleton(type.getSimpleName())).isFalse();
+            }
+            assertThat(registrations).hasValue(0);
+            assertThat(metricOwners(registry)).isEmpty();
+            assertThat(registry.getMeters()).isEmpty();
+            assertThat(dispatches).hasValue(2);
+        } finally {
+            registry.close();
+        }
+    }
 
     @ParameterizedTest
     @CsvSource({"false,false", "false,true", "true,false", "true,true"})
@@ -360,6 +442,13 @@ class ResourceOwnershipReviewTest {
     @Test
     void replacementConnectorStaysApplicationOwnedAfterFactoryDestroy() throws Exception {
         AtomicInteger dispatches = new AtomicInteger();
+        AtomicInteger authorizations = new AtomicInteger();
+        var executor = Executors.newSingleThreadExecutor();
+        var scheduler = Schedulers.fromExecutorService(executor);
+        AuthProvider auth = request -> Mono.fromSupplier(() -> {
+            authorizations.incrementAndGet();
+            return AuthContext.empty();
+        }).subscribeOn(scheduler);
         var server = HttpServer.create().host("127.0.0.1").port(0)
                 .handle((request, response) -> {
                     dispatches.incrementAndGet();
@@ -372,8 +461,10 @@ class ResourceOwnershipReviewTest {
             var properties = properties(false);
             String url = "http://127.0.0.1:" + server.port();
             properties.getClients().get(NAME).setBaseUrl(url);
+            properties.getClients().get(NAME).setAuthProvider("applicationAuth");
             var connector = new ReactorClientHttpConnector(HttpClient.create(provider).disableRetry(true));
             context.registerBean(ReactiveHttpClientProperties.class, () -> properties);
+            context.getBeanFactory().registerSingleton("applicationAuth", auth);
             context.registerBean("applicationConnector", ReactiveHttpClientCustomizer.class,
                     () -> builder -> builder.clientConnector(connector));
             context.refresh();
@@ -381,12 +472,17 @@ class ResourceOwnershipReviewTest {
             factory.setApplicationContext(context);
             Client client = factory.getObject();
             assertThat(client.get().block(WAIT)).isEqualTo("ok");
+            assertThat(authorizations).hasValue(1);
             assertThat(provider.isDisposed()).isFalse();
             assertThat((Set<?>) field(factory, "ownedConnections")).isEmpty();
             factory.destroy();
             context.close();
             assertThat(provider.isDisposed()).isFalse();
             // The application can still use its connector; factory teardown does not own its pool.
+            assertThat(executor.isShutdown()).isFalse();
+            assertThat(scheduler.isDisposed()).isFalse();
+            assertThat(auth.getAuth(null).block(WAIT)).isNotNull();
+            assertThat(authorizations).hasValue(2);
             assertThat(WebClient.builder().baseUrl(url).clientConnector(connector).build()
                     .get().uri("/after-close").retrieve().bodyToMono(String.class).block(WAIT)).isEqualTo("ok");
             assertThat(dispatches).hasValue(2);
@@ -395,6 +491,8 @@ class ResourceOwnershipReviewTest {
             context.close();
             provider.disposeLater().block(WAIT);
             server.disposeNow(WAIT);
+            scheduler.dispose();
+            executor.close();
         }
         assertThat(provider.isDisposed()).isTrue();
     }

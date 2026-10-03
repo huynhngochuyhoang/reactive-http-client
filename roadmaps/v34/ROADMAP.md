@@ -30,7 +30,10 @@ optimization. [Priority 6 hardening](HARDENING-EVIDENCE.md) records the C004
 experiment and rollback after its benefit gate failed; behavioral controls remain.
 [Priority 7 ownership controls](BODY-CONTEXT-OWNERSHIP.md) retain body release,
 caller isolation and guarded terminal behavior without production changes.
-Priorities 8-12 remain open, including the unresolved allocation investigation.
+[Priority 8 lifecycle controls](INACTIVE-LIFECYCLE.md) verify inactive integrations,
+physical optional absence, construction rollback and framework/application ownership.
+No production resource or framework change is retained. Priorities 9-12 remain
+open, including the unresolved allocation investigation.
 
 ## Intent
 
