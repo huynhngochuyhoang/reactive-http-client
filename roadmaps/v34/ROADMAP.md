@@ -28,7 +28,9 @@ The [Priority 5 planning controls](PLANNING-INVOCATION.md) record production N/A
 for deferred C003 and fresh metadata/wire/selection regressions, not a planning
 optimization. [Priority 6 hardening](HARDENING-EVIDENCE.md) records the C004
 experiment and rollback after its benefit gate failed; behavioral controls remain.
-Priorities 7-12 remain open, including the unresolved allocation investigation.
+[Priority 7 ownership controls](BODY-CONTEXT-OWNERSHIP.md) retain body release,
+caller isolation and guarded terminal behavior without production changes.
+Priorities 8-12 remain open, including the unresolved allocation investigation.
 
 ## Intent
 

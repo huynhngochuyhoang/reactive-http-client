@@ -321,7 +321,7 @@ class DocumentationReleaseArtifactTest {
             assertThat(current.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
                     .containsExactly("> **Release scope:** unselected");
         }
-        assertThat(checklist).contains("### [ ] 7.1", "### [ ] 8.1",
+        assertThat(checklist).contains("### [ ] 8.1",
                 "### [ ] 12.1", "C004 is implemented once in Priority 6");
         assertThat(decision.replaceAll("\\s+", " ")).contains(
                 "C004 only, within that boundary (Recommended)", "implementation work only",
@@ -353,7 +353,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority).contains("### [x] 5.1", "### [x] 5.2", "### [x] 5.3",
                 "(PLANNING-INVOCATION.md)", "Production N/A", "Cost rerun N/A", "2026-10-01")
                 .doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 7.1", "### [ ] 8.1",
+        assertThat(checklist).contains("### [ ] 8.1",
                 "### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("PLANNING-INVOCATION.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
@@ -389,7 +389,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority).contains("### [x] 6.1", "### [x] 6.2", "### [x] 6.3",
                 "(HARDENING-EVIDENCE.md)", "Production discovery N/A", "Production reporting N/A")
                 .doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 7.1", "### [ ] 8.1", "### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
+        assertThat(checklist).contains("### [ ] 8.1", "### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("HARDENING-EVIDENCE.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
                 .containsExactly("> **Delivered production IDs:** none; V34-C004 rolled back after failed benefit gate");
@@ -409,6 +409,39 @@ class DocumentationReleaseArtifactTest {
         }
         for (String name : List.of("ROADMAP.md", "CHECKLIST.md")) {
             assertThat(Files.readString(directory.resolve(name))).contains("(HARDENING-EVIDENCE.md)");
+        }
+        for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
+                Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
+            Matcher links = pattern.matcher(record);
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+            }
+        }
+    }
+
+    @Test
+    void v34OwnershipControlsPreserveRollbackScopeAndCollectionLimits() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 7 - ", 2)[1].split("## Priority 8 - ", 2)[0];
+        assertThat(priority).contains("### [x] 7.1", "### [x] 7.2", "### [x] 7.3",
+                "(BODY-CONTEXT-OWNERSHIP.md)", "no retained production diff", "2026-10-03")
+                .doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 8.1", "### [ ] 9.1", "### [ ] 10.1", "### [ ] 12.1");
+        String record = Files.readString(directory.resolve("BODY-CONTEXT-OWNERSHIP.md"));
+        assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
+                .containsExactly("> **Delivered production IDs:** none");
+        assertThat(record.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                .containsExactly("> **Release scope:** unselected");
+        assertThat(record.replaceAll("\\s+", " ")).contains("C002 deferred", "C004 rolled back",
+                "## Owners and Terminal Boundaries", "## Applicability and Limits",
+                "doOnDiscard", "reference count zero", "One-shot replay N/A", "Collection claims N/A",
+                "-XX:+DisableExplicitGC", "v31-handoff-reachability", "v32-cache-reachability",
+                "70 executions", "23 classes", "366", "452 distinct cases", "quarantined as stale",
+                "enabled-only allocation flag remains unresolved", "target/release-evidence/v34/priority7/");
+        for (String name : List.of("ROADMAP.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(directory.resolve(name))).contains("(BODY-CONTEXT-OWNERSHIP.md)");
         }
         for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
                 Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {

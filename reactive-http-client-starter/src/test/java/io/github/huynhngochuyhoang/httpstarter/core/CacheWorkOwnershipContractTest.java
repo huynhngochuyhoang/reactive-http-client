@@ -4,12 +4,16 @@ import io.github.huynhngochuyhoang.httpstarter.auth.AuthContext;
 import io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import io.netty.buffer.PooledByteBufAllocator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Subscription;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.core.io.buffer.NettyDataBuffer;
+import org.springframework.core.io.buffer.NettyDataBufferFactory;
 import reactor.core.CoreSubscriber;
 import reactor.core.publisher.*;
 import reactor.test.scheduler.VirtualTimeScheduler;
@@ -48,8 +52,9 @@ class CacheWorkOwnershipContractTest {
         CountDownLatch cancellationEntered = new CountDownLatch(1);
         CountDownLatch allowCancellation = new CountDownLatch(1);
         AtomicInteger cancellations = new AtomicInteger();
-        AtomicInteger resource = new AtomicInteger(1);
-        List<AtomicInteger> discarded = new CopyOnWriteArrayList<>();
+        NettyDataBuffer resource = new NettyDataBufferFactory(PooledByteBufAllocator.DEFAULT).allocateBuffer(8);
+        resource.write(new byte[]{1, 2, 3});
+        List<NettyDataBuffer> discarded = new CopyOnWriteArrayList<>();
         String hook = "cache-work-valued-terminal";
         // Gate the ownership subscriber's immediate upstream, after preparation has attached.
         Hooks.onEachOperator(hook, Operators.<Object, Object>lift((ignored, actual) -> {
@@ -82,11 +87,11 @@ class CacheWorkOwnershipContractTest {
         }));
         ExecutorService executor = Executors.newFixedThreadPool(2);
         try {
-            Sinks.One<AtomicInteger> source = Sinks.one();
+            Sinks.One<NettyDataBuffer> source = Sinks.one();
             var result = CacheWorkAdmission.own(source.asMono(), reservation, terminals::add)
-                    .doOnDiscard(AtomicInteger.class, value -> {
+                    .doOnDiscard(NettyDataBuffer.class, value -> {
                         discarded.add(value);
-                        value.decrementAndGet();
+                        DataBufferUtils.release(value);
                     }).toFuture();
             var emission = executor.submit(() -> source.tryEmitValue(resource).orThrow());
             await(valueDelivered);
@@ -109,11 +114,13 @@ class CacheWorkOwnershipContractTest {
             if (cancel) {
                 result.cancel(true);
                 assertThat(discarded).containsExactly(resource);
-                assertThat(resource).hasValue(0);
+                assertThat(resource.getNativeBuffer().refCnt()).isZero();
             } else {
                 assertThat(result.get(5, TimeUnit.SECONDS)).isSameAs(resource);
                 assertThat(discarded).isEmpty();
-                assertThat(resource).hasValue(1);
+                assertThat(resource.getNativeBuffer().refCnt()).isEqualTo(1);
+                assertThat(DataBufferUtils.release(resource)).isTrue();
+                assertThat(resource.getNativeBuffer().refCnt()).isZero();
             }
             assertThat(terminals).containsExactly(cancel ? SignalType.CANCEL : SignalType.ON_COMPLETE);
             assertThat(cancellations).hasValue(cancel ? 1 : 0);
@@ -133,6 +140,7 @@ class CacheWorkOwnershipContractTest {
                 Hooks.resetOnEachOperator(hook);
                 reservation.complete();
                 admission.close();
+                DataBufferUtils.release(resource);
             }
         }
     }
