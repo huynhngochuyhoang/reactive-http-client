@@ -35,8 +35,11 @@ physical optional absence, construction rollback and framework/application owner
 No production resource or framework change is retained.
 [Priority 9 parity](PARITY-EVIDENCE.md) records fresh mock/public/factory witnesses,
 genuine Boot 4.0.0/4.1.0 consumers and JVM/AOT execution, plus a clean-source Boot
-4.0.0 native compile and executable. Priorities 10-12 remain open, including the
-unresolved allocation investigation and release selection.
+4.0.0 native compile and executable. [Priority 10 evidence](COMPATIBILITY-PERFORMANCE.md)
+records the final matched pair, reverse confirmation, strict API and full Boot
+module verification. 10.2/10.3 are complete; 10.1 acceptance remains pending
+because the enabled-only allocation split recurred. Priorities 11-12 remain open,
+including guidance and release selection; no all-clear performance claim is made.
 
 ## Intent
 

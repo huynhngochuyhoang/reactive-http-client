@@ -698,38 +698,70 @@ source-copy sealing to avoid a self-referential checksum.
 
 ### [ ] 10.1 Run final matched cost and allocation verification
 
-- [ ] Run selected before/after rows plus minimal/default and enabled-feature
+- [x] Run selected before/after rows plus minimal/default and enabled-feature
       sentinels with final fixtures and frozen Priority 2 rules.
-- [ ] Preserve identical non-starter stacks and semantic witnesses, isolated
+- [x] Preserve identical non-starter stacks and semantic witnesses, isolated
       published provenance, raw JMH/GC samples, intervals, order and artifact hashes.
-- [ ] Confirm flagged rows with a reversed-order matched pair; retain original
+- [x] Confirm flagged rows with a reversed-order matched pair; retain original
       flags and failures. Explain missing samples or workload differences explicitly.
 - [ ] Require demonstrated benefit for optimizations or reproduced safety/ownership
       benefit for hardening, with honest cost. Roll back unhelpful optimization;
       a repeatable regression needs an explicit bounded correctness tradeoff decision.
 
-### [ ] 10.2 Verify API, behavior and packaging
+### [x] 10.2 Verify API, behavior and packaging
 
-- [ ] Run strict root and independent starter source/binary API comparisons against
+- [x] Run strict root and independent starter source/binary API comparisons against
       Central `4.4.2`, each with isolated provenance and separate reports/exits.
       Run the second comparison even if the first fails; retain failures.
-- [ ] Review behavioral and extension compatibility beyond japicmp, including
+- [x] Review behavioral and extension compatibility beyond japicmp, including
       defaults, provider lifecycles, metadata/builder/AOT and optional linkage.
-- [ ] Run applicable complete module suites and focused regressions, generated
+- [x] Run applicable complete module suites and focused regressions, generated
       docs/metadata, packaging and version/fixture guards. Report actual totals.
-- [ ] Run/reconcile supported Boot and affected mock/consumer/AOT/native evidence
+- [x] Run/reconcile supported Boot and affected mock/consumer/AOT/native evidence
       from Priority 9; preserve native collection controls and avoid double-counting cases.
 
-### [ ] 10.3 Seal results and constrain performance claims
+### [x] 10.3 Seal results and constrain performance claims
 
-- [ ] Inventory final source, fixtures, dependencies, environment, commands,
+- [x] Inventory final source, fixtures, dependencies, environment, commands,
       actual outcomes, raw samples/reports and artifact/evidence hashes.
-- [ ] Rerun evidence affected by later implementation or fixture edits; explain
+- [x] Rerun evidence affected by later implementation or fixture edits; explain
       exact unchanged-input reuse instead of substituting old totals.
-- [ ] Separate microbenchmark, startup, throughput, tail latency and deployment
+- [x] Separate microbenchmark, startup, throughput, tail latency and deployment
       memory conclusions. B/op or mean no-network time supports only that measured claim.
-- [ ] Follow the existing release-quality report promotion process for public
+- [x] Follow the existing release-quality report promotion process for public
       numbers. No claim is required; smoke runs or unresolved noise cannot justify one.
+
+**10.2/10.3 complete; 10.1 acceptance pending, 2026-10-03.**
+[Matched performance and compatibility evidence](COMPATIBILITY-PERFORMANCE.md)
+records clean benchmark inputs from `44d6ffaede52a5be92148cc078f287428791d511`,
+39 matched harness/POM files, 120 identical non-starter JARs and 310 identical
+starter classes. All 60 primary rows completed with zero review flags, but the
+historical enabled-only GET publisher's reverse pair recorded one allocation flag:
+current forks 1,392/1,136 B/op versus baseline 1,136/1,136. The original P3 split
+and all raw samples remain preserved. Its cause is unresolved; the favorable
+primary run is not an all-clear. C004 stays rolled back and no production change
+or correctness tradeoff is accepted by this evidence. The last 10.1 checkbox stays
+open pending explanation or explicit scope disposition, not another favorable rerun.
+
+Fresh strict root and independent starter API/provenance lanes pass separately
+against Central `4.4.2`. Full ordinary Boot 4.0.0 and 4.1.0 module rows each pass
+2,152 starter + 80 test-helper + 62 OTel = 2,294 cases, with packaging/reference/
+metadata checks. Both matched benchmark builds pass 75 cases each. Controlled
+reachability passes 16 cache + 5 handoff + 2 benchmark cases; API/provenance
+negative guards and 14 V34 + 5 native-runner Python tests pass. Final documentation
+reruns pass 89 cases on each Boot row after adding this record's guard, replacing
+the earlier 88-case documentation coverage, not increasing the recorded full-suite
+totals. All test rows have zero failures, errors and skips; repeated/overlapping
+executions are not distinct cases.
+
+P9 consumer/AOT/native inputs are unchanged and its inventories/binary reverified;
+those are explicit reuse, not new P10 runs or test totals. The P10 bundle is
+`target/release-evidence/v34/priority10/`: 973 files, inventory SHA-256
+`0987d689fa4c131763d12296297380d2698346a2dec78793be4a8093652604cc`.
+This checklist is excluded from final source copies to avoid a self-referential
+hash. Runtime, benchmark and fixture inputs remain unchanged by the local
+documentation delta. No public numbers are promoted, no release is selected,
+and P11/P12 remain open.
 
 ## Priority 11 - Maintainer and Operations Guidance
 

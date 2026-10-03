@@ -34,8 +34,11 @@ The [Priority 8 lifecycle record](v34/INACTIVE-LIFECYCLE.md) separates unselecte
 integrations from physically absent dependencies and verifies construction,
 application-resource and framework ownership without a production change.
 The [Priority 9 parity record](v34/PARITY-EVIDENCE.md) adds fresh assembled Boot
-4.0.0/4.1.0 and JVM/AOT evidence plus a clean-source native run; final cost,
-compatibility and release gates remain open.
+4.0.0/4.1.0 and JVM/AOT evidence plus a clean-source native run.
+The [Priority 10 evidence](v34/COMPATIBILITY-PERFORMANCE.md) seals matched costs,
+strict API and full-module Boot verification. Compatibility and evidence work
+are complete; cost acceptance remains pending after the allocation split recurred
+in reverse confirmation. Guidance and release selection remain open.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.

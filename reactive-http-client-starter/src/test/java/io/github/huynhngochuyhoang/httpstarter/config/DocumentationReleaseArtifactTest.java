@@ -526,6 +526,43 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
+    void v34MatchedEvidenceKeepsTheAllocationGateOpenDespiteCompatibilityPasses() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 10 - ", 2)[1].split("## Priority 11 - ", 2)[0];
+        assertThat(priority).contains("### [ ] 10.1", "### [x] 10.2", "### [x] 10.3",
+                "- [ ] Require demonstrated benefit", "(COMPATIBILITY-PERFORMANCE.md)",
+                "10.1 acceptance pending", "2026-10-03");
+        assertThat(priority.split("### \\[x\\] 10.2", 2)[1]).doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 11.1", "### [ ] 12.1");
+        String record = Files.readString(directory.resolve("COMPATIBILITY-PERFORMANCE.md"));
+        assertThat(record.lines().filter(line -> line.startsWith("> **Status:**")).toList())
+                .containsExactly("> **Status:** 10.2 and 10.3 complete; 10.1 performance acceptance pending, 2026-10-03");
+        assertThat(record.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                .containsExactly("> **Release scope:** unselected");
+        assertThat(record.replaceAll("\\s+", " ")).contains("C004 rolled back", "all 60 rows",
+                "one allocation flag", "1392.018, 1136.015", "enabled-only allocation flag remains unresolved",
+                "39 source/POM files", "120 non-starter", "310 starter classes", "No changes.",
+                "44d6ffaede52a5be92148cc078f287428791d511", "2,294 passed", "89 passed on each Boot row",
+                "16 / 5 / 2 passed", "14 / 5 passed", "not another native execution",
+                "not clean-commit release evidence", "analysis-final/results.json", "plannedFinalVersion=null",
+                "No public performance number is promoted", "P11 guidance and P12 release scope remain open");
+        for (String name : List.of("ROADMAP.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(directory.resolve(name))).contains("(COMPATIBILITY-PERFORMANCE.md)");
+        }
+        assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v34/COMPATIBILITY-PERFORMANCE.md)");
+        for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
+                Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
+            Matcher links = pattern.matcher(record);
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+            }
+        }
+    }
+
+    @Test
     void v33ExecutionChecklistMatchesRoadmapAndPreservesScopeApproval() throws IOException {
         Path directory = projectRoot().resolve("roadmaps/v33");
         String roadmap = Files.readString(directory.resolve("ROADMAP.md"));
