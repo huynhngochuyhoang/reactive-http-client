@@ -3,36 +3,46 @@
 Roadmaps are planning records. Their acceptance boxes preserve the proposal as it
 was written and are not retroactively used as release-completion evidence.
 Execution status is recorded in the sibling checklist when one exists and in the
-matching `CHANGELOG.md` release section. An unchecked mutually exclusive no-go
+matching `CHANGELOG.md` release section or an explicit no-release decision. An unchecked mutually exclusive no-go
 branch after a go decision, or an item explicitly labeled deferred/superseded,
 is historical context rather than active work.
 
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V33 are completed release records. V33 was released as `4.4.2`.
-V34 is active; C004's bounded disabled-policy value reuse was evaluated and rolled back.
-Release scope remains unselected.
+V34 is completed as a review-only/no-release roadmap; C004 was evaluated and rolled back.
+No execution roadmap or next release is selected.
 The reactor is `4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are
 verified `4.4.2`.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured
-cost/ownership findings and explicitly selected bounded improvements. Adoption
-completes no execution priority; production edits require Priority 4.3 approval,
-and release selection remains separate in Priority 12. Configuration defaults
-and the published baseline are unchanged.
+cost/ownership findings and explicitly selected bounded improvements. The review
+is closed without a release by the Priority 12 decision below. Configuration
+defaults and the published baseline are unchanged.
 The [Priority 1 baseline](v34/BASELINE-SCOPE.md) records effective profiles,
 revalidated `4.4.2` evidence and fresh guards without approving an optimization.
-The [Priority 4 decision](v34/IMPROVEMENT-DECISION.md) now selects only immutable
+The [Priority 4 decision](v34/IMPROVEMENT-DECISION.md) selected only immutable
 disabled cache-policy decision reuse, retaining every mutation check. C001-C003,
 C005 and broader C004 resource work are deferred. [Priority 6 hardening](v34/HARDENING-EVIDENCE.md)
 records the failed benefit gate, rollback and retained controls. No production
-improvement is delivered; remaining verification is not final release acceptance.
+improvement is delivered; review verification is not final release acceptance.
 The [Priority 7 ownership record](v34/BODY-CONTEXT-OWNERSHIP.md) adds deterministic
 body cleanup/discard controls and verifies caller/terminal isolation without
 production changes or a new collection/performance claim.
 The [Priority 8 lifecycle record](v34/INACTIVE-LIFECYCLE.md) separates unselected
 integrations from physically absent dependencies and verifies construction,
 application-resource and framework ownership without a production change.
+The [Priority 9 parity record](v34/PARITY-EVIDENCE.md) adds fresh assembled Boot
+4.0.0/4.1.0 and JVM/AOT evidence plus a clean-source native run.
+The [Priority 10 evidence](v34/COMPATIBILITY-PERFORMANCE.md) seals matched costs,
+strict API and full-module Boot verification. Compatibility and evidence work
+are complete; cost acceptance did not pass after the allocation split recurred
+in reverse confirmation. [Priority 11 guidance](v34/MAINTAINER-GUIDANCE.md)
+connects the retained contracts, deferred owners/triggers and bounded investigation
+commands. [Priority 12 closure](v34/RELEASE-DECISION.md) records the maintainer's
+review-only/no-release decision and explicit deferral of the unresolved allocation
+flag. This is not a performance pass, release GO or new published version. Historical
+P1-P11 checkpoints remain unchanged; their then-pending gates do not reopen V34.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.
@@ -99,4 +109,4 @@ automatically create another execution roadmap or reopen V32.
 | V31 | [Roadmap](v31/ROADMAP.md) | [Checklist](v31/CHECKLIST.md) | Completed and released as `4.4.0` |
 | V32 | [Roadmap](v32/ROADMAP.md) | [Checklist](v32/CHECKLIST.md) | Completed and released as `4.4.1` |
 | V33 | [Roadmap](v33/ROADMAP.md) | [Checklist](v33/CHECKLIST.md) | Completed and released as `4.4.2` |
-| V34 | [Roadmap](v34/ROADMAP.md) | [Checklist](v34/CHECKLIST.md) | Active |
+| V34 | [Roadmap](v34/ROADMAP.md) | [Checklist](v34/CHECKLIST.md) | Completed; review-only, no release |

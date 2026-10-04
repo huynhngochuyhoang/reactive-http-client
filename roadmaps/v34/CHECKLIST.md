@@ -1,12 +1,19 @@
 # Reactive HTTP Client - Roadmap V34 Execution Checklist
 
-> **Status:** active
+> **Status:** completed; review-only, no release
 > **Theme:** performance and default-path hardening
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Implementation scope:** V34-C004 evaluated and rolled back; no production change retained
-> **Release scope:** unselected
+> **Release scope:** no release; V34 closed
 > **Adopted:** 2026-09-30
+> **Closed:** 2026-10-04
+
+[Priority 12 decision](RELEASE-DECISION.md): maintainer-approved review-only closure.
+C004 remains rolled back; no production improvement or new version is delivered.
+The two unchecked 10.1 acceptance markers are explicitly deferred, not outstanding
+V34 implementation work or a performance pass. Earlier dated checkpoints below
+preserve the decisions and limitations at the time they were recorded.
 
 Execution companion to [`ROADMAP.md`](ROADMAP.md). Adoption authorizes baseline,
 workload and characterization work, not production changes, a version bump or a
@@ -620,166 +627,311 @@ final source-copy sealing to avoid a self-referential checksum.
 
 ## Priority 9 - Cross-Path and Assembled Parity
 
-### [ ] 9.1 Verify supported entry points and assembled consumers
+### [x] 9.1 Verify supported entry points and assembled consumers
 
-- [ ] Cover mocks, public handler entry points and Spring factory creation for
+- [x] Cover mocks, public handler entry points and Spring factory creation for
       the accepted diff, including intentional differences in available integration state.
-- [ ] Verify external consumers use built artifacts, not reactor classes; record
+- [x] Verify external consumers use built artifacts, not reactor classes; record
       selected profiles, effective dependencies, hashes and real test totals.
-- [ ] Run genuine Boot 4.0.0 and 4.1.0 consumer parents with tracked fixtures or exact
+- [x] Run genuine Boot 4.0.0 and 4.1.0 consumer parents with tracked fixtures or exact
       reproducible overlay commands. A mixed dependency tree is not a second Boot lane.
-- [ ] Exercise minimal, selected-feature and physical optional-absence controls
+- [x] Exercise minimal, selected-feature and physical optional-absence controls
       after relevant changes. Mock results do not prove transport release semantics.
 
-### [ ] 9.2 Verify AOT and native execution where affected
+### [x] 9.2 Verify AOT and native execution where affected
 
-- [ ] Run JVM/AOT witnesses for accepted production changes affecting execution,
+- [x] Run JVM/AOT witnesses for accepted production changes affecting execution,
       selection or lifecycle; preserve request and terminal/ownership assertions.
-- [ ] Compile and run required native evidence from clean reachable source with
+- [x] Compile and run required native evidence from clean reachable source with
       final fixtures. Record toolchain, build resources, command exits and binary hash.
-- [ ] Count all relevant loopback dispatches and use bounded quiet/terminal
+- [x] Count all relevant loopback dispatches and use bounded quiet/terminal
       evidence; an unregistered route or immediate counter read is not zero-dispatch proof.
-- [ ] Preserve failed/partial attempts. Resource exhaustion, stale binaries or
+- [x] Preserve failed/partial attempts. Resource exhaustion, stale binaries or
       JVM-only verification leave required native work pending.
 
-### [ ] 9.3 Reconcile parity and evidence applicability
+### [x] 9.3 Reconcile parity and evidence applicability
 
-- [ ] Map results to each selected boundary and retain any uncovered shapes or
+- [x] Map results to each selected boundary and retain any uncovered shapes or
       supported limitations; do not infer universal coverage from representative cases.
-- [ ] For unchanged inputs/review-only scope, record exact evidence reuse or dated
+- [x] For unchanged inputs/review-only scope, record exact evidence reuse or dated
       N/A with limitations. Changed native inputs require the relevant rerun.
-- [ ] Seal commands, classpaths, reports and source/artifact hashes; fix regressions
+- [x] Seal commands, classpaths, reports and source/artifact hashes; fix regressions
       before promoting a cost result or accepting the implementation.
+
+**Completed 2026-10-03:** [cross-path and assembled parity](PARITY-EVIDENCE.md)
+records no delivered production IDs and fresh verification from clean starting
+commit `fc98e58b9d5154a0ba539ea878b05c532b379554`. The tracked overlay runner
+uses genuine Boot 4.0.0/4.1.0 parents and verifies built-JAR dependency classpaths.
+Mock helpers pass 76 cases; each Boot row passes 29 selected-consumer cases,
+one physical-absence case, 283 focused AOT/cross-path cases and six smoke fixture
+cases. Both ordinary and AOT-enabled smoke executions pass on each Boot row.
+These total 714 JUnit executions, not unique test definitions across rows.
+
+Fresh Boot 4.0.0 native compilation and execution both exit 0 from a clean
+detached checkout of that commit; six fixture tests pass during compilation.
+The binary SHA-256 is
+`a3476f5f749d0cb546e4c175f371ea070291923d5621d92cb819758ab9a3b10e`.
+Full native evidence is in
+`target/v34-priority9-native-runs/native-feynp9yy/evidence/`; parity commands,
+reports, copied overlays and dependencies are under
+`target/release-evidence/v34/priority9/`. No failed runtime attempt or native
+retry occurred in this priority. Earlier failed attempts remain in their original
+bundles, not counted as current passes.
+
+P8 remains earlier resource evidence, not a second set of new tests here.
+Mock versus transport, public-handler diagnostics, minimal-profile source and
+native-versus-upper-Boot limits are explicit in the record. No production,
+fixture, dependency, coordinate or runner change is retained. C004 stays rolled
+back; the allocation flag, Priorities 10-12 and release selection remain open.
+
+Final documentation/archive/readiness passes 88 cases: **808 Java test executions**
+including the 714 JVM-row cases and six native-build fixture cases above, all
+with zero failures/errors/skips. V34 evidence guards pass 14 Python cases and
+native-runner guards pass five. Final readiness remains V34 active, release
+lane/scope unselected and `plannedFinalVersion=null`. The audit verifies the
+current starter's 310 class files still match the archived published baseline;
+this is not the pending strict API lane or a new Central-consumer result.
+
+The 1,213-file `priority9/SHA256SUMS` inventory has SHA-256
+`596d511a2683fad7bbdd76fccf4779b9e80a9f7045883739cd023c0b0a22c5b7`.
+It retains commands/exits, copied fixture outputs, reports, module artifacts,
+source copies and final provenance, plus fresh P3-P8 inventory verification.
+The native-reference audit verifies its separate inventory with SHA-256
+`d62ac7cd25d3f9eb816595b9ef6b07d0af431dfa53e4781c8d7968dd9a4c6821`.
+This checklist remains the external integrity index, excluded from final
+source-copy sealing to avoid a self-referential checksum.
 
 ## Priority 10 - Matched Performance and Compatibility Evidence
 
 ### [ ] 10.1 Run final matched cost and allocation verification
 
-- [ ] Run selected before/after rows plus minimal/default and enabled-feature
+**Deferred by approved no-release closure, 2026-10-04:** the acceptance requirement
+and its checkbox remain unpassed. [Priority 12](RELEASE-DECISION.md) defers the
+unresolved allocation finding with an owner and reopening trigger; this is
+**not a performance pass** or a correctness tradeoff. No optimization survives rollback.
+
+- [x] Run selected before/after rows plus minimal/default and enabled-feature
       sentinels with final fixtures and frozen Priority 2 rules.
-- [ ] Preserve identical non-starter stacks and semantic witnesses, isolated
+- [x] Preserve identical non-starter stacks and semantic witnesses, isolated
       published provenance, raw JMH/GC samples, intervals, order and artifact hashes.
-- [ ] Confirm flagged rows with a reversed-order matched pair; retain original
+- [x] Confirm flagged rows with a reversed-order matched pair; retain original
       flags and failures. Explain missing samples or workload differences explicitly.
 - [ ] Require demonstrated benefit for optimizations or reproduced safety/ownership
       benefit for hardening, with honest cost. Roll back unhelpful optimization;
       a repeatable regression needs an explicit bounded correctness tradeoff decision.
 
-### [ ] 10.2 Verify API, behavior and packaging
+### [x] 10.2 Verify API, behavior and packaging
 
-- [ ] Run strict root and independent starter source/binary API comparisons against
+- [x] Run strict root and independent starter source/binary API comparisons against
       Central `4.4.2`, each with isolated provenance and separate reports/exits.
       Run the second comparison even if the first fails; retain failures.
-- [ ] Review behavioral and extension compatibility beyond japicmp, including
+- [x] Review behavioral and extension compatibility beyond japicmp, including
       defaults, provider lifecycles, metadata/builder/AOT and optional linkage.
-- [ ] Run applicable complete module suites and focused regressions, generated
+- [x] Run applicable complete module suites and focused regressions, generated
       docs/metadata, packaging and version/fixture guards. Report actual totals.
-- [ ] Run/reconcile supported Boot and affected mock/consumer/AOT/native evidence
+- [x] Run/reconcile supported Boot and affected mock/consumer/AOT/native evidence
       from Priority 9; preserve native collection controls and avoid double-counting cases.
 
-### [ ] 10.3 Seal results and constrain performance claims
+### [x] 10.3 Seal results and constrain performance claims
 
-- [ ] Inventory final source, fixtures, dependencies, environment, commands,
+- [x] Inventory final source, fixtures, dependencies, environment, commands,
       actual outcomes, raw samples/reports and artifact/evidence hashes.
-- [ ] Rerun evidence affected by later implementation or fixture edits; explain
+- [x] Rerun evidence affected by later implementation or fixture edits; explain
       exact unchanged-input reuse instead of substituting old totals.
-- [ ] Separate microbenchmark, startup, throughput, tail latency and deployment
+- [x] Separate microbenchmark, startup, throughput, tail latency and deployment
       memory conclusions. B/op or mean no-network time supports only that measured claim.
-- [ ] Follow the existing release-quality report promotion process for public
+- [x] Follow the existing release-quality report promotion process for public
       numbers. No claim is required; smoke runs or unresolved noise cannot justify one.
+
+**10.2/10.3 complete; 10.1 acceptance pending, 2026-10-03.**
+[Matched performance and compatibility evidence](COMPATIBILITY-PERFORMANCE.md)
+records clean benchmark inputs from `44d6ffaede52a5be92148cc078f287428791d511`,
+39 matched harness/POM files, 120 identical non-starter JARs and 310 identical
+starter classes. All 60 primary rows completed with zero review flags, but the
+historical enabled-only GET publisher's reverse pair recorded one allocation flag:
+current forks 1,392/1,136 B/op versus baseline 1,136/1,136. The original P3 split
+and all raw samples remain preserved. Its cause is unresolved; the favorable
+primary run is not an all-clear. C004 stays rolled back and no production change
+or correctness tradeoff is accepted by this evidence. The last 10.1 checkbox stays
+open pending explanation or explicit scope disposition, not another favorable rerun.
+
+Fresh strict root and independent starter API/provenance lanes pass separately
+against Central `4.4.2`. Full ordinary Boot 4.0.0 and 4.1.0 module rows each pass
+2,152 starter + 80 test-helper + 62 OTel = 2,294 cases, with packaging/reference/
+metadata checks. Both matched benchmark builds pass 75 cases each. Controlled
+reachability passes 16 cache + 5 handoff + 2 benchmark cases; API/provenance
+negative guards and 14 V34 + 5 native-runner Python tests pass. Final documentation
+reruns pass 89 cases on each Boot row after adding this record's guard, replacing
+the earlier 88-case documentation coverage, not increasing the recorded full-suite
+totals. All test rows have zero failures, errors and skips; repeated/overlapping
+executions are not distinct cases.
+
+P9 consumer/AOT/native inputs are unchanged and its inventories/binary reverified;
+those are explicit reuse, not new P10 runs or test totals. The P10 bundle is
+`target/release-evidence/v34/priority10/`: 973 files, inventory SHA-256
+`0987d689fa4c131763d12296297380d2698346a2dec78793be4a8093652604cc`.
+This checklist is excluded from final source copies to avoid a self-referential
+hash. Runtime, benchmark and fixture inputs remain unchanged by the local
+documentation delta. No public numbers are promoted, no release is selected,
+and P11/P12 remain open.
 
 ## Priority 11 - Maintainer and Operations Guidance
 
-### [ ] 11.1 Document delivered behavior and intentional costs
+### [x] 11.1 Document delivered behavior and intentional costs
 
-- [ ] Link effective profiles, findings, approved IDs, delivered changes and
+- [x] Link effective profiles, findings, approved IDs, delivered changes and
       retained/deferred work. Explain why required discovery/state/cleanup remains.
-- [ ] Document unchanged defaults and extension/ownership guarantees; avoid a
+- [x] Document unchanged defaults and extension/ownership guarantees; avoid a
       universal zero-overhead claim or invented performance-mode configuration.
-- [ ] Distinguish candidate behavior from published `4.4.2` until publication;
+- [x] Distinguish candidate behavior from published `4.4.2` until publication;
       keep V33's historical results and unresolved incident conclusions intact.
 
-### [ ] 11.2 Publish reproducible investigation guidance
+### [x] 11.2 Publish reproducible investigation guidance
 
-- [ ] Provide tracked commands/fixtures for phase-specific matched workloads,
+- [x] Provide tracked commands/fixtures for phase-specific matched workloads,
       correctness controls and repeatable confirmation of cost flags.
-- [ ] Explain CPU/allocation versus retention/direct memory/RSS, profiler overhead,
+- [x] Explain CPU/allocation versus retention/direct memory/RSS, profiler overhead,
       workload/classpath differences and measurement noise.
-- [ ] Keep support capture bounded and sanitized; no new meter/dashboard or
+- [x] Keep support capture bounded and sanitized; no new meter/dashboard or
       production payload capture is implied by this roadmap.
 
-### [ ] 11.3 Reconcile guidance and documentation guards
+### [x] 11.3 Reconcile guidance and documentation guards
 
-- [ ] Update relevant benchmark, performance, customizer/context/ownership and
+- [x] Update relevant benchmark, performance, customizer/context/ownership and
       operations guidance only where delivered findings require changes.
-- [ ] Verify examples, local links, scope/status consistency, generated references
+- [x] Verify examples, local links, scope/status consistency, generated references
       and current commands with actual test totals; preserve historical evidence.
-- [ ] Record remaining owners, workarounds, triggers and explicit limitations.
+- [x] Record remaining owners, workarounds, triggers and explicit limitations.
       Guidance cannot turn an unselected candidate or noisy score into a delivered fix.
+
+**Completed, 2026-10-03.**
+[Maintainer and operations guidance](MAINTAINER-GUIDANCE.md) documents the C004
+rollback, other deferrals, retained contracts and phase-specific investigation.
+Execution of P11 was requested while 10.1 acceptance remains pending; this is
+independent documentation work, not a waiver or a new implementation/release
+decision. Published `4.4.2`, unchanged development behavior and unselected release
+scope stay distinct. Canonical benchmark/performance, customizer/context and
+operations/support guides link to the current findings without rewriting V33 or
+P1-P10 evidence. No production/API/configuration/default/dependency changes.
+
+Fresh verification on source `922c72f98246735385b5cc47e0d90bcd974961f6` plus the
+guidance/test delta: 232 focused starter tests in ten classes, 75 ordinary benchmark
+correctness tests, and 14 Python guard tests, all with zero failures/errors/skips.
+The final 232-case rerun includes 90 documentation/archive/readiness cases and
+four checked V33 example cases; it overlaps the initial 232-case run. Ordinary
+JVMs disable explicit GC. Bash syntax, JMH method/parameter discovery, recorded
+input comparison and raw-result review pass; the reverse review still reports
+one allocation flag. There is no new scored JMH, native, complete-module, strict
+API or Central-consumer run. Unchanged-input P9/P10 references retain those limits.
+
+The separate `target/release-evidence/v34/priority11/` bundle records commands,
+exits, fresh reports, sources, readiness and P10 inventory revalidation: 156 files,
+inventory SHA-256
+`bdb0e8a4b1b9b890a73f2465fe3073f30da699c50cff940ba18cb6693fddde2a`.
+This checklist remains outside final source-copy sealing. **10.1 acceptance and
+P12 remain open**, with no new release selection or public performance claim.
 
 ## Priority 12 - Scope Decision and Conditional Release Go/No-Go
 
-### [ ] 12.1 Reconcile implementation scope and release intent
+### [x] 12.1 Reconcile implementation scope and release intent
 
-- [ ] Match approved IDs to delivered/rolled-back changes, acceptance evidence
+- [x] Match approved IDs to delivered/rolled-back changes, acceptance evidence
       and deferrals; resolve blockers or obtain explicit scope removal.
-- [ ] Obtain the maintainer decision for release preparation or review-only/no-release.
+- [x] Obtain the maintainer decision for release preparation or review-only/no-release.
       Evaluate a compatible patch first; `4.5.0-SNAPSHOT` does not select a minor.
-- [ ] Record unresolved evidence as no-go/pending, not completed work. Review-only
+- [x] Record unresolved evidence as no-go/pending, not completed work. Review-only
       closure needs explicit disposition of all findings and any implementation.
 
-### [ ] 12.2 Select the exact candidate or no-release branch
+### [x] 12.2 Select the exact candidate or no-release branch
 
-- [ ] For a release, approve the exact candidate after compatibility/migration and
-      performance-claim review. No new feature/default enters by implication.
-- [ ] Update reactor/modules/fixtures, supported-matrix/version guards, current
-      commands, changelog and readiness together; keep baseline `4.4.2` until
+- [x] **N/A: no release selected.** For a release, approve the exact candidate after
+      compatibility/migration and performance-claim review. No new feature/default
+      enters by implication.
+- [x] **N/A: no coordinate transition.** Update reactor/modules/fixtures,
+      supported-matrix/version guards, current commands, changelog and readiness
+      together; keep baseline `4.4.2` until
       publication is verified and keep V34 active through the final-version cut.
-- [ ] For no release, record rationale, accepted findings and implementation
+- [x] For no release, record rationale, accepted findings and implementation
       disposition; label candidate/signing/publication work N/A explicitly.
-- [ ] Record the branch without treating preparation as publication or final GO;
+- [x] Record the branch without treating preparation as publication or final GO;
       preserve earlier evidence coordinates and source limits.
 
-### [ ] 12.3 Assemble immutable release or review evidence
+### [x] 12.3 Assemble immutable release or review evidence
 
-- [ ] Inventory clean reachable final source, decisions and required correctness,
+- [x] Inventory clean reachable final source, decisions and required correctness,
       API, consumer, Boot/AOT/native, cost, ownership and guidance evidence.
-- [ ] Seal exact commands, actual totals, toolchains, effective dependencies,
+- [x] Seal exact commands, actual totals, toolchains, effective dependencies,
       artifacts/reports and hashes; keep failures and remaining limitations.
-- [ ] Revalidate after final source/fixture/coordinate changes; document exact
+- [x] Revalidate after final source/fixture/coordinate changes; document exact
       unchanged-input reuse without calling it a new final-coordinate run.
-- [ ] For a release, verify applicable packaging/unsigned/staged checks; signing,
-      tag/workflow publication and Central consumption stay separate until verified.
+- [x] **N/A: no release selected.** For a release, verify applicable
+      packaging/unsigned/staged checks; signing, tag/workflow publication and
+      Central consumption stay separate until verified.
 
-### [ ] 12.4 Verify publication or no-release closure
+### [x] 12.4 Verify publication or no-release closure
 
-- [ ] For the approved release, verify signing/staged signatures, version-matched
-      tag/workflow and Central artifact provenance. Authorize signing locally;
+- [x] **N/A: no release selected.** For the approved release, verify signing/staged
+      signatures, version-matched tag/workflow and Central artifact provenance. Authorize signing locally;
       never include passphrases in evidence.
-- [ ] Verify published assembled consumption from an isolated repository with
-      versions/signatures/hashes, not a reactor install or local repository shadow.
-- [ ] For approved no-release/no-go closure, record explicit final disposition
+- [x] **N/A: no new publication.** Verify published assembled consumption from an
+      isolated repository with versions/signatures/hashes, not a reactor install
+      or local repository shadow.
+- [x] For approved no-release/no-go closure, record explicit final disposition
       and evidence limits; unrun required release gates cannot be called passes.
-- [ ] Only then close roadmap/checklist/index/readiness together; advance baselines
+- [x] Only then close roadmap/checklist/index/readiness together; advance baselines
       only after verified publication and leave future scope unselected.
-- [ ] Record closure revision and evidence links. No pending required work may
+- [x] Record closure revision and evidence links. No pending required work may
       be presented as completed release evidence.
+
+**Completed, 2026-10-04: review-only/no release.** The maintainer explicitly
+approved closure and deferral of the unresolved allocation flag, not acceptance
+of a regression or performance claim. [Release decision](RELEASE-DECISION.md)
+reconciles all findings, evidence and N/A release gates. Clean reviewed source
+`be2b640e75e38c13c2861165928df88a45fbd9d1` plus the sealed documentation/guard
+closure patch identifies the reviewed tree; the patch is not a new committed
+revision. Production, dependencies, benchmark/consumer/native inputs and versions
+remain unchanged. Baseline `4.4.2`, development `4.5.0-SNAPSHOT`,
+`plannedFinalVersion=null`, `activeRoadmap=null`; future scope is unselected.
+
+Fresh closure verification and inventory integrity are recorded in
+`target/release-evidence/v34/priority12/` and the linked decision. Earlier P1-P11
+records and bundles are historical evidence, not overwritten closure results.
+The focused suite passes 233 cases in ten classes, including 91 documentation
+cases and four compiled examples; 14 V34 Python guards pass. Final focused
+verification repeats those cases, not additional distinct coverage. Saved-input
+comparison, result review, command syntax and whitespace checks pass; the reverse
+review still reports one allocation flag. All 2,403 prior evidence files rehash
+successfully. No new native, scored JMH, signing or publication is claimed.
 
 ## Completion Criteria
 
-- [ ] Effective profiles and equivalent workloads are measured against published
+- [x] Effective profiles and equivalent workloads are measured against published
       `4.4.2` under rules frozen before scoring.
-- [ ] Findings have explicit dispositions and production work was approved before
+- [x] Findings have explicit dispositions and production work was approved before
       edits; no regression/leak premise or positive speedup was assumed.
-- [ ] Selected improvements demonstrate benefit or reproduced hardening while
-      preserving defaults, supported extensions, optional behavior and ownership.
-- [ ] Request/context/terminal semantics and cleanup remain verified; allocation
+- [x] **N/A: no improvement retained.** C004 failed its benefit gate and was rolled
+      back; no positive result is claimed. The unresolved 10.1 finding is explicitly
+      deferred by approved review-only closure, not accepted as an improvement.
+- [x] Request/context/terminal semantics and cleanup remain verified; allocation
       reduction has not introduced retention, hidden work or cross-caller state.
-- [ ] Required matched cost, API, module, mock/consumer, Boot/AOT/native and
+- [x] Required matched cost, API, module, mock/consumer, Boot/AOT/native and
       packaging results identify final inputs, actual outcomes and evidence limits.
-- [ ] Guidance and public claims match the measured workload and release availability.
-- [ ] Release/no-release choice and final archive/readiness state are verifiable.
+- [x] Guidance and public claims match the measured workload and release availability.
+- [x] Release/no-release choice and final archive/readiness state are verifiable.
 
 No execution item is complete merely because this checklist exists. Production
 scope is limited to the recorded decision; broader work requires renewed
-Priority 4.3 approval. Release scope still requires Priority 12.
+Priority 4.3 approval. Priority 12 selects no release; future scope needs a new decision.
+
+## Priority 12 Integrity Anchor
+
+The 103-file `target/release-evidence/v34/priority12/SHA256SUMS` inventory has
+SHA-256 `bfff9f508b3642e4f7345dddd72712f5d3e401cf24f091ee1dcb65b88849f532`.
+Its `final/closure.patch` has SHA-256
+`9946951385eb4fdd0d14fcedf35989bfdb09225040ed63a3e91331cf49a178e8` and includes
+all nine closure source files over clean `be2b640e75e38c13c2861165928df88a45fbd9d1`.
+The sealed checklist snapshot excludes only this external integrity section,
+appended after sealing; no decision, test or production input changes afterward.
+Both 233-case focused runs, the expected initial red test, 14 Python guards,
+saved-sample reviews, generated readiness and prior-inventory rechecks are retained.
+Run `sha256sum --check --quiet SHA256SUMS` from the bundle directory to verify it.

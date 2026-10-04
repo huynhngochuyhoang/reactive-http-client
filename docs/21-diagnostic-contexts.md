@@ -138,6 +138,12 @@ Use exchange logging for per-call request/response metadata, and use the diagnos
 
 ## Runtime diagnostics provider
 
+The [V34 maintainer review](../roadmaps/v34/MAINTAINER-GUIDANCE.md#extension-and-ownership-boundaries)
+retains per-subscription reporting, explicit context handoff and non-instantiating
+diagnostics. Do not pool mutable terminal state or retain request/context objects
+globally to reduce allocations. It adds no diagnostic fields or metrics and makes
+no deployment-memory claim.
+
 Applications can inject `ReactiveHttpClientDiagnosticsProvider` to inspect sanitized
 registered-client summaries at runtime. The provider reports the client name,
 client interface, base URL source, effective pool policy, bounded cache phase and

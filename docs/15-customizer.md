@@ -140,6 +140,11 @@ declaration. F001 removes only a proven starter-builder entry, not the requireme
 to inventory Boot customizers, matching per-client customizers and replacement
 builders. No V33 correction is published in `4.4.1`.
 
+The [V34 cost/ownership review](../roadmaps/v34/MAINTAINER-GUIDANCE.md#extension-and-ownership-boundaries)
+changes none of these guarantees: no filter gate, customization classification,
+dynamic request projection or application-resource ownership is removed for a
+benchmark saving. V34 retains no production optimization after its rollback.
+
 ---
 
 ## Applying a customizer to all clients
