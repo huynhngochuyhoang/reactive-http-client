@@ -38,8 +38,10 @@ genuine Boot 4.0.0/4.1.0 consumers and JVM/AOT execution, plus a clean-source Bo
 4.0.0 native compile and executable. [Priority 10 evidence](COMPATIBILITY-PERFORMANCE.md)
 records the final matched pair, reverse confirmation, strict API and full Boot
 module verification. 10.2/10.3 are complete; 10.1 acceptance remains pending
-because the enabled-only allocation split recurred. Priorities 11-12 remain open,
-including guidance and release selection; no all-clear performance claim is made.
+because the enabled-only allocation split recurred. [Priority 11 guidance](MAINTAINER-GUIDANCE.md)
+documents retained costs, supported ownership, reproduction and bounded operations
+triage without waiving that flag. Priority 12 release selection remains open;
+no all-clear performance claim is made.
 
 ## Intent
 

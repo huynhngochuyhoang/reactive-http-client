@@ -459,7 +459,7 @@ class DocumentationReleaseArtifactTest {
         String priority = checklist.split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0];
         assertThat(priority).contains("### [x] 8.1", "### [x] 8.2", "### [x] 8.3",
                 "(INACTIVE-LIFECYCLE.md)", "production N/A", "2026-10-03").doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 11.1", "### [ ] 12.1");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("INACTIVE-LIFECYCLE.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
                 .containsExactly("> **Delivered production IDs:** none");
@@ -494,7 +494,7 @@ class DocumentationReleaseArtifactTest {
         String priority = checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0];
         assertThat(priority).contains("### [x] 9.1", "### [x] 9.2", "### [x] 9.3",
                 "(PARITY-EVIDENCE.md)", "2026-10-03").doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 11.1", "### [ ] 12.1");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("PARITY-EVIDENCE.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Status:**")).toList())
                 .containsExactly("> **Status:** Priority 9 complete, 2026-10-03");
@@ -535,7 +535,7 @@ class DocumentationReleaseArtifactTest {
                 "- [ ] Require demonstrated benefit", "(COMPATIBILITY-PERFORMANCE.md)",
                 "10.1 acceptance pending", "2026-10-03");
         assertThat(priority.split("### \\[x\\] 10.2", 2)[1]).doesNotContain("[ ]");
-        assertThat(checklist).contains("### [ ] 11.1", "### [ ] 12.1");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 12.1");
         String record = Files.readString(directory.resolve("COMPATIBILITY-PERFORMANCE.md"));
         assertThat(record.lines().filter(line -> line.startsWith("> **Status:**")).toList())
                 .containsExactly("> **Status:** 10.2 and 10.3 complete; 10.1 performance acceptance pending, 2026-10-03");
@@ -555,6 +555,56 @@ class DocumentationReleaseArtifactTest {
         for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
                 Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
             Matcher links = pattern.matcher(record);
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+            }
+        }
+    }
+
+    @Test
+    void v34GuidancePreservesDeferredScopePerformanceGateAndReproductionBoundaries() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v34");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 11 - ", 2)[1].split("## Priority 12 - ", 2)[0];
+        assertThat(priority).contains("### [x] 11.1", "### [x] 11.2", "### [x] 11.3",
+                "(MAINTAINER-GUIDANCE.md)", "2026-10-03").doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 10.1", "### [ ] 12.1");
+        String guide = Files.readString(directory.resolve("MAINTAINER-GUIDANCE.md"));
+        assertThat(guide.lines().filter(line -> line.startsWith("> **Status:**")).toList())
+                .containsExactly("> **Status:** Priority 11 complete, 2026-10-03");
+        assertThat(guide.lines().filter(line -> line.startsWith("> **Delivered production IDs:**")).toList())
+                .containsExactly("> **Delivered production IDs:** none; C004 rolled back");
+        assertThat(guide.lines().filter(line -> line.startsWith("> **Release scope:**")).toList())
+                .containsExactly("> **Release scope:** unselected");
+        assertThat(guide.replaceAll("\\s+", " ")).contains("10.1 performance acceptance remains pending",
+                "C001:", "C002:", "C003:", "C004:", "C005:", "P3/P10 enabled-only allocation flag: unresolved",
+                "P01 `MINIMAL`", "P02 `AUTO_NO_REGISTRY`", "P03 `AUTO_REGISTRY`",
+                "P04 `RESILIENCE_ENABLED_ONLY`", "P05 physical absence", "P06 `OBSERVER` / `HOOK`",
+                "P07 independent pool gauges", "P08 selected cache/work", "not a production optimization",
+                "per-subscription terminal state", "full primary matrix", ">max(32 B/op, 5%)",
+                "not retained live heap", "before close", "No production payload capture",
+                "earlier pod-memory and service-mesh reports remain unattributed", "plannedFinalVersion=null",
+                "232 passed", "75 passed", "14 passed", "not re-executed for new measurements");
+        assertThat(guide).contains("scripts/verify-v34-benchmark-inputs.py compare", ".shadedSha256",
+                "for version in 4.5.0-SNAPSHOT 4.4.2", "-p profile=RESILIENCE_ENABLED_ONLY -p scenario=GET",
+                "-bm avgt -tu ns -t 1 -wi 5 -w 1s -i 5 -r 1s -f 2 -prof gc -foe true",
+                "scripts/review-v34-benchmark-results.py --confirmation", "-XX:+DisableExplicitGC",
+                "test \"$status\" -eq 0 || exit \"$status\"");
+        for (String name : List.of("ROADMAP.md", "CHECKLIST.md")) {
+            assertThat(Files.readString(directory.resolve(name))).contains("(MAINTAINER-GUIDANCE.md)");
+        }
+        assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v34/MAINTAINER-GUIDANCE.md)");
+        for (String name : List.of("15-customizer.md", "21-diagnostic-contexts.md", "22-benchmarks.md",
+                "23-performance-summary.md", "25-performance-troubleshooting.md", "26-support-bundles.md",
+                "30-operations-troubleshooting.md")) {
+            assertThat(Files.readString(root.resolve("docs").resolve(name))).as(name)
+                    .contains("../roadmaps/v34/MAINTAINER-GUIDANCE.md");
+        }
+        for (Pattern pattern : List.of(Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)"),
+                Pattern.compile("(?m)^\\[[^]]+]:\\s+(\\S+)"))) {
+            Matcher links = pattern.matcher(guide);
             while (links.find()) {
                 String target = links.group(1);
                 if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();

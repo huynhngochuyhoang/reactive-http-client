@@ -125,6 +125,38 @@ Before using benchmark data as a reference point, check:
 If the workload does not match a promoted benchmark scenario, treat the benchmark
 as orientation only and measure the real path directly.
 
+## Default-Path Cost and Ownership
+
+For published `4.4.2` incidents, first identify the effective profile. Observability
+defaults enabled but requires available integrations for built-in exports;
+application observers/hooks can still run without a MeterRegistry. Pool metrics
+are independently selected. Resilience enabled without named operators is not
+equivalent to an active Retry, and a defined but unselected cache policy is inert.
+Do not disable required behavior just to resemble a minimal benchmark.
+
+Separate construction, first call, warm publisher creation, subscribed execution
+and transport/body work. A cold publisher's creation does not dispatch a request;
+a local cache hit is not equivalent to a network load. Observer/hook discovery,
+policy mutation checks, per-subscription terminal state and resource cleanup are
+intentional costs, not automatically removable overhead. Use supported proxy and
+context lifetimes; do not cache resolved requests or share mutable caller state.
+
+The [V34 maintainer guide](../roadmaps/v34/MAINTAINER-GUIDANCE.md) supplies existing
+phase-specific fixtures, matched commands and deferred owners/triggers. Its
+`4.5.0-SNAPSHOT` review delivers no production optimization, and 10.1 performance
+acceptance remains pending. It does not diagnose an application memory incident
+or recommend a snapshot upgrade as a remedy.
+
+B/op measures allocation per operation, not retained heap. Compare time-aligned
+post-GC heap, direct/native memory, protocol-aware pool gauges, threads and RSS
+under the existing [memory-triage procedure](30-operations-troubleshooting.md#cache-memory-triage-420).
+Keep profiling separate from scored runs and record its overhead and workload
+differences. Use bounded synthetic reproduction first; any authorized production
+capture must have time/size limits and privacy review. Raw recordings, heap dumps,
+request material, identities and arbitrary error messages are not safe bundle
+attachments. Follow [support capture](26-support-bundles.md#performance-investigations)
+for sanitized evidence, including unknown rather than invented zero values.
+
 ## Investigation Checklist
 
 1. Identify the client name, API name, HTTP method, and path template.

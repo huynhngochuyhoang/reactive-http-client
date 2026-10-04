@@ -1238,6 +1238,18 @@ incidents, use it as orientation and measure the real downstream path directly.
 Do not cite smoke-only benchmark reports or generated `target/benchmark-reports`
 files as public evidence.
 
+For default-path investigations, also record effective feature selections and
+available integrations, the construction/invocation/subscription phase, toolchain
+and dependency versions, caller totals and final-attempt dispatch evidence for the
+same window. Attempt counts are not network-send counts.
+Use the [V34 maintainer guide](../roadmaps/v34/MAINTAINER-GUIDANCE.md#bounded-operations-triage)
+to separate CPU/allocation from retained heap, direct/native memory and RSS.
+V34 adds no support schema or meter and leaves performance acceptance pending;
+its internal matched scores are not promoted report evidence. Use existing bounded
+capture/sanitization recipes, preserve unknowns, and sample cache/work counters
+before their last owner closes. Do not attach raw profiler recordings, heap dumps,
+targets, headers/bodies, identities, cache key material or arbitrary exception text.
+
 ## Related Docs
 
 - [Diagnostic Context Contracts](21-diagnostic-contexts.md)

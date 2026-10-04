@@ -765,32 +765,59 @@ and P11/P12 remain open.
 
 ## Priority 11 - Maintainer and Operations Guidance
 
-### [ ] 11.1 Document delivered behavior and intentional costs
+### [x] 11.1 Document delivered behavior and intentional costs
 
-- [ ] Link effective profiles, findings, approved IDs, delivered changes and
+- [x] Link effective profiles, findings, approved IDs, delivered changes and
       retained/deferred work. Explain why required discovery/state/cleanup remains.
-- [ ] Document unchanged defaults and extension/ownership guarantees; avoid a
+- [x] Document unchanged defaults and extension/ownership guarantees; avoid a
       universal zero-overhead claim or invented performance-mode configuration.
-- [ ] Distinguish candidate behavior from published `4.4.2` until publication;
+- [x] Distinguish candidate behavior from published `4.4.2` until publication;
       keep V33's historical results and unresolved incident conclusions intact.
 
-### [ ] 11.2 Publish reproducible investigation guidance
+### [x] 11.2 Publish reproducible investigation guidance
 
-- [ ] Provide tracked commands/fixtures for phase-specific matched workloads,
+- [x] Provide tracked commands/fixtures for phase-specific matched workloads,
       correctness controls and repeatable confirmation of cost flags.
-- [ ] Explain CPU/allocation versus retention/direct memory/RSS, profiler overhead,
+- [x] Explain CPU/allocation versus retention/direct memory/RSS, profiler overhead,
       workload/classpath differences and measurement noise.
-- [ ] Keep support capture bounded and sanitized; no new meter/dashboard or
+- [x] Keep support capture bounded and sanitized; no new meter/dashboard or
       production payload capture is implied by this roadmap.
 
-### [ ] 11.3 Reconcile guidance and documentation guards
+### [x] 11.3 Reconcile guidance and documentation guards
 
-- [ ] Update relevant benchmark, performance, customizer/context/ownership and
+- [x] Update relevant benchmark, performance, customizer/context/ownership and
       operations guidance only where delivered findings require changes.
-- [ ] Verify examples, local links, scope/status consistency, generated references
+- [x] Verify examples, local links, scope/status consistency, generated references
       and current commands with actual test totals; preserve historical evidence.
-- [ ] Record remaining owners, workarounds, triggers and explicit limitations.
+- [x] Record remaining owners, workarounds, triggers and explicit limitations.
       Guidance cannot turn an unselected candidate or noisy score into a delivered fix.
+
+**Completed, 2026-10-03.**
+[Maintainer and operations guidance](MAINTAINER-GUIDANCE.md) documents the C004
+rollback, other deferrals, retained contracts and phase-specific investigation.
+Execution of P11 was requested while 10.1 acceptance remains pending; this is
+independent documentation work, not a waiver or a new implementation/release
+decision. Published `4.4.2`, unchanged development behavior and unselected release
+scope stay distinct. Canonical benchmark/performance, customizer/context and
+operations/support guides link to the current findings without rewriting V33 or
+P1-P10 evidence. No production/API/configuration/default/dependency changes.
+
+Fresh verification on source `922c72f98246735385b5cc47e0d90bcd974961f6` plus the
+guidance/test delta: 232 focused starter tests in ten classes, 75 ordinary benchmark
+correctness tests, and 14 Python guard tests, all with zero failures/errors/skips.
+The final 232-case rerun includes 90 documentation/archive/readiness cases and
+four checked V33 example cases; it overlaps the initial 232-case run. Ordinary
+JVMs disable explicit GC. Bash syntax, JMH method/parameter discovery, recorded
+input comparison and raw-result review pass; the reverse review still reports
+one allocation flag. There is no new scored JMH, native, complete-module, strict
+API or Central-consumer run. Unchanged-input P9/P10 references retain those limits.
+
+The separate `target/release-evidence/v34/priority11/` bundle records commands,
+exits, fresh reports, sources, readiness and P10 inventory revalidation: 156 files,
+inventory SHA-256
+`bdb0e8a4b1b9b890a73f2465fe3073f30da699c50cff940ba18cb6693fddde2a`.
+This checklist remains outside final source-copy sealing. **10.1 acceptance and
+P12 remain open**, with no new release selection or public performance claim.
 
 ## Priority 12 - Scope Decision and Conditional Release Go/No-Go
 

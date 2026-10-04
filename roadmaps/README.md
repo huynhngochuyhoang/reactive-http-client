@@ -38,7 +38,9 @@ The [Priority 9 parity record](v34/PARITY-EVIDENCE.md) adds fresh assembled Boot
 The [Priority 10 evidence](v34/COMPATIBILITY-PERFORMANCE.md) seals matched costs,
 strict API and full-module Boot verification. Compatibility and evidence work
 are complete; cost acceptance remains pending after the allocation split recurred
-in reverse confirmation. Guidance and release selection remain open.
+in reverse confirmation. [Priority 11 guidance](v34/MAINTAINER-GUIDANCE.md)
+connects the retained contracts, deferred owners/triggers and bounded investigation
+commands. It does not waive 10.1 or select a release; Priority 12 remains open.
 
 [V33](v33/ROADMAP.md) and its [execution checklist](v33/CHECKLIST.md) revisit
 supported-extension and AOT selection gaps V32-F001, V32-F002 and V32-F003.

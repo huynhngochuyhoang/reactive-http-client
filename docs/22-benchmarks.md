@@ -54,6 +54,23 @@ Current promoted report:
 | Spring HTTP Interface | Framework proxy comparison where the scenario is supported without custom glue that changes the comparison. | Same transport, codecs, base URL, request metadata, response decoding, and consumed body. | Only the named loopback scenario and report version. |
 | Starter | Declarative client under test, including starter-only feature and error-mapping overhead scenarios. | Default scenarios match the baselines; optional features are measured separately or against baselines doing equivalent work. | Only the named starter scenario and report version. |
 
+## V34 Default-Path Review
+
+V34 compares published `4.4.2` with development `4.5.0-SNAPSHOT` using the same
+harness and non-starter dependencies. It is a release-to-release investigation,
+not a new raw-client comparison or promoted report. The approved C004 optimization
+was rolled back; no production improvement is delivered. **10.1 performance
+acceptance remains pending** because reverse confirmation reproduced an unresolved
+allocation split. Do not report only the favorable primary pair.
+
+Use the [maintainer investigation guide](../roadmaps/v34/MAINTAINER-GUIDANCE.md#reproduce-the-investigation)
+for phase selection, effective profiles, exact confirmation commands and retained
+ownership costs. The [frozen workload contract](../roadmaps/v34/WORKLOAD-CONTRACT.md)
+defines the 60-row matrix, matched input checks and V34's review triggers;
+[P10 evidence](../roadmaps/v34/COMPATIBILITY-PERFORMANCE.md) retains all samples,
+compatibility results and limits. These narrower rules do not replace the
+release-quality report promotion process below. No V34 public numbers are promoted.
+
 ## Commands
 
 Compile the benchmark module without running benchmarks:

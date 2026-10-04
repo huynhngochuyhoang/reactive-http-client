@@ -8,6 +8,14 @@ not a general claim about every application, payload, network, JVM, or deploymen
 For production latency investigation, use the [Performance Troubleshooting](25-performance-troubleshooting.md)
 guide before comparing an application workload with benchmark rows.
 
+The [V34 maintainer review](../roadmaps/v34/MAINTAINER-GUIDANCE.md) does not replace
+that promoted report. It compares `4.4.2` with `4.5.0-SNAPSHOT`, retains no
+production optimization after C004's rollback, and leaves 10.1 performance
+acceptance pending. Minimal, auto-configured/no-registry and registry-enabled
+workloads are distinct; the historical "default path" rows below are not a
+statement that current auto-configuration disables all diagnostics. No current
+speed, startup or pod-memory improvement is claimed.
+
 ## Methodology First
 
 The benchmark harness measures named scenarios before making any performance
@@ -139,3 +147,8 @@ without an intentional request-shape change, or when an optional-feature row
 jumps about 25%. Rerun the current and baseline methods on the same machine
 before treating that movement as a trend, then either optimize the changed path
 or document why the cost is expected.
+
+V34's preselected investigation uses its own frozen triggers: >20% mean latency
+or >max(32 B/op, 5%) allocation. Do not substitute the generic report heuristics
+above to clear its unresolved flag; see the
+[matched evidence](../roadmaps/v34/COMPATIBILITY-PERFORMANCE.md#unresolved-enabled-only-allocation).
