@@ -10,9 +10,16 @@ is historical context rather than active work.
 V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V33 are completed release records. V33 was released as `4.4.2`.
 V34 is completed as a review-only/no-release roadmap; C004 was evaluated and rolled back.
-No execution roadmap or next release is selected.
+V35 is active for investigation and bounded fix design; no next release is selected.
 The reactor is `4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are
 verified `4.4.2`.
+
+[V35](v35/ROADMAP.md) and its [execution checklist](v35/CHECKLIST.md) cover every V34 deferral:
+C001-C005, C004's broader preparation work and rolled-back experiment, and the
+unresolved P3/P10 allocation finding. It proposes attribution-led fixes with
+per-finding acceptance, ownership and compatibility controls. Adoption completes
+no execution item: production edits require Priority 3.3 approval and release
+selection remains separate in Priority 12. V34 stays closed and versions are unchanged.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured
@@ -110,3 +117,4 @@ automatically create another execution roadmap or reopen V32.
 | V32 | [Roadmap](v32/ROADMAP.md) | [Checklist](v32/CHECKLIST.md) | Completed and released as `4.4.1` |
 | V33 | [Roadmap](v33/ROADMAP.md) | [Checklist](v33/CHECKLIST.md) | Completed and released as `4.4.2` |
 | V34 | [Roadmap](v34/ROADMAP.md) | [Checklist](v34/CHECKLIST.md) | Completed; review-only, no release |
+| V35 | [Roadmap](v35/ROADMAP.md) | [Checklist](v35/CHECKLIST.md) | Active |
