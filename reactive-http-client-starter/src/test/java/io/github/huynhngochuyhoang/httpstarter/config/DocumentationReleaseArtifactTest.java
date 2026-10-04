@@ -259,8 +259,8 @@ class DocumentationReleaseArtifactTest {
                 "System.gc-dependent", "explicit GC disabled", "controlled reachability",
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
-                "Creating this checklist completes no execution item")
-                .doesNotContain("[x]");
+                "Creating this checklist completes no execution item");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 2 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [ ] 2.4 Record causal evidence or the unresolved gate",
                 "### [ ] 3.3 Obtain explicit bounded implementation approval",
@@ -273,6 +273,50 @@ class DocumentationReleaseArtifactTest {
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).exists();
+        }
+    }
+
+    @Test
+    void v35BaselineReconcilesReachableEvidenceAndKeepsEveryFindingOpen() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
+        String findings = Files.readString(directory.resolve("FINDINGS.md"));
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(baseline).contains(
+                "> **Published baseline:** `4.4.2`", "> **Development coordinate:** `4.5.0-SNAPSHOT`",
+                "05dfbaaa86e7f9afbdf88315ba212db7d65f0bb6", "21ad81bd44db15b75d6787a0ceac308939a2741e",
+                "fc98e58b9d5154a0ba539ea878b05c532b379554", "## Reachable Provenance",
+                "## Effective Profiles", "## Verification and Limits", "pre-squash",
+                "activeRoadmap=v35", "plannedFinalVersion=null", "Priority 3.3",
+                "V34-P01", "V34-P02", "V34-P03", "V34-P04", "V34-P05", "V34-P06", "V34-P07", "V34-P08");
+        assertThat(baseline.replaceAll("\\s+", " ")).contains(
+                "not fresh Central downloads", "not a new native", "not a performance pass",
+                "no MeterRegistry", "Pool metrics are independent", "physically absent",
+                "3,051", "target/release-evidence/v35/priority1/");
+        List<String> ids = List.of("V34-P3/P10 allocation finding", "V34-C001", "V34-C002", "V34-C003",
+                "V34-C004 optional preparation", "V34-C004 rolled-back value reuse", "V34-C005");
+        assertThat(findings.lines().filter(line -> line.startsWith("## V34-")).map(line -> line.substring(3)).toList())
+                .containsExactlyElementsOf(ids);
+        for (String id : ids) {
+            String row = findings.split(Pattern.quote("## " + id + "\n"), 2)[1].split("\n## ", 2)[0];
+            assertThat(row).as(id).contains("**Owner:**", "**Status:** unresolved/blocking",
+                    "**Current evidence:**", "**Reproduction:**", "**Proposed boundary:**",
+                    "**Controls:**", "**Acceptance:**", "**Open questions:**", "**Profiles:**")
+                    .doesNotContain("Fixed and verified", "Resolved without production change");
+        }
+        assertThat(findings.replaceAll("\\s+", " ")).contains("no production change approved",
+                "Priority 3.3", "same saved JAR", "whole-interface mutation", "late registration",
+                "prototype", "controlled reachability", "not a new fix");
+        String priority = checklist.split("## Priority 1 - ", 2)[1].split("## Priority 2 - ", 2)[0];
+        assertThat(priority).contains("### [x] 1.1", "### [x] 1.2", "### [x] 1.3",
+                "(BASELINE-SCOPE.md)", "(FINDINGS.md)").doesNotContain("[ ]");
+        for (String document : List.of(baseline, findings)) {
+            Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(document);
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+            }
         }
     }
 

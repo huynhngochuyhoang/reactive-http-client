@@ -93,12 +93,12 @@ terminal reporting and body/resource cleanup cannot be removed for a score.
 ## Intended Records
 
 Create records as work produces evidence, not empty reports or implied results.
-Suggested names are not links to files that already exist.
+Linked records exist; other names are suggestions, not implied completed reports.
 
 | Record | Contents |
 |---|---|
-| `BASELINE-SCOPE.md` | Reachable/published provenance, profiles and prior-evidence applicability |
-| `FINDINGS.md` | Complete seven-row ledger, owners, acceptance and final dispositions |
+| [BASELINE-SCOPE.md](BASELINE-SCOPE.md) | Reachable/published provenance, profiles and prior-evidence applicability |
+| [FINDINGS.md](FINDINGS.md) | Complete seven-row ledger, owners, acceptance and unresolved dispositions |
 | `ALLOCATION-INVESTIGATION.md` | Frozen experiments, all samples, attribution and unresolved limits |
 | `FIX-DECISION.md` | Explicit maintainer approvals, local boundaries, acceptance and rollback |
 | `FIX-EVIDENCE.md` | Per-finding implementation/no-change evidence, ownership and costs |
@@ -108,34 +108,59 @@ Suggested names are not links to files that already exist.
 
 ## Priority 1 - Post-V34 Baseline and Complete Deferred-Scope Integrity
 
-### [ ] 1.1 Verify adoption and version state
+### [x] 1.1 Verify adoption and version state
 
-- [ ] Verify roadmap/checklist/index/readiness agree that V35 is active, V34 is
+- [x] Verify roadmap/checklist/index/readiness agree that V35 is active, V34 is
       closed review-only and no production fix or release has been selected.
-- [ ] Verify reactor/modules/current fixtures remain `4.5.0-SNAPSHOT`, public/API/
+- [x] Verify reactor/modules/current fixtures remain `4.5.0-SNAPSHOT`, public/API/
       consumer/benchmark baselines remain `4.4.2`, and `plannedFinalVersion=null`.
-- [ ] Verify readiness follows checklist lifecycle through a final-version cut,
+- [x] Verify readiness follows checklist lifecycle through a final-version cut,
       not the snapshot suffix; run applicable archive/version/documentation guards.
 
-### [ ] 1.2 Establish reachable source and reusable provenance
+### [x] 1.2 Establish reachable source and reusable provenance
 
-- [ ] Record clean/dirty state, reachable commit/tree, toolchains/settings and
+- [x] Record clean/dirty state, reachable commit/tree, toolchains/settings and
       effective dependencies for Java 21 and genuine Boot 4.0.0/4.1.0 rows.
-- [ ] Revalidate Central `4.4.2` provenance and existing consumer/native/API/cost
+- [x] Revalidate Central `4.4.2` provenance and existing consumer/native/API/cost
       evidence, or reproduce unavailable/changed inputs in isolated repositories.
       A reactor install cannot substitute for a published artifact.
-- [ ] Preserve V34's rollback, unexplained flag and all V1-V34 history. Reconcile
+- [x] Preserve V34's rollback, unexplained flag and all V1-V34 history. Reconcile
       pre-squash references explicitly; do not replace them with invented provenance.
 
-### [ ] 1.3 Initialize complete finding and profile coverage
+### [x] 1.3 Initialize complete finding and profile coverage
 
-- [ ] Create all seven ledger rows with owner, current evidence, reproduction,
+- [x] Create all seven ledger rows with owner, current evidence, reproduction,
       proposed boundary, controls, acceptance and unresolved questions.
-- [ ] Retain minimal/public, real auto-configured no-registry/registry, enabled-only
+- [x] Retain minimal/public, real auto-configured no-registry/registry, enabled-only
       resilience, application observer/hook, physically absent optional integration,
       independent pool gauge and selected-cache/work profiles.
-- [ ] Map reusable V34 structural/ownership tests to each row. Configuration flags
+- [x] Map reusable V34 structural/ownership tests to each row. Configuration flags
       alone do not prove effective behavior, inactive resources or zero work.
+
+Completed 2026-10-04. [BASELINE-SCOPE.md](BASELINE-SCOPE.md) records the clean
+starting commit `05dfbaaa86e7f9afbdf88315ba212db7d65f0bb6`, reachable reconciliation
+of V34's pre-squash references and exact unchanged-input reuse. All 3,051 entries
+across six prior inventories rehash; published artifacts remain Central-derived.
+[FINDINGS.md](FINDINGS.md) initializes seven unresolved rows and maps all eight
+effective profiles and existing controls. No production change, finding resolution,
+new score, release or version transition is approved. Priority 2 attribution and
+Priority 3.3 implementation approval remain open.
+
+Verification: reactor validation, published-baseline fixtures, strict API negative
+fixtures, script syntax and fresh Boot 4.0 dependency inventory passed. The final
+focused run passed **263 tests across 12 classes** (94 documentation and 169
+profile/ownership cases), zero failures/errors/skips, with explicit GC disabled.
+The earlier 169-case profile run overlaps, not an additional distinct total.
+The new documentation guard first failed with the missing record as intended;
+the initial fixture-script failure and corrected writable-repository run are
+retained. Final documentation-only rerun: **94 passed**, overlapping the 263.
+Prior native/API/consumer/cost results are revalidated reuse, not new executions.
+Evidence: `target/release-evidence/v35/priority1/`; source copies, exact commands,
+exits, XML, readiness and hashes are sealed separately from this external anchor.
+
+Integrity anchor: **262 files**; SHA-256 of `priority1/SHA256SUMS`:
+`5119e62d287d19cc7b1068fbc89cb329ae4d2dfddab65187023a9e2311907e62`.
+The sealed checklist copy excludes this anchor to avoid a self-referential hash.
 
 ## Priority 2 - Explain the Unresolved Allocation Split
 

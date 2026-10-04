@@ -20,6 +20,9 @@ unresolved P3/P10 allocation finding. It proposes attribution-led fixes with
 per-finding acceptance, ownership and compatibility controls. Adoption completes
 no execution item: production edits require Priority 3.3 approval and release
 selection remains separate in Priority 12. V34 stays closed and versions are unchanged.
+The [V35 baseline](v35/BASELINE-SCOPE.md) reconciles reusable evidence with reachable
+source; its [seven-row ledger](v35/FINDINGS.md) retains every unresolved workstream
+and effective profile without approving production changes.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

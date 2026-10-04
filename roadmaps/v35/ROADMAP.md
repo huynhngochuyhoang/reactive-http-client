@@ -49,6 +49,10 @@ resolved. Keep allocation rate, retained heap, direct/native memory and RSS sepa
 
 ## Starting Evidence
 
+The [Priority 1 baseline](BASELINE-SCOPE.md) reconciles reusable artifacts with
+reachable source and preserves effective profiles. The [finding ledger](FINDINGS.md)
+keeps all seven workstreams unresolved and implementation approval pending.
+
 The inspected starting revision is
 `21ad81bd44db15b75d6787a0ceac308939a2741e`, containing V34's closure.
 Re-establish reachable source and artifact provenance during execution; historical
