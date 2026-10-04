@@ -60,8 +60,10 @@ V34 compares published `4.4.2` with development `4.5.0-SNAPSHOT` using the same
 harness and non-starter dependencies. It is a release-to-release investigation,
 not a new raw-client comparison or promoted report. The approved C004 optimization
 was rolled back; no production improvement is delivered. **10.1 performance
-acceptance remains pending** because reverse confirmation reproduced an unresolved
-allocation split. Do not report only the favorable primary pair.
+acceptance did not pass** because reverse confirmation reproduced an unresolved
+allocation split. [V34 closed review-only/no release](../roadmaps/v34/RELEASE-DECISION.md)
+with that finding explicitly deferred, not waived. Do not report only the favorable
+primary pair.
 
 Use the [maintainer investigation guide](../roadmaps/v34/MAINTAINER-GUIDANCE.md#reproduce-the-investigation)
 for phase selection, effective profiles, exact confirmation commands and retained

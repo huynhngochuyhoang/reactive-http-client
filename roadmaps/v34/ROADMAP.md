@@ -1,13 +1,20 @@
 # Reactive HTTP Client - Roadmap V34
 
-> **Status:** active
+> **Status:** completed; review-only, no release
 > **Theme:** performance and default-path hardening
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Implementation scope:** V34-C004 evaluated and rolled back; no production change retained
-> **Release scope:** unselected
+> **Release scope:** no release; V34 closed
 > **Draft date:** 2026-09-30
 > **Adopted:** 2026-09-30
+> **Closed:** 2026-10-04
+
+[Priority 12 closure](RELEASE-DECISION.md) records the maintainer-approved
+review-only/no-release result. C004 remains rolled back; no production improvement
+is delivered. The unresolved allocation finding is deferred, not passed. Versions
+remain unchanged and future scope is unselected. The proposal and dated evidence
+below retain their original scope and verification limits.
 
 This follows [V33 publication and closure](../v33/RELEASE-DECISION.md#post-publication-closure).
 V1-V33 remain completed release records. The [execution checklist](CHECKLIST.md)
@@ -23,7 +30,7 @@ records the scored pair, reverse-order confirmation, ownership controls and rank
 findings; one allocation flag remains unresolved. The [Priority 4 decision](IMPROVEMENT-DECISION.md)
 approves only C004's immutable disabled-value reuse, preserving every mutation
 check. Other candidates and broader C004 resource changes are deferred;
-release scope remains unselected.
+release selection was deferred until Priority 12.
 The [Priority 5 planning controls](PLANNING-INVOCATION.md) record production N/A
 for deferred C003 and fresh metadata/wire/selection regressions, not a planning
 optimization. [Priority 6 hardening](HARDENING-EVIDENCE.md) records the C004
@@ -37,11 +44,11 @@ No production resource or framework change is retained.
 genuine Boot 4.0.0/4.1.0 consumers and JVM/AOT execution, plus a clean-source Boot
 4.0.0 native compile and executable. [Priority 10 evidence](COMPATIBILITY-PERFORMANCE.md)
 records the final matched pair, reverse confirmation, strict API and full Boot
-module verification. 10.2/10.3 are complete; 10.1 acceptance remains pending
+module verification. 10.2/10.3 are complete; 10.1 acceptance did not pass
 because the enabled-only allocation split recurred. [Priority 11 guidance](MAINTAINER-GUIDANCE.md)
 documents retained costs, supported ownership, reproduction and bounded operations
-triage without waiving that flag. Priority 12 release selection remains open;
-no all-clear performance claim is made.
+triage without waiving that flag. Priority 12 closes the review without a release
+and explicitly defers the flag; no all-clear performance claim is made.
 
 ## Intent
 

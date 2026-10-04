@@ -1,12 +1,19 @@
 # Reactive HTTP Client - Roadmap V34 Execution Checklist
 
-> **Status:** active
+> **Status:** completed; review-only, no release
 > **Theme:** performance and default-path hardening
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Implementation scope:** V34-C004 evaluated and rolled back; no production change retained
-> **Release scope:** unselected
+> **Release scope:** no release; V34 closed
 > **Adopted:** 2026-09-30
+> **Closed:** 2026-10-04
+
+[Priority 12 decision](RELEASE-DECISION.md): maintainer-approved review-only closure.
+C004 remains rolled back; no production improvement or new version is delivered.
+The two unchecked 10.1 acceptance markers are explicitly deferred, not outstanding
+V34 implementation work or a performance pass. Earlier dated checkpoints below
+preserve the decisions and limitations at the time they were recorded.
 
 Execution companion to [`ROADMAP.md`](ROADMAP.md). Adoption authorizes baseline,
 workload and characterization work, not production changes, a version bump or a
@@ -698,6 +705,11 @@ source-copy sealing to avoid a self-referential checksum.
 
 ### [ ] 10.1 Run final matched cost and allocation verification
 
+**Deferred by approved no-release closure, 2026-10-04:** the acceptance requirement
+and its checkbox remain unpassed. [Priority 12](RELEASE-DECISION.md) defers the
+unresolved allocation finding with an owner and reopening trigger; this is
+**not a performance pass** or a correctness tradeoff. No optimization survives rollback.
+
 - [x] Run selected before/after rows plus minimal/default and enabled-feature
       sentinels with final fixtures and frozen Priority 2 rules.
 - [x] Preserve identical non-starter stacks and semantic witnesses, isolated
@@ -821,67 +833,105 @@ P12 remain open**, with no new release selection or public performance claim.
 
 ## Priority 12 - Scope Decision and Conditional Release Go/No-Go
 
-### [ ] 12.1 Reconcile implementation scope and release intent
+### [x] 12.1 Reconcile implementation scope and release intent
 
-- [ ] Match approved IDs to delivered/rolled-back changes, acceptance evidence
+- [x] Match approved IDs to delivered/rolled-back changes, acceptance evidence
       and deferrals; resolve blockers or obtain explicit scope removal.
-- [ ] Obtain the maintainer decision for release preparation or review-only/no-release.
+- [x] Obtain the maintainer decision for release preparation or review-only/no-release.
       Evaluate a compatible patch first; `4.5.0-SNAPSHOT` does not select a minor.
-- [ ] Record unresolved evidence as no-go/pending, not completed work. Review-only
+- [x] Record unresolved evidence as no-go/pending, not completed work. Review-only
       closure needs explicit disposition of all findings and any implementation.
 
-### [ ] 12.2 Select the exact candidate or no-release branch
+### [x] 12.2 Select the exact candidate or no-release branch
 
-- [ ] For a release, approve the exact candidate after compatibility/migration and
-      performance-claim review. No new feature/default enters by implication.
-- [ ] Update reactor/modules/fixtures, supported-matrix/version guards, current
-      commands, changelog and readiness together; keep baseline `4.4.2` until
+- [x] **N/A: no release selected.** For a release, approve the exact candidate after
+      compatibility/migration and performance-claim review. No new feature/default
+      enters by implication.
+- [x] **N/A: no coordinate transition.** Update reactor/modules/fixtures,
+      supported-matrix/version guards, current commands, changelog and readiness
+      together; keep baseline `4.4.2` until
       publication is verified and keep V34 active through the final-version cut.
-- [ ] For no release, record rationale, accepted findings and implementation
+- [x] For no release, record rationale, accepted findings and implementation
       disposition; label candidate/signing/publication work N/A explicitly.
-- [ ] Record the branch without treating preparation as publication or final GO;
+- [x] Record the branch without treating preparation as publication or final GO;
       preserve earlier evidence coordinates and source limits.
 
-### [ ] 12.3 Assemble immutable release or review evidence
+### [x] 12.3 Assemble immutable release or review evidence
 
-- [ ] Inventory clean reachable final source, decisions and required correctness,
+- [x] Inventory clean reachable final source, decisions and required correctness,
       API, consumer, Boot/AOT/native, cost, ownership and guidance evidence.
-- [ ] Seal exact commands, actual totals, toolchains, effective dependencies,
+- [x] Seal exact commands, actual totals, toolchains, effective dependencies,
       artifacts/reports and hashes; keep failures and remaining limitations.
-- [ ] Revalidate after final source/fixture/coordinate changes; document exact
+- [x] Revalidate after final source/fixture/coordinate changes; document exact
       unchanged-input reuse without calling it a new final-coordinate run.
-- [ ] For a release, verify applicable packaging/unsigned/staged checks; signing,
-      tag/workflow publication and Central consumption stay separate until verified.
+- [x] **N/A: no release selected.** For a release, verify applicable
+      packaging/unsigned/staged checks; signing, tag/workflow publication and
+      Central consumption stay separate until verified.
 
-### [ ] 12.4 Verify publication or no-release closure
+### [x] 12.4 Verify publication or no-release closure
 
-- [ ] For the approved release, verify signing/staged signatures, version-matched
-      tag/workflow and Central artifact provenance. Authorize signing locally;
+- [x] **N/A: no release selected.** For the approved release, verify signing/staged
+      signatures, version-matched tag/workflow and Central artifact provenance. Authorize signing locally;
       never include passphrases in evidence.
-- [ ] Verify published assembled consumption from an isolated repository with
-      versions/signatures/hashes, not a reactor install or local repository shadow.
-- [ ] For approved no-release/no-go closure, record explicit final disposition
+- [x] **N/A: no new publication.** Verify published assembled consumption from an
+      isolated repository with versions/signatures/hashes, not a reactor install
+      or local repository shadow.
+- [x] For approved no-release/no-go closure, record explicit final disposition
       and evidence limits; unrun required release gates cannot be called passes.
-- [ ] Only then close roadmap/checklist/index/readiness together; advance baselines
+- [x] Only then close roadmap/checklist/index/readiness together; advance baselines
       only after verified publication and leave future scope unselected.
-- [ ] Record closure revision and evidence links. No pending required work may
+- [x] Record closure revision and evidence links. No pending required work may
       be presented as completed release evidence.
+
+**Completed, 2026-10-04: review-only/no release.** The maintainer explicitly
+approved closure and deferral of the unresolved allocation flag, not acceptance
+of a regression or performance claim. [Release decision](RELEASE-DECISION.md)
+reconciles all findings, evidence and N/A release gates. Clean reviewed source
+`be2b640e75e38c13c2861165928df88a45fbd9d1` plus the sealed documentation/guard
+closure patch identifies the reviewed tree; the patch is not a new committed
+revision. Production, dependencies, benchmark/consumer/native inputs and versions
+remain unchanged. Baseline `4.4.2`, development `4.5.0-SNAPSHOT`,
+`plannedFinalVersion=null`, `activeRoadmap=null`; future scope is unselected.
+
+Fresh closure verification and inventory integrity are recorded in
+`target/release-evidence/v34/priority12/` and the linked decision. Earlier P1-P11
+records and bundles are historical evidence, not overwritten closure results.
+The focused suite passes 233 cases in ten classes, including 91 documentation
+cases and four compiled examples; 14 V34 Python guards pass. Final focused
+verification repeats those cases, not additional distinct coverage. Saved-input
+comparison, result review, command syntax and whitespace checks pass; the reverse
+review still reports one allocation flag. All 2,403 prior evidence files rehash
+successfully. No new native, scored JMH, signing or publication is claimed.
 
 ## Completion Criteria
 
-- [ ] Effective profiles and equivalent workloads are measured against published
+- [x] Effective profiles and equivalent workloads are measured against published
       `4.4.2` under rules frozen before scoring.
-- [ ] Findings have explicit dispositions and production work was approved before
+- [x] Findings have explicit dispositions and production work was approved before
       edits; no regression/leak premise or positive speedup was assumed.
-- [ ] Selected improvements demonstrate benefit or reproduced hardening while
-      preserving defaults, supported extensions, optional behavior and ownership.
-- [ ] Request/context/terminal semantics and cleanup remain verified; allocation
+- [x] **N/A: no improvement retained.** C004 failed its benefit gate and was rolled
+      back; no positive result is claimed. The unresolved 10.1 finding is explicitly
+      deferred by approved review-only closure, not accepted as an improvement.
+- [x] Request/context/terminal semantics and cleanup remain verified; allocation
       reduction has not introduced retention, hidden work or cross-caller state.
-- [ ] Required matched cost, API, module, mock/consumer, Boot/AOT/native and
+- [x] Required matched cost, API, module, mock/consumer, Boot/AOT/native and
       packaging results identify final inputs, actual outcomes and evidence limits.
-- [ ] Guidance and public claims match the measured workload and release availability.
-- [ ] Release/no-release choice and final archive/readiness state are verifiable.
+- [x] Guidance and public claims match the measured workload and release availability.
+- [x] Release/no-release choice and final archive/readiness state are verifiable.
 
 No execution item is complete merely because this checklist exists. Production
 scope is limited to the recorded decision; broader work requires renewed
-Priority 4.3 approval. Release scope still requires Priority 12.
+Priority 4.3 approval. Priority 12 selects no release; future scope needs a new decision.
+
+## Priority 12 Integrity Anchor
+
+The 103-file `target/release-evidence/v34/priority12/SHA256SUMS` inventory has
+SHA-256 `bfff9f508b3642e4f7345dddd72712f5d3e401cf24f091ee1dcb65b88849f532`.
+Its `final/closure.patch` has SHA-256
+`9946951385eb4fdd0d14fcedf35989bfdb09225040ed63a3e91331cf49a178e8` and includes
+all nine closure source files over clean `be2b640e75e38c13c2861165928df88a45fbd9d1`.
+The sealed checklist snapshot excludes only this external integrity section,
+appended after sealing; no decision, test or production input changes afterward.
+Both 233-case focused runs, the expected initial red test, 14 Python guards,
+saved-sample reviews, generated readiness and prior-inventory rechecks are retained.
+Run `sha256sum --check --quiet SHA256SUMS` from the bundle directory to verify it.

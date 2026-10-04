@@ -144,8 +144,9 @@ context lifetimes; do not cache resolved requests or share mutable caller state.
 The [V34 maintainer guide](../roadmaps/v34/MAINTAINER-GUIDANCE.md) supplies existing
 phase-specific fixtures, matched commands and deferred owners/triggers. Its
 `4.5.0-SNAPSHOT` review delivers no production optimization, and 10.1 performance
-acceptance remains pending. It does not diagnose an application memory incident
-or recommend a snapshot upgrade as a remedy.
+acceptance did not pass. [Review-only closure](../roadmaps/v34/RELEASE-DECISION.md)
+defers the unresolved allocation finding without a release. It does not diagnose
+an application memory incident or recommend a snapshot upgrade as a remedy.
 
 B/op measures allocation per operation, not retained heap. Compare time-aligned
 post-GC heap, direct/native memory, protocol-aware pool gauges, threads and RSS

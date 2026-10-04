@@ -10,8 +10,10 @@ guide before comparing an application workload with benchmark rows.
 
 The [V34 maintainer review](../roadmaps/v34/MAINTAINER-GUIDANCE.md) does not replace
 that promoted report. It compares `4.4.2` with `4.5.0-SNAPSHOT`, retains no
-production optimization after C004's rollback, and leaves 10.1 performance
-acceptance pending. Minimal, auto-configured/no-registry and registry-enabled
+production optimization after C004's rollback, and did not pass 10.1 performance
+acceptance. [Review-only closure](../roadmaps/v34/RELEASE-DECISION.md) defers the
+unresolved finding without a release or performance all-clear.
+Minimal, auto-configured/no-registry and registry-enabled
 workloads are distinct; the historical "default path" rows below are not a
 statement that current auto-configuration disables all diagnostics. No current
 speed, startup or pod-memory improvement is claimed.

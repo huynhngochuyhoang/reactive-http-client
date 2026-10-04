@@ -192,13 +192,15 @@ consolidates current limits and a [checked public example](examples/v33-extensio
 Patch `4.4.2` is published; see the
 [V33 publication evidence](../roadmaps/v33/RELEASE-DECISION.md#post-publication-closure)
 for signing, tag/workflow and fresh Central consumption. Public baselines are `4.4.2`.
-V1-V33 are completed release records. [V34](../roadmaps/v34/CHECKLIST.md) is active
-for performance/default-path hardening. Its [Priority 4 decision](../roadmaps/v34/IMPROVEMENT-DECISION.md)
-approves only C004's immutable disabled cache-policy decision reuse while retaining
+V1-V33 are completed release records. [V34](../roadmaps/v34/CHECKLIST.md) is closed
+as a performance/default-path review without a release. Its [Priority 4 decision](../roadmaps/v34/IMPROVEMENT-DECISION.md)
+approved only C004's immutable disabled cache-policy decision reuse while retaining
 all mutation checks. [Priority 6 hardening](../roadmaps/v34/HARDENING-EVIDENCE.md)
 records its failed benefit gate and rollback, with behavioral regressions retained.
-Remaining verification is pending and release scope is unselected. Runtime
-defaults and release coordinates are unchanged.
+[Priority 12 closure](../roadmaps/v34/RELEASE-DECISION.md) explicitly defers the
+unresolved allocation finding, not a performance pass. Signing/publication gates
+are N/A for this review-only result. Runtime defaults and release coordinates are
+unchanged; no next release is selected.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records the release tag, successful signing/staging/packaging/deployment workflow,
 13 verified signed Central artifacts and published-consumer results.
@@ -1141,8 +1143,10 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V32 is published and archived at `4.4.1`; V33 is published and archived at `4.4.2`.
-The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=v34`, C004-only
-implementation scope and `plannedFinalVersion=null`; release scope is unselected.
+The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=null` and
+`plannedFinalVersion=null`; V34 closed review-only with no production improvement
+retained and future scope unselected. Generated pending manual commands describe
+a future release, not required work for the approved no-release closure.
 V33 remained active through the release cut until verified publication and
 checklist closure; a version suffix
 does not decide roadmap lifecycle. The
