@@ -49,6 +49,13 @@ resolved. Keep allocation rate, retained heap, direct/native memory and RSS sepa
 
 ## Starting Evidence
 
+The [Priority 1 baseline](BASELINE-SCOPE.md) reconciles reusable artifacts with
+reachable source and preserves effective profiles. The [finding ledger](FINDINGS.md)
+tracks all seven workstreams with implementation approval pending.
+[Priority 2](ALLOCATION-INVESTIGATION.md) explains the observed allocation split
+through compiler/class-loading evidence without a production change or performance
+all-clear. The six implementation workstreams remain open.
+
 The inspected starting revision is
 `21ad81bd44db15b75d6787a0ceac308939a2741e`, containing V34's closure.
 Re-establish reachable source and artifact provenance during execution; historical
