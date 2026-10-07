@@ -1,7 +1,7 @@
 # V35 Complete Deferred-Finding Ledger
 
 > **Recorded:** 2026-10-04
-> **Implementation authorization:** pending Priority 3.3; no production change approved
+> **Implementation authorization:** seven-row bounded plan approved in Priority 3.3; no production change delivered
 > **Release scope:** unselected
 
 This is the seven-workstream inventory required by [Priority 1](CHECKLIST.md),
@@ -9,16 +9,28 @@ using the [reachable baseline](BASELINE-SCOPE.md). Owners below are maintainer
 roles, not assumptions about an assigned person. Priority 1 initialized all seven
 as unresolved. [Priority 2](ALLOCATION-INVESTIGATION.md) now explains the measured
 allocation split without production changes; the six implementation workstreams
-remain open. Reproductions and concrete acceptance still precede Priority 3.3
-approval. V34's limited approval does not carry into V35.
+remain open. Priority 3.3 now approves the concrete bounded plan below, not a
+delivered fix. V34's limited approval did not carry into V35.
 
-For every row, an approved production boundary and V35 patch are currently
-**none**. The first row has dated no-change evidence; later execution must attach
+Approved production boundaries and no-change routes are specified in the dated
+decision below; no V35 production patch is delivered. The first row has dated
+no-change evidence; later execution must attach
 evidence and a disposition to the remaining rows, preserving
 contrary results. Fixed/verified and substantiated no-change outcomes require the
 checklist's acceptance rules; unresolved rows block complete-scope closure unless
 the maintainer explicitly reduces scope. No new API, dependency, default, feature
 switch, telemetry export or broad framework rewrite is selected.
+
+## Priority 3 Specifications
+
+[FIX-DECISION.md](FIX-DECISION.md), recorded 2026-10-07, specifies all seven
+boundaries, no-change alternatives, dependencies, regression witnesses and
+per-candidate cost/rollback gates. The maintainer approved its seven-row plan in
+Priority 3.3; it is not a production patch or acceptance of any implementation.
+The proposed local experiments retain full dynamic discovery, body/state ownership,
+public metadata, whole-interface mutation checks and optional-resource ownership.
+C005 takes an evidence-first route, not an unspecified framework rewrite. Each
+execution priority must attach its own evidence before changing the statuses below.
 
 ## V34-P3/P10 allocation finding
 

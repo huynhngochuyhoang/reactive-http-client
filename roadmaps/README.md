@@ -26,6 +26,9 @@ and effective profile without approving production changes.
 The [allocation investigation](v35/ALLOCATION-INVESTIGATION.md) reproduces and
 explains the observed compiler-dependent split on both saved artifacts. It adopts
 no runtime tuning or measurement correction; six implementation workstreams remain open.
+The [bounded fix specifications](v35/FIX-DECISION.md) cover all seven rows without
+closing those findings; the maintainer approved this bounded plan in Priority 3.3,
+not a release or a performance claim.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

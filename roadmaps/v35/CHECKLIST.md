@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Investigation scope:** all V34-C001 through V34-C005 and the unresolved P3/P10 allocation finding
-> **Implementation authorization:** pending Priority 3.3; no production change approved
+> **Implementation authorization:** seven-row bounded plan approved in Priority 3.3; no production change delivered
 > **Release scope:** unselected
 > **Adopted:** 2026-10-04
 
@@ -100,7 +100,7 @@ Linked records exist; other names are suggestions, not implied completed reports
 | [BASELINE-SCOPE.md](BASELINE-SCOPE.md) | Reachable/published provenance, profiles and prior-evidence applicability |
 | [FINDINGS.md](FINDINGS.md) | Complete seven-row ledger, owners, acceptance and unresolved dispositions |
 | [ALLOCATION-INVESTIGATION.md](ALLOCATION-INVESTIGATION.md) | Frozen experiments, all samples, attribution and remaining limits |
-| `FIX-DECISION.md` | Explicit maintainer approvals, local boundaries, acceptance and rollback |
+| [FIX-DECISION.md](FIX-DECISION.md) | Approved seven-row plan, acceptance/rollback and scope exclusions |
 | `FIX-EVIDENCE.md` | Per-finding implementation/no-change evidence, ownership and costs |
 | `VERIFICATION.md` | Mock/consumer/Boot/AOT/native/API and final matched evidence |
 | `MAINTAINER-GUIDANCE.md` | Retained costs, reproducible investigations and operations limits |
@@ -234,33 +234,58 @@ The sealed checklist copy excludes this anchor to avoid a self-referential hash.
 
 ## Priority 3 - Specify Bounded Fixes for Every Workstream
 
-### [ ] 3.1 Specify reproduced need and the smallest correction
+### [x] 3.1 Specify reproduced need and the smallest correction
 
-- [ ] For every inventory row, identify unnecessary work/defect or intentional
+- [x] For every inventory row, identify unnecessary work/defect or intentional
       cost, affected profiles/phases, source owner and local candidate boundary.
-- [ ] Map semantic, extension, optional-loading and lifetime dependencies; name
+- [x] Map semantic, extension, optional-loading and lifetime dependencies; name
       cross-cutting effects instead of hiding them in a combined improvement.
-- [ ] Compare no change with each candidate. C004 value reuse requires new
+- [x] Compare no change with each candidate. C004 value reuse requires new
       evidence, not reinstating the failed V34 patch under a new label.
 
-### [ ] 3.2 Define acceptance and rollback per candidate
+### [x] 3.2 Define acceptance and rollback per candidate
 
-- [ ] Freeze untimed regression witnesses, matched cost selection, expected
+- [x] Freeze untimed regression witnesses, matched cost selection, expected
       benefit or reproduced hardening, attribution limits and rollback criteria.
-- [ ] Preserve discovery/materialization timing, full policy mutation checks,
+- [x] Preserve discovery/materialization timing, full policy mutation checks,
       body/context/terminal ownership, coldness and selected-feature behavior.
-- [ ] Keep patches independently reviewable and reversible. Specify retention
+- [x] Keep patches independently reviewable and reversible. Specify retention
       checks so reduced allocation cannot trade for longer request lifetimes.
 
-### [ ] 3.3 Obtain explicit bounded implementation approval
+### [x] 3.3 Obtain explicit bounded implementation approval
 
-- [ ] Record the maintainer's concrete approved plans before production edits;
+- [x] Record the maintainer's concrete approved plans before production edits;
       adoption and a reproduction alone are not implementation approval.
-- [ ] Cover all seven workstreams in the decision. Approval for one row does not
+- [x] Cover all seven workstreams in the decision. Approval for one row does not
       silently defer the others; scope reduction requires an explicit decision.
-- [ ] Record rejected/no-change alternatives with supporting evidence. A need
+- [x] Record rejected/no-change alternatives with supporting evidence. A need
       outside the roadmap's compatibility/default boundaries stops that change
       for separate scope approval; it cannot enter by implication.
+
+Completed 2026-10-07. [FIX-DECISION.md](FIX-DECISION.md) covers every ledger row
+with source-supported need/limits, local owners, no-change alternatives,
+semantic/extension/lifetime dependencies, untimed witnesses, matched cost rows
+and independent acceptance/rollback rules. It preserves P2's explanation without
+a performance pass, all six open implementation workstreams, and V34's rollback.
+The maintainer explicitly selected "Approve the seven-row plan (Recommended)".
+This supersedes the earlier P1/P2 pending-approval state, not their measurements.
+Only the documented candidate boundaries and evidence-backed no-change routes are
+approved for later execution; no finding is silently dropped or marked fixed.
+No production edits or release/version decision are made by this priority.
+
+Verification: **238 tests across 11 classes** passed, zero failures/errors/skips,
+with explicit GC disabled: 96 documentation/archive/readiness cases and 142
+existing contract/ownership controls. The earlier pre-approval run overlaps this
+total. The new specification guard first failed with the missing decision record
+as intended. P2's 254-file inventory rehashes unchanged; it is reused attribution,
+not new scoring. Production, benchmark, module coordinates and V1-V34 records
+remain unchanged. Commands, XML, proposal/approval provenance, source copies and
+readiness are retained under `target/release-evidence/v35/priority3/`.
+The final documentation-only rerun passed **96 cases**, overlapping the 238.
+The sealed source copy excludes the external integrity anchor below.
+
+Priority 3 integrity anchor: **49 files**; SHA-256 of `priority3/SHA256SUMS`:
+`286c77f2cccc18f10f492c6d3ab8bc2a7e704eef7fef48c0a267d53d357dd665`.
 
 ## Priority 4 - C001 - Dynamic Discovery and Composition Cost
 
