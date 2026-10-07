@@ -22,9 +22,9 @@ in scope; approval of one patch does not silently remove the others.
 
 ## Finding Coverage and Completion Rules
 
-| Required workstream | Primary execution owner | Initial disposition |
+| Required workstream | Primary execution owner | Current disposition |
 |---|---|---|
-| V34-P3/P10 allocation finding | Priority 2; performance maintainer | Pending investigation; not passed |
+| V34-P3/P10 allocation finding | Priority 2; performance maintainer | Resolved without production change for the observed split; not a performance pass |
 | V34-C001 | Priority 4; observer/hook maintainer | Pending attribution and fix/no-change evidence |
 | V34-C002 | Priority 5; invocation/body maintainer | Pending attribution and fix/no-change evidence |
 | V34-C003 | Priority 6; planning/resolver maintainer | Pending attribution and fix/no-change evidence |
@@ -99,7 +99,7 @@ Linked records exist; other names are suggestions, not implied completed reports
 |---|---|
 | [BASELINE-SCOPE.md](BASELINE-SCOPE.md) | Reachable/published provenance, profiles and prior-evidence applicability |
 | [FINDINGS.md](FINDINGS.md) | Complete seven-row ledger, owners, acceptance and unresolved dispositions |
-| `ALLOCATION-INVESTIGATION.md` | Frozen experiments, all samples, attribution and unresolved limits |
+| [ALLOCATION-INVESTIGATION.md](ALLOCATION-INVESTIGATION.md) | Frozen experiments, all samples, attribution and remaining limits |
 | `FIX-DECISION.md` | Explicit maintainer approvals, local boundaries, acceptance and rollback |
 | `FIX-EVIDENCE.md` | Per-finding implementation/no-change evidence, ownership and costs |
 | `VERIFICATION.md` | Mock/consumer/Boot/AOT/native/API and final matched evidence |
@@ -164,43 +164,73 @@ The sealed checklist copy excludes this anchor to avoid a self-referential hash.
 
 ## Priority 2 - Explain the Unresolved Allocation Split
 
-### [ ] 2.1 Freeze distinguishing experiments before scoring
+### [x] 2.1 Freeze distinguishing experiments before scoring
 
-- [ ] State hypotheses, distinguishing observations, bounded fork/run count and
+- [x] State hypotheses, distinguishing observations, bounded fork/run count and
       order, stop rules and acceptance before inspecting new scores.
-- [ ] Include historical enabled-only GET publisher assembly plus minimal/registry
+- [x] Include historical enabled-only GET publisher assembly plus minimal/registry
       sentinels. Keep phase/setup/teardown and exact workload semantics explicit.
-- [ ] Freeze VM flags, heap, warmup, iterations, threads, profiler use and host
+- [x] Freeze VM flags, heap, warmup, iterations, threads, profiler use and host
       constraints; keep V34's >20% latency and >max(32 B/op, 5%) review triggers.
 
-### [ ] 2.2 Reproduce matched and same-artifact variability
+### [x] 2.2 Reproduce matched and same-artifact variability
 
-- [ ] Audit harness bytecode, artifact metadata, parameters, classpath order,
+- [x] Audit harness bytecode, artifact metadata, parameters, classpath order,
       loaded classes, VM options and starter/non-starter identity/provenance.
-- [ ] Compare repeated forks of the same saved JAR with baseline/current pairs
+- [x] Compare repeated forks of the same saved JAR with baseline/current pairs
       in both orders. Retain contrary forks, intervals and unsuccessful attempts.
-- [ ] Record CPU/quota/pressure/memory limits; do not run competing builds or
+- [x] Record CPU/quota/pressure/memory limits; do not run competing builds or
       diagnostic profilers alongside scored comparisons. Do not run until green.
 
-### [ ] 2.3 Test allocation explanations independently
+### [x] 2.3 Test allocation explanations independently
 
-- [ ] Collect supported compiler/inlining/escape-analysis or allocation-site
+- [x] Collect supported compiler/inlining/escape-analysis or allocation-site
       diagnostics separately; record unavailable tooling and profiler perturbation.
-- [ ] Change one factor at a time to test a proposed cause. Sampled stacks or
+- [x] Change one factor at a time to test a proposed cause. Sampled stacks or
       byte-identical classes alone cannot explain the fork split.
-- [ ] If the harness/VM is causal, validate any measurement correction on both
+- [x] If the harness/VM is causal, validate any measurement correction on both
       artifacts and preserve old samples. If production is causal, route the
       bounded fix through Priority 3.3; diagnostic flags are not runtime defaults.
 
-### [ ] 2.4 Record causal evidence or the unresolved gate
+### [x] 2.4 Record causal evidence or the unresolved gate
 
-- [ ] Distinguish a validated explanation from a plausible hypothesis. Preserve
+- [x] Distinguish a validated explanation from a plausible hypothesis. Preserve
       the historical 1,136/1,392 fork split and why a favorable pair cannot clear it.
-- [ ] Record representative confirmation and implications for each affected
+- [x] Record representative confirmation and implications for each affected
       acceptance row; do not promote diagnostic timings as scored benefit.
-- [ ] If attribution remains unresolved at the stop boundary, keep the finding
+- [x] If attribution remains unresolved at the stop boundary, keep the finding
       blocking and obtain explicit next scope. This gate cannot be completed as
       resolved merely because experiments ran; no silent threshold relaxation.
+
+Completed 2026-10-07. [ALLOCATION-INVESTIGATION.md](ALLOCATION-INVESTIGATION.md)
+preserves the frozen plan and all 46 forks from saved, byte-matched artifacts.
+The 1,136/1,392 B/op modes reproduced on both artifacts. C2 traces connect the
+high mode to unavailable Selection-constructor signature classes and lack of
+Selection elimination; one-factor inlining controls corroborate the boundary.
+The allocation-mechanism finding is resolved without production change, **not a
+performance pass**. Reverse comparison still records one allocation review flag.
+No production, dependency, default, version or release change is selected.
+
+The 2.3 correction branch is N/A: no measurement correction is adopted; all
+interventions remain diagnostic-only. The 2.4 unresolved-scope branch is N/A for
+this explained mechanism, not waived because experiments ran. Six implementation
+workstreams remain unresolved and Priority 3.3 approval is still open. Exact
+commands, raw samples/intervals, compiler/class-load logs, privacy-filtered JFR,
+failures and source/input hashes remain under `target/release-evidence/v35/priority2/`.
+
+Verification: **166 starter cases across five classes** (95 documentation and
+71 policy/ownership cases), **40 benchmark contract cases**, and **22 Python
+checks** (eight investigation/reviewer and 14 existing V34 checks) passed with
+zero failures/errors/skips. Maven correctness runs disabled explicit GC; no unit
+test requires a particular compiler mode or measured allocation value. The
+documentation-only final rerun passed **95 cases**, overlapping the 166 above.
+No fresh native, API, Central-consumer or full performance-matrix run is claimed.
+Source copies, exact commands/exits, XML, raw samples, analysis and readiness are
+sealed separately from the checklist's external integrity anchor.
+
+Priority 2 integrity anchor: **254 files**; SHA-256 of `priority2/SHA256SUMS`:
+`c7b4c0b68eaa3b7e7db0d197d0b63527ef0dd161d3befb149136b5b91745747f`.
+The sealed checklist copy excludes this anchor to avoid a self-referential hash.
 
 ## Priority 3 - Specify Bounded Fixes for Every Workstream
 

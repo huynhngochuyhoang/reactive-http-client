@@ -6,13 +6,15 @@
 
 This is the seven-workstream inventory required by [Priority 1](CHECKLIST.md),
 using the [reachable baseline](BASELINE-SCOPE.md). Owners below are maintainer
-roles, not assumptions about an assigned person. All seven remain unresolved;
-initialization is not a fix, scope approval, no-change verdict or renewed silent
-deferral. Priorities 2-3 must establish reproductions and concrete acceptance
-before Priority 3.3 approval. V34's limited approval does not carry into V35.
+roles, not assumptions about an assigned person. Priority 1 initialized all seven
+as unresolved. [Priority 2](ALLOCATION-INVESTIGATION.md) now explains the measured
+allocation split without production changes; the six implementation workstreams
+remain open. Reproductions and concrete acceptance still precede Priority 3.3
+approval. V34's limited approval does not carry into V35.
 
-For every row, approved boundary and V35 patch/no-change evidence are currently
-**none**. Later execution must attach dated evidence and a disposition, preserving
+For every row, an approved production boundary and V35 patch are currently
+**none**. The first row has dated no-change evidence; later execution must attach
+evidence and a disposition to the remaining rows, preserving
 contrary results. Fixed/verified and substantiated no-change outcomes require the
 checklist's acceptance rules; unresolved rows block complete-scope closure unless
 the maintainer explicitly reduces scope. No new API, dependency, default, feature
@@ -21,33 +23,40 @@ switch, telemetry export or broad framework rewrite is selected.
 ## V34-P3/P10 allocation finding
 
 **Owner:** performance maintainer; execution Priority 2, final acceptance Priority 10.
-**Status:** unresolved/blocking; attribution pending, not passed.
+**Status:** Resolved without production change, 2026-10-07; observed enabled-only
+allocation mechanism explained, not a final performance pass.
 **Profiles:** V34-P04 enabled-only GET publisher, with P01/P02/P03 sentinels.
 
 **Current evidence:** [V34 P3](../v34/COST-OWNERSHIP.md#confirmed-and-unresolved-flags)
 and [P10 reverse confirmation](../v34/COMPATIBILITY-PERFORMANCE.md#unresolved-enabled-only-allocation)
-retain the 1,392/1,136 B/op current-fork split. All 60 favorable primary rows and
-byte-identical starter classes do not explain or clear it. Rehashed saved JARs
-and raw results are reusable inputs, not new V35 scores.
+retain the 1,392/1,136 B/op current-fork split. Those records remain unchanged.
+[V35's 46-fork investigation](ALLOCATION-INVESTIGATION.md) reproduces both levels
+on each same saved JAR, records constructor inlining blocked by an unloaded
+CachePolicyConfig signature type in high forks, and observes Selection elimination
+in low forks. A no-inline intervention reproduces the high level on both artifacts;
+forcing resolver inlining alone does not guarantee constructor elimination.
 
-**Reproduction:** freeze bounded experiments first, then run repeated forks of
+**Reproduction:** the frozen experiment ran repeated forks of
 the **same saved JAR** and matched pairs in both orders for
 `V34DefaultPathBenchmark.defaultV34NoNetworkWarmPublisher`,
 `profile=RESILIENCE_ENABLED_ONLY`, `scenario=GET`. Use the tracked
 [harness/reviewer](../v34/WORKLOAD-CONTRACT.md#reproduction), preserving all forks,
 VM/classpath/environment identity and failures. No rerun-until-green policy.
 
-**Proposed boundary:** causal measurement/compilation/allocation attribution;
-no production workaround or threshold relaxation is preselected.
+**Proposed boundary:** attribution only, now evidenced; no production workaround,
+eager class loading, JVM default or threshold relaxation is selected.
 **Controls:** `V34WorkloadContractTest`, `DefaultPathCostOwnershipTest` and
 `ExplicitResilienceActivationContractTest` separate assembly, subscription,
 dispatch and enabled-only state. Keep profiler experiments separate from scores.
-**Acceptance:** a distinguishing one-factor experiment supports an explanation
-and representative validation, or preserve the unresolved gate. Retain >20%
-latency and >max(32 B/op, 5%) review triggers and reverse confirmation.
-**Open questions:** which allocation sites/compiler decisions vary by fork;
-whether classpath/layout, environment or compilation explains the split; which
-result remains after same-artifact controls. JIT variation is still a hypothesis.
+**Acceptance:** met for the observed enabled-only allocation mechanism through
+compiler/class-load evidence and one-factor intervention on both artifacts.
+Minimal/registry controls remain stable in this run. Retain >20% latency and
+>max(32 B/op, 5%) triggers: reverse comparison still has one explained allocation
+flag, not a benefit or full-matrix pass. No measurement correction was adopted.
+**Open questions:** exact scheduling of signature resolution versus compilation
+is not controlled; other JVMs and earlier related profile shifts are not diagnosed
+universally. Any optimization still needs stable matched benefit and separate
+approval. These limits do not turn the observed mechanism back into a source-delta claim.
 
 ## V34-C001
 
@@ -177,9 +186,10 @@ invocations, no selected infrastructure when policy is absent.
 **Acceptance:** explicit Priority 3.3 approval and new stable matched benefit,
 with full mutation rejection, or a reasoned no-change conclusion backed by new
 investigation. V34's failed attempt alone resolves neither C004 row.
-**Open questions:** whether the immutable values contribute to the unexplained
-fork split; whether elimination is already compiler-dependent; what bounded
-alternative can be justified without changing validation semantics.
+**Open questions:** P2 establishes that disabled Selection materialization is
+compiler-dependent; whether value reuse has stable benefit across those modes
+remains unproven. What bounded alternative can be justified without changing
+validation semantics or restoring V34's failed experiment by assumption?
 
 ## V34-C005
 
@@ -214,4 +224,5 @@ Fresh P1 tests and exactly reused suites are distinguished in
 retain in each later workstream, not a claim that every named suite was freshly
 run in P1. Reproduction commands for ordinary controls and historical artifacts
 are linked there. New profiling/scoring needs the Priority 2 frozen experiment;
-new production edits need Priority 3.3. No finding is closed by this inventory.
+new production edits need Priority 3.3. Only the allocation-mechanism finding has
+the P2 evidence disposition; the inventory itself closes no implementation finding.

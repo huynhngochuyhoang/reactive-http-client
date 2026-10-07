@@ -260,9 +260,9 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 2 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 3 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
-                "### [ ] 2.4 Record causal evidence or the unresolved gate",
+                "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [ ] 3.3 Obtain explicit bounded implementation approval",
                 "### [ ] 7.3 Re-evaluate rolled-back value reuse separately",
                 "### [ ] 12.4 Verify publication or explicit no-release closure");
@@ -277,7 +277,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v35BaselineReconcilesReachableEvidenceAndKeepsEveryFindingOpen() throws IOException {
+    void v35BaselineReconcilesReachableEvidenceAndAccountsForEveryFinding() throws IOException {
         Path root = projectRoot();
         Path directory = root.resolve("roadmaps/v35");
         String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
@@ -300,10 +300,15 @@ class DocumentationReleaseArtifactTest {
                 .containsExactlyElementsOf(ids);
         for (String id : ids) {
             String row = findings.split(Pattern.quote("## " + id + "\n"), 2)[1].split("\n## ", 2)[0];
-            assertThat(row).as(id).contains("**Owner:**", "**Status:** unresolved/blocking",
+            assertThat(row).as(id).contains("**Owner:**",
                     "**Current evidence:**", "**Reproduction:**", "**Proposed boundary:**",
-                    "**Controls:**", "**Acceptance:**", "**Open questions:**", "**Profiles:**")
-                    .doesNotContain("Fixed and verified", "Resolved without production change");
+                    "**Controls:**", "**Acceptance:**", "**Open questions:**", "**Profiles:**");
+            if (id.equals("V34-P3/P10 allocation finding")) {
+                assertThat(row).contains("**Status:** Resolved without production change", "(ALLOCATION-INVESTIGATION.md)");
+            } else {
+                assertThat(row).contains("**Status:** unresolved/blocking")
+                        .doesNotContain("Fixed and verified", "Resolved without production change");
+            }
         }
         assertThat(findings.replaceAll("\\s+", " ")).contains("no production change approved",
                 "Priority 3.3", "same saved JAR", "whole-interface mutation", "late registration",
@@ -317,6 +322,34 @@ class DocumentationReleaseArtifactTest {
                 String target = links.group(1);
                 if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
             }
+        }
+    }
+
+    @Test
+    void v35AllocationEvidencePreservesVarianceAndDiagnosticLimits() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String record = Files.readString(directory.resolve("ALLOCATION-INVESTIGATION.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "Plan frozen", "46 forks", "both", "same saved JAR", "Priority 3.3",
+                "## Results and Attribution", "Resolved without production change",
+                "24,224", "unloaded signature classes", "CachePolicyConfig", "256 B/op",
+                "1,136", "1,392", "one allocation review flag", "not a performance pass",
+                "no measurement correction", "PrintEscapeAnalysis", "JFR", "jdk.ObjectAllocationSample",
+                "Six implementation workstreams remain open", "not a leak", "shared-host",
+                "target/release-evidence/v35/priority2/");
+        String priority = Files.readString(directory.resolve("CHECKLIST.md"))
+                .split("## Priority 2 - ", 2)[1].split("## Priority 3 - ", 2)[0];
+        assertThat(priority.replaceAll("\\s+", " ")).contains("### [x] 2.1", "### [x] 2.2", "### [x] 2.3", "### [x] 2.4",
+                "(ALLOCATION-INVESTIGATION.md)", "not a performance pass").doesNotContain("[ ]");
+        for (String file : List.of("investigate-v35-allocation.py", "review-v35-allocation.py",
+                "test_investigate_v35_allocation.py")) {
+            assertThat(root.resolve("scripts").resolve(file)).exists();
+        }
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
         }
     }
 
