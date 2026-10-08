@@ -57,6 +57,36 @@ class DefaultPathCostOwnershipTest {
 
     @ParameterizedTest
     @EnumSource(Profile.class)
+    void absentBodiesSeparateInvocationOwnersFromSubscriptionState(Profile profile) throws ClassNotFoundException {
+        Class<?> ownerType = Class.forName(ReactiveClientInvocationHandler.class.getName() + "$RequestBodyOwnership");
+        try (var owners = mockConstruction(ownerType,
+                (owner, context) -> assertThat(context.arguments().getLast()).isNull());
+             var fixture = new Fixture(profile)) {
+            Mono<String> get = fixture.client.target("one", "summary", "scope");
+            Mono<String> nullUpload = fixture.client.upload(null);
+            // C002's allocation candidate was rejected; holders remain invocation-scoped.
+            assertThat(owners.constructed()).hasSize(2);
+            assertThat(fixture.dispatches).hasValue(0);
+            assertThat(get.block(WAIT)).isEqualTo("ok");
+            assertThat(get.block(WAIT)).isEqualTo("ok");
+            assertThat(nullUpload.block(WAIT)).isEqualTo("ok");
+            assertThat(nullUpload.block(WAIT)).isEqualTo("ok");
+            assertThat(owners.constructed()).hasSize(2);
+            assertThat(fixture.dispatches).hasValue(4);
+            if (profile == Profile.MINIMAL || profile == Profile.AUTO_NO_REGISTRY) {
+                assertThat(fixture.states).isEmpty();
+            } else {
+                assertThat(fixture.states).hasSize(4).doesNotHaveDuplicates();
+                assertThat(fixture.states).allSatisfy(state -> {
+                    assertThat(state.attemptCount()).isEqualTo(1);
+                    assertThat(state.activeAttempt()).isNull();
+                });
+            }
+        }
+    }
+
+    @ParameterizedTest
+    @EnumSource(Profile.class)
     void countsInvocationDiscoveryAndSubscriptionStateWithoutPreparingUnselectedFeatures(Profile profile) {
         AtomicInteger scheduled = new AtomicInteger();
         try (var fixture = new Fixture(profile)) {

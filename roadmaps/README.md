@@ -31,8 +31,11 @@ closing those findings; the maintainer approved this bounded plan in Priority 3.
 not a release or a performance claim.
 The [C001 investigation](v35/DISCOVERY-COMPOSITION.md) characterizes dynamic
 discovery and rejects its bounded candidate after matched scoring in both orders.
-It records an evidence-backed no-change outcome, not a performance pass; five
-implementation workstreams remain open and no production change is delivered.
+It records an evidence-backed no-change outcome, not a performance pass.
+The [body/reporting ownership review](v35/BODY-REPORTING-OWNERSHIP.md) likewise
+rejects its null-holder candidate after matched scoring and retains the ownership
+regressions. Four implementation workstreams remain open; no production change
+is delivered.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

@@ -25,8 +25,8 @@ in scope; approval of one patch does not silently remove the others.
 | Required workstream | Primary execution owner | Current disposition |
 |---|---|---|
 | V34-P3/P10 allocation finding | Priority 2; performance maintainer | Resolved without production change for the observed split; not a performance pass |
-| V34-C001 | Priority 4; observer/hook maintainer | Pending attribution and fix/no-change evidence |
-| V34-C002 | Priority 5; invocation/body maintainer | Pending attribution and fix/no-change evidence |
+| V34-C001 | Priority 4; observer/hook maintainer | Resolved without production change; bounded candidate rolled back, not a performance pass |
+| V34-C002 | Priority 5; invocation/body maintainer | Resolved without production change; ownership reviewed and null-holder candidate rolled back, not a performance pass |
 | V34-C003 | Priority 6; planning/resolver maintainer | Pending attribution and fix/no-change evidence |
 | V34-C004 optional preparation | Priority 7.1-7.2; handler/factory maintainer | Pending acquisition/lifetime evidence |
 | V34-C004 rolled-back value reuse | Priority 7.3; effective-policy maintainer | Rolled back in V34; new evidence required |
@@ -349,33 +349,75 @@ Priority 4 integrity anchor: **187 files**; SHA-256 of `priority4/SHA256SUMS`:
 
 ## Priority 5 - C002 - Body and Reporting-State Ownership
 
-### [ ] 5.1 Characterize body-owner and caller-state lifetimes
+### [x] 5.1 Characterize body-owner and caller-state lifetimes
 
-- [ ] Attribute invocation-wide body-owner work separately from subscription-local
+- [x] Attribute invocation-wide body-owner work separately from subscription-local
       reporting state. Enumerate null/immutable/non-owning and resource inputs.
-- [ ] Identify state consumers for auth, operators, generated idempotency, deadlines,
+- [x] Identify state consumers for auth, operators, generated idempotency, deadlines,
       logger/observer/hooks, ordinary callers, shared loads and refreshes.
-- [ ] Keep enabled-only resilience distinct; absent exports do not prove that
+- [x] Keep enabled-only resilience distinct; absent exports do not prove that
       current state is unnecessary or authorize changing its observable behavior.
 
-### [ ] 5.2 Apply only approved ownership-preserving changes
+### [x] 5.2 Apply only approved ownership-preserving changes
 
-- [ ] Reduce proven unused work without pooling caller state, retaining requests
+- [x] Reduce proven unused work without pooling caller state, retaining requests
       globally, reusing one-shot bodies or assuming arbitrary DTOs are non-owning.
-- [ ] Preserve stream/reader/channel/DataBuffer/multipart and inner-body ownership,
+- [x] Preserve stream/reader/channel/DataBuffer/multipart and inner-body ownership,
       replayable repeated subscriptions, backpressure, coldness and tenant isolation.
-- [ ] Record a substantiated no-change outcome where appropriate; failed benefit
+- [x] Record a substantiated no-change outcome where appropriate; failed benefit
       alone does not resolve uninvestigated ownership or reporting questions.
 
-### [ ] 5.3 Verify cleanup, terminal semantics and retention
+### [x] 5.3 Verify cleanup, terminal semantics and retention
 
-- [ ] Cover success/error/empty completion, serialization/decode failure, admission
+- [x] Cover success/error/empty completion, serialization/decode failure, admission
       rejection, cancellation, buffered and late-arriving discard, and concurrent
       caller termination with deterministic cleanup acknowledgements.
-- [ ] Preserve one terminal event, attempt/final-request facts, timeout attribution,
+- [x] Preserve one terminal event, attempt/final-request facts, timeout attribution,
       cache outcomes and health exclusions for every consumer that remains selected.
-- [ ] Pair matched cost with controlled reachability where making collection claims;
+- [x] Pair matched cost with controlled reachability where making collection claims;
       no System.gc-dependent ordinary tests. Record C002 acceptance or rollback.
+
+Completed 2026-10-09. [BODY-REPORTING-OWNERSHIP.md](BODY-REPORTING-OWNERSHIP.md)
+preserves the frozen plan, body-shape and state-consumer inventory, allocation
+attribution and **384 scored forks** plus two separate diagnostic forks. All
+eight stages completed without retries. Forward review has three latency and two
+allocation flags; reverse has zero latency and two allocation flags. The observed
+40 B/op minimal warm-publisher reduction does not waive the adverse controls.
+The null-body candidate was **rolled back**; C002 is **Resolved without production
+change**, not a performance pass. Original production source is restored, with
+the rejected patch tracked as an experiment artifact only.
+
+Baseline ownership verification passed **425 cases across 25 classes**. Six new
+null-owner cases first failed on baseline, then the candidate passed **431 cases**.
+After rollback the retained cases characterize invocation allocation versus
+independent subscription state; the restored ownership suite also passed **431**.
+Candidate benchmark correctness passed **40 cases**. These runs overlap. Explicit GC is disabled;
+release/discard counters and cleanup acknowledgements are not collection claims.
+Controlled reachability is N/A because no new collection/heap/RSS claim is made.
+
+Final verification passed **542 cases across 27 classes**, including **98**
+documentation cases and 13 idempotency cases. The first final run's documentation
+phrase mismatch is retained under `tests-final/`; the complete corrected rerun is
+`tests-final-corrected/`, with zero failures, errors or skips. All **30 Python
+checks** passed. Restoring the local starter and rebuilding the benchmark passed
+**40 benchmark-contract cases** again; 310 starter classes and all 24,224 shaded
+benchmark classes match the saved baseline byte-for-byte. The rejected candidate
+is retained only in the evidence bundle, not the installed/local benchmark artifact.
+
+The matched audit preserves 39 harness files, 120 non-starter dependencies and
+classpath order; only the candidate handler class differs. Commands/exits, raw
+samples/intervals, host snapshots, input/source hashes, candidate and final source
+are retained under `target/release-evidence/v35/priority5/`. No fresh native, strict
+API, assembled consumer or full 60-row performance pass is claimed. Four
+implementation workstreams remain open and release scope stays unselected.
+
+Final documentation-only verification passed **98 cases** again after reconciling
+the finding index. The P5 bundle seals **308 files**; `SHA256SUMS` SHA-256 is
+`fc9cedcadd057f52bf3de9cac2295b7b34cd66ff6b5ed31affcf867adaf5a895`.
+P2/P3/P4 inventories were reverified unchanged. `closure/` records the final
+source/tests/readiness audit; source copies precede this external integrity anchor
+to avoid a self-referential checksum. These overlapping documentation reruns do
+not increase the 542-case total.
 
 ## Priority 6 - C003 - Static Planning and Dynamic Request Projection
 
