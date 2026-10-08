@@ -289,32 +289,63 @@ Priority 3 integrity anchor: **49 files**; SHA-256 of `priority3/SHA256SUMS`:
 
 ## Priority 4 - C001 - Dynamic Discovery and Composition Cost
 
-### [ ] 4.1 Isolate provider and composition work
+### [x] 4.1 Isolate provider and composition work
 
-- [ ] Separate provider lookup, streams/lists, empty fallback and composite work
+- [x] Separate provider lookup, streams/lists, empty fallback and composite work
       across empty/single/multiple/ordered/prototype consumers and custom providers.
-- [ ] Record invocation-time capture versus publisher resubscription, per-client
+- [x] Record invocation-time capture versus publisher resubscription, per-client
       support checks and provider result/failure behavior before changing code.
-- [ ] Attribute actual removable cost; helper totals cannot stand in for complete
+- [x] Attribute actual removable cost; helper totals cannot stand in for complete
       factory/proxy calls or justify caching provider results globally.
 
-### [ ] 4.2 Implement the approved local reduction or prove no change
+### [x] 4.2 Implement the approved local reduction or prove no change
 
-- [ ] Implement only Priority 3.3's boundary, preserving late registrations,
+- [x] Implement only Priority 3.3's boundary, preserving late registrations,
       materialization/order/support timing and custom-provider failures/results.
-- [ ] Do not equate an empty ordered stream with every other provider operation;
+- [x] Do not equate an empty ordered stream with every other provider operation;
       no permanent negative lookup cache, forced singleton or skipped callback.
-- [ ] If no change is justified, retain measured/structural evidence of required
+- [x] If no change is justified, retain measured/structural evidence of required
       work and rejected alternatives, not just the previous deferral.
 
-### [ ] 4.3 Verify dynamic behavior and matched cost
+### [x] 4.3 Verify dynamic behavior and matched cost
 
-- [ ] Test empty-to-present registration, multiple ordered/prototype consumers,
+- [x] Test empty-to-present registration, multiple ordered/prototype consumers,
       per-client support, concurrent first calls and new versus existing publishers.
-- [ ] Preserve no-registry and master-off application observers/hooks plus
+- [x] Preserve no-registry and master-off application observers/hooks plus
       independent pool telemetry; absent exports do not mean absent behavior.
-- [ ] Compare approved production-path rows and helpers, record retained ownership,
+- [x] Compare approved production-path rows and helpers, record retained ownership,
       roll back failed candidates and update C001's ledger disposition.
+
+Completed 2026-10-08. [DISCOVERY-COMPOSITION.md](DISCOVERY-COMPOSITION.md) preserves
+the frozen plan, local/provider allocation attribution, custom-provider and
+dynamic capture contracts, and **224 scored forks** plus two separate diagnostic
+forks. All eight scored stages completed without retries. Reverse HOOK/GET has
+one allocation review flag; multiple-hook mean allocation increases in both
+orders. The candidate was **rolled back** under the frozen stop rule. C001 is
+**Resolved without production change**, not a performance pass or a claim that
+all provider cost is irreducible. The original production source is restored;
+the rejected patch remains an explicitly labeled experiment artifact.
+
+The final restored-source suite passes **204 cases across eight classes**:
+107 contract/ownership cases (including 36 discovery/ownership cases, 21 new)
+and 97 documentation cases, zero failures/errors/skips. Earlier baseline,
+candidate and restored-control runs overlap this total. The candidate benchmark
+correctness suite passed **40 cases**; **26 Python checks** passed. The final
+documentation-only rerun passed **97 cases**, overlapping the 204 above.
+Tests disable explicit GC; no timing/allocation/collection assertion is introduced.
+Source/classpath audit matches 39 harness files and
+120 non-starter dependencies; only handler implementation classes changed in the
+candidate. Raw samples, intervals, commands/exits, host snapshots, candidate
+source and input hashes are retained under `target/release-evidence/v35/priority4/`.
+Five implementation workstreams remain open; release scope stays unselected.
+No fresh native, API, Central-consumer or full-matrix performance pass is claimed.
+The restored local Maven artifact's **310 classes** match the saved baseline;
+the rejected candidate is no longer installed. P2/P3 sealed inventories rehash
+unchanged. Final sources, readiness, analysis and commands are sealed separately
+from the external integrity anchor; the sealed checklist copy excludes the anchor.
+
+Priority 4 integrity anchor: **187 files**; SHA-256 of `priority4/SHA256SUMS`:
+`c07ef8241405cf725f2b3f3364873c0e955a02d4286e9df7350927439c56b174`.
 
 ## Priority 5 - C002 - Body and Reporting-State Ownership
 

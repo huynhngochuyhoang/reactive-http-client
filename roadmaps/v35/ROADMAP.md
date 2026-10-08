@@ -54,7 +54,9 @@ reachable source and preserves effective profiles. The [finding ledger](FINDINGS
 tracks all seven workstreams and their independent acceptance requirements.
 [Priority 2](ALLOCATION-INVESTIGATION.md) explains the observed allocation split
 through compiler/class-loading evidence without a production change or performance
-all-clear. The six implementation workstreams remain open.
+all-clear. [Priority 4](DISCOVERY-COMPOSITION.md) characterizes C001 and rejects
+its bounded accumulation candidate after matched scoring; no production change
+remains. Five implementation workstreams remain open.
 [Priority 3's specifications](FIX-DECISION.md) define local candidate boundaries,
 no-change routes and acceptance/rollback for all seven rows. The maintainer approved
 this bounded plan in Priority 3.3; execution and release selection remain separate.

@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 4 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 5 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [x] 3.3 Obtain explicit bounded implementation approval",
@@ -305,6 +305,9 @@ class DocumentationReleaseArtifactTest {
                     "**Controls:**", "**Acceptance:**", "**Open questions:**", "**Profiles:**");
             if (id.equals("V34-P3/P10 allocation finding")) {
                 assertThat(row).contains("**Status:** Resolved without production change", "(ALLOCATION-INVESTIGATION.md)");
+            } else if (id.equals("V34-C001")) {
+                assertThat(row).contains("**Status:** Resolved without production change", "(DISCOVERY-COMPOSITION.md)",
+                        "rolled back", "not a performance pass");
             } else {
                 assertThat(row).contains("**Status:** unresolved/blocking")
                         .doesNotContain("Fixed and verified", "Resolved without production change");
@@ -384,6 +387,37 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("[ ]");
         assertThat(Files.readString(directory.resolve("FINDINGS.md"))).contains("(FIX-DECISION.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v35DiscoveryEvidencePreservesRejectedCandidateAndDynamicContracts() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String record = Files.readString(directory.resolve("DISCOVERY-COMPOSITION.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "32930459abb783dfa2f1c153e7f38d54de9048f4", "Plan frozen", "224 scored forks",
+                "two separate diagnostic forks", "28 matched rows", "one allocation review flag",
+                "Resolved without production change", "rolled back", "not a performance pass",
+                "no refinement", "not applied production code", "prototype", "parallel", "fallback",
+                "jdk.ObjectAllocationSample", "not assign exact B/op", "1728.021/1984.025",
+                "39 harness source files", "120 non-starter dependencies", "Five other",
+                "target/release-evidence/v35/priority4/", "raw samples", "not proof of a universal",
+                "max(32 B/op, 5%)", "private", "not a fresh Central download");
+        String priority = Files.readString(directory.resolve("CHECKLIST.md"))
+                .split("## Priority 4 - ", 2)[1].split("## Priority 5 - ", 2)[0];
+        assertThat(priority).contains("### [x] 4.1", "### [x] 4.2", "### [x] 4.3", "(DISCOVERY-COMPOSITION.md)")
+                .doesNotContain("[ ]");
+        String patch = Files.readString(directory.resolve("c001-rejected-candidate.patch"));
+        assertThat(patch.lines().filter(line -> line.startsWith("diff --git ")).toList()).hasSize(1);
+        assertThat(patch).contains("ReactiveClientInvocationHandler.java", "stream.iterator()", "stream.isParallel()");
+        for (String script : List.of("investigate-v35-discovery.py", "test_investigate_v35_discovery.py")) {
+            assertThat(root.resolve("scripts").resolve(script)).exists();
+        }
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
