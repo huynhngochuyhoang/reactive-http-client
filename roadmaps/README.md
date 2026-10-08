@@ -25,7 +25,14 @@ source; its [seven-row ledger](v35/FINDINGS.md) retains every unresolved workstr
 and effective profile without approving production changes.
 The [allocation investigation](v35/ALLOCATION-INVESTIGATION.md) reproduces and
 explains the observed compiler-dependent split on both saved artifacts. It adopts
-no runtime tuning or measurement correction; six implementation workstreams remain open.
+no runtime tuning or measurement correction.
+The [bounded fix specifications](v35/FIX-DECISION.md) cover all seven rows without
+closing those findings; the maintainer approved this bounded plan in Priority 3.3,
+not a release or a performance claim.
+The [C001 investigation](v35/DISCOVERY-COMPOSITION.md) characterizes dynamic
+discovery and rejects its bounded candidate after matched scoring in both orders.
+It records an evidence-backed no-change outcome, not a performance pass; five
+implementation workstreams remain open and no production change is delivered.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

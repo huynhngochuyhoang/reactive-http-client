@@ -41,6 +41,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -289,6 +290,218 @@ class DefaultPathCostOwnershipTest {
             assertThat(body.closes).hasValue(1);
             assertThat(fixture.dispatches).hasValue(1);
             assertThat(fixture.states).allSatisfy(state -> assertThat(state.activeAttempt()).isNull());
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void customEmptyObserverStreamUsesFallbackWithoutClosingOrRediscoveringOnSubscription(boolean nullStream) {
+        try (var fixture = new Fixture(Profile.MINIMAL)) {
+            List<String> events = new ArrayList<>();
+            doAnswer(ignored -> {
+                events.add("stream");
+                return nullStream ? null : Stream.<HttpClientObserver>empty().onClose(() -> events.add("close"));
+            }).when(fixture.context.observers).orderedStream();
+            doAnswer(ignored -> {
+                events.add("fallback");
+                return (HttpClientObserver) event -> events.add("terminal");
+            }).when(fixture.context.observers).getIfAvailable();
+            fixture.resetCounts();
+            Mono<String> call = fixture.client.target("one", "summary", "scope");
+            assertThat(events).containsExactly("stream", "fallback");
+            assertThat(call.block(WAIT)).isEqualTo("ok");
+            assertThat(call.block(WAIT)).isEqualTo("ok");
+            assertThat(events).containsExactly("stream", "fallback", "terminal", "terminal");
+            assertDiscovery(fixture, 1);
+        }
+    }
+
+    @Test
+    void orderedPrototypeConsumersAreMaterializedOncePerInvocationAndCapturedByColdPublishers() {
+        try (var fixture = new Fixture(Profile.MINIMAL)) {
+            List<String> events = new ArrayList<>();
+            AtomicInteger created = new AtomicInteger();
+            Mono<String> before = fixture.client.target("before", "summary", "scope");
+            for (int order : new int[]{2, 0, 1}) {
+                fixture.context.registerBean("observer" + order, HttpClientObserver.class,
+                        () -> new OrderedObserver(order, created.incrementAndGet(), events),
+                        definition -> definition.setScope("prototype"));
+                fixture.context.registerBean("hook" + order, ReactiveHttpClientLifecycleHook.class,
+                        () -> new OrderedHook(order, created.incrementAndGet(), events),
+                        definition -> definition.setScope("prototype"));
+            }
+            assertThat(before.block(WAIT)).isEqualTo("ok");
+            assertThat(created).hasValue(0);
+            Mono<String> first = fixture.client.target("first", "summary", "scope");
+            assertThat(created).hasValue(6);
+            assertThat(events).containsExactly("support:0", "support:1", "support:2");
+            events.clear();
+            assertThat(first.block(WAIT)).isEqualTo("ok");
+            List<String> firstTerminal = List.copyOf(events);
+            assertThat(firstTerminal.stream().filter(value -> value.startsWith("observer:"))
+                    .map(value -> value.substring(0, value.lastIndexOf(':'))).toList())
+                    .containsExactly("observer:0", "observer:1", "observer:2");
+            assertThat(firstTerminal.stream().filter(value -> value.startsWith("hook:"))
+                    .map(value -> value.substring(0, value.lastIndexOf(':'))).toList())
+                    .containsExactly("hook:0", "hook:1", "hook:2");
+            events.clear();
+            assertThat(first.block(WAIT)).isEqualTo("ok");
+            assertThat(events).containsExactlyElementsOf(firstTerminal);
+            assertThat(created).hasValue(6);
+            events.clear();
+            assertThat(fixture.client.target("second", "summary", "scope").block(WAIT)).isEqualTo("ok");
+            assertThat(created).hasValue(12);
+            assertThat(events).contains("support:0", "support:1", "support:2")
+                    .doesNotContainAnyElementsOf(firstTerminal);
+        }
+    }
+
+    private record OrderedObserver(int order, int owner, List<String> events)
+            implements HttpClientObserver, org.springframework.core.Ordered {
+        @Override public int getOrder() { return order; }
+        @Override public void record(io.github.huynhngochuyhoang.httpstarter.observability.HttpClientObserverEvent event) {
+            events.add("observer:" + order + ":" + owner);
+        }
+    }
+
+    private record OrderedHook(int order, int owner, List<String> events)
+            implements ReactiveHttpClientLifecycleHook, org.springframework.core.Ordered {
+        @Override public int getOrder() { return order; }
+        @Override public boolean supports(String name) { events.add("support:" + order); return NAME.equals(name); }
+        @Override public void onSuccess(ReactiveHttpClientLifecycleContext event) { events.add("hook:" + order + ":" + owner); }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,1", "false,3", "true,1", "true,3"})
+    void customObserverStreamsKeepOrderDuplicatesAndFullTraversal(boolean parallel, int count) {
+        try (var fixture = new Fixture(Profile.MINIMAL)) {
+            List<String> terminals = new ArrayList<>();
+            List<Integer> materialized = java.util.Collections.synchronizedList(new ArrayList<>());
+            AtomicInteger closed = new AtomicInteger();
+            HttpClientObserver repeated = event -> terminals.add("repeated");
+            HttpClientObserver tail = event -> terminals.add("tail");
+            List<HttpClientObserver> selected = count == 1 ? List.of(repeated) : List.of(repeated, repeated, tail);
+            doAnswer(ignored -> {
+                Stream<HttpClientObserver> stream = java.util.stream.IntStream.range(0, selected.size())
+                        .mapToObj(index -> { materialized.add(index); return selected.get(index); });
+                return (parallel ? stream.parallel() : stream).onClose(closed::incrementAndGet);
+            }).when(fixture.context.observers).orderedStream();
+            doAnswer(ignored -> { throw new AssertionError("nonempty stream must not use fallback"); })
+                    .when(fixture.context.observers).getIfAvailable();
+            Mono<String> call = fixture.client.target("one", "summary", "scope");
+            assertThat(materialized).containsExactlyInAnyOrderElementsOf(
+                    java.util.stream.IntStream.range(0, count).boxed().toList());
+            assertThat(terminals).isEmpty();
+            assertThat(call.block(WAIT)).isEqualTo("ok");
+            assertThat(terminals).containsExactlyElementsOf(count == 1 ? List.of("repeated")
+                    : List.of("repeated", "repeated", "tail"));
+            assertThat(closed).hasValue(0);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void observerTraversalFailureIsSynchronousAndNeverFallsBack(boolean fallbackFailure) {
+        try (var fixture = new Fixture(Profile.MINIMAL)) {
+            var failure = new IllegalArgumentException("synthetic discovery failure");
+            AtomicInteger visited = new AtomicInteger();
+            AtomicInteger closed = new AtomicInteger();
+            doAnswer(ignored -> fallbackFailure ? Stream.empty() : Stream.<HttpClientObserver>generate(() -> {
+                if (visited.incrementAndGet() == 2) throw failure;
+                return event -> {};
+            }).limit(2).onClose(closed::incrementAndGet)).when(fixture.context.observers).orderedStream();
+            doThrow(failure).when(fixture.context.observers).getIfAvailable();
+            fixture.resetCounts();
+            assertThatThrownBy(() -> fixture.client.target("one", "summary", "scope")).isSameAs(failure);
+            verify(fixture.context.observers, times(fallbackFailure ? 1 : 0)).getIfAvailable();
+            verifyNoInteractions(fixture.context.hooks);
+            assertThat(visited).hasValue(fallbackFailure ? 0 : 2);
+            assertThat(fixture.dispatches).hasValue(0);
+            assertThat(closed).hasValue(0);
+        }
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void nullObserverSingletonDiffersFromNullInCompositeAfterFullTraversal(boolean composite) {
+        try (var fixture = new Fixture(Profile.MINIMAL)) {
+            AtomicInteger visited = new AtomicInteger();
+            doAnswer(ignored -> Stream.<HttpClientObserver>of(null, event -> {})
+                    .limit(composite ? 2 : 1).peek(value -> visited.incrementAndGet()))
+                    .when(fixture.context.observers).orderedStream();
+            fixture.resetCounts();
+            if (composite) {
+                assertThatThrownBy(() -> fixture.client.target("one", "summary", "scope"))
+                        .isInstanceOf(NullPointerException.class);
+                assertThat(fixture.dispatches).hasValue(0);
+            } else {
+                assertThat(fixture.client.target("one", "summary", "scope").block(WAIT)).isEqualTo("ok");
+            }
+            assertThat(visited).hasValue(composite ? 2 : 1);
+            verify(fixture.context.observers, never()).getIfAvailable();
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"false,0", "false,1", "false,2", "true,0", "true,1", "true,2"})
+    void hookSelectionPreservesSupportFilteringOrderingAndDuplicateCallbacks(boolean parallel, int accepted) {
+        try (var fixture = new Fixture(Profile.MINIMAL)) {
+            List<String> terminals = new ArrayList<>();
+            List<String> visited = java.util.Collections.synchronizedList(new ArrayList<>());
+            AtomicInteger closed = new AtomicInteger();
+            ReactiveHttpClientLifecycleHook repeated = new ReactiveHttpClientLifecycleHook() {
+                @Override public boolean supports(String name) {
+                    visited.add("accepted");
+                    assertThat(name).isEqualTo(NAME);
+                    return true;
+                }
+                @Override public void onSuccess(ReactiveHttpClientLifecycleContext event) { terminals.add("ok"); }
+            };
+            ReactiveHttpClientLifecycleHook rejected = new ReactiveHttpClientLifecycleHook() {
+                @Override public boolean supports(String name) { visited.add("rejected"); return false; }
+            };
+            ReactiveHttpClientLifecycleHook broken = new ReactiveHttpClientLifecycleHook() {
+                @Override public boolean supports(String name) { visited.add("broken"); throw new IllegalStateException("synthetic"); }
+            };
+            List<ReactiveHttpClientLifecycleHook> hooks = new ArrayList<>(List.of(rejected, broken));
+            for (int i = 0; i < accepted; i++) hooks.add(repeated);
+            doAnswer(ignored -> (parallel ? hooks.parallelStream() : hooks.stream()).onClose(closed::incrementAndGet))
+                    .when(fixture.context.hooks).orderedStream();
+            fixture.resetCounts();
+            Mono<String> call = fixture.client.target("one", "summary", "scope");
+            assertThat(visited).hasSize(2 + accepted).contains("rejected", "broken");
+            assertThat(call.block(WAIT)).isEqualTo("ok");
+            assertThat(call.block(WAIT)).isEqualTo("ok");
+            assertThat(terminals).hasSize(2 * accepted).allMatch("ok"::equals);
+            assertThat(visited).hasSize(2 + accepted);
+            assertDiscovery(fixture, 1);
+            assertThat(closed).hasValue(0);
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource({"null-stream", "null-element", "stream-failure", "fatal-support"})
+    void hookCustomProviderFailureAndNullBoundariesRemainSynchronous(String mode) {
+        try (var fixture = new Fixture(Profile.MINIMAL)) {
+            var failure = new AssertionError("synthetic fatal failure");
+            doAnswer(ignored -> switch (mode) {
+                case "null-stream" -> null;
+                case "null-element" -> Stream.of((ReactiveHttpClientLifecycleHook) null);
+                case "stream-failure" -> throw failure;
+                default -> Stream.of(new ReactiveHttpClientLifecycleHook() {
+                    @Override public boolean supports(String name) { throw failure; }
+                });
+            }).when(fixture.context.hooks).orderedStream();
+            if (mode.equals("null-stream")) {
+                assertThat(fixture.client.target("one", "summary", "scope").block(WAIT)).isEqualTo("ok");
+            } else if (mode.equals("null-element")) {
+                assertThatThrownBy(() -> fixture.client.target("one", "summary", "scope"))
+                        .isInstanceOf(NullPointerException.class);
+            } else {
+                assertThatThrownBy(() -> fixture.client.target("one", "summary", "scope")).isSameAs(failure);
+            }
+            verify(fixture.context.hooks, never()).getIfAvailable();
+            assertThat(fixture.dispatches).hasValue(mode.equals("null-stream") ? 1 : 0);
         }
     }
 

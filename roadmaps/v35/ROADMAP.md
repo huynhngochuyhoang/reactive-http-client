@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Investigation scope:** all V34-C001 through V34-C005 and the unresolved P3/P10 allocation finding
-> **Implementation authorization:** pending Priority 3.3; no production change approved
+> **Implementation authorization:** seven-row bounded plan approved in Priority 3.3; no production change delivered
 > **Release scope:** unselected
 > **Draft date:** 2026-10-04
 > **Adopted:** 2026-10-04
@@ -51,10 +51,15 @@ resolved. Keep allocation rate, retained heap, direct/native memory and RSS sepa
 
 The [Priority 1 baseline](BASELINE-SCOPE.md) reconciles reusable artifacts with
 reachable source and preserves effective profiles. The [finding ledger](FINDINGS.md)
-tracks all seven workstreams with implementation approval pending.
+tracks all seven workstreams and their independent acceptance requirements.
 [Priority 2](ALLOCATION-INVESTIGATION.md) explains the observed allocation split
 through compiler/class-loading evidence without a production change or performance
-all-clear. The six implementation workstreams remain open.
+all-clear. [Priority 4](DISCOVERY-COMPOSITION.md) characterizes C001 and rejects
+its bounded accumulation candidate after matched scoring; no production change
+remains. Five implementation workstreams remain open.
+[Priority 3's specifications](FIX-DECISION.md) define local candidate boundaries,
+no-change routes and acceptance/rollback for all seven rows. The maintainer approved
+this bounded plan in Priority 3.3; execution and release selection remain separate.
 
 The inspected starting revision is
 `21ad81bd44db15b75d6787a0ceac308939a2741e`, containing V34's closure.

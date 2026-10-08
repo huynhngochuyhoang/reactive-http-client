@@ -1,0 +1,54 @@
+diff --git a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+index 2a71543e..7bff4021 100644
+--- a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
++++ b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+@@ -330,2 +330,9 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
+-        List<HttpClientObserver> observers = stream.toList();
+-        if (observers.isEmpty()) {
++        if (stream.isParallel()) {
++            List<HttpClientObserver> observers = stream.toList();
++            if (observers.isEmpty()) {
++                return observerProvider.getIfAvailable();
++            }
++            return observers.size() == 1 ? observers.get(0) : new CompositeHttpClientObserver(observers);
++        }
++        var iterator = stream.iterator();
++        if (!iterator.hasNext()) {
+@@ -334,2 +341,3 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
+-        if (observers.size() == 1) {
+-            return observers.get(0);
++        HttpClientObserver first = iterator.next();
++        if (!iterator.hasNext()) {
++            return first;
+@@ -336,0 +345,5 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
++        List<HttpClientObserver> observers = new ArrayList<>();
++        observers.add(first);
++        do {
++            observers.add(iterator.next());
++        } while (iterator.hasNext());
+@@ -348,3 +361,22 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
+-        return stream
+-                .filter(hook -> supportsLifecycleHook(hook, clientName))
+-                .toList();
++        if (stream.isParallel()) {
++            return stream.filter(hook -> supportsLifecycleHook(hook, clientName)).toList();
++        }
++        var iterator = stream.iterator();
++        ReactiveHttpClientLifecycleHook first = null;
++        List<ReactiveHttpClientLifecycleHook> hooks = null;
++        while (iterator.hasNext()) {
++            ReactiveHttpClientLifecycleHook hook = iterator.next();
++            if (!supportsLifecycleHook(hook, clientName)) {
++                continue;
++            }
++            if (first == null) {
++                first = hook;
++            } else {
++                if (hooks == null) {
++                    hooks = new ArrayList<>();
++                    hooks.add(first);
++                }
++                hooks.add(hook);
++            }
++        }
++        return hooks != null ? List.copyOf(hooks) : first != null ? List.of(first) : List.of();

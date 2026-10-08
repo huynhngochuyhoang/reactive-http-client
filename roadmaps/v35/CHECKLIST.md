@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Investigation scope:** all V34-C001 through V34-C005 and the unresolved P3/P10 allocation finding
-> **Implementation authorization:** pending Priority 3.3; no production change approved
+> **Implementation authorization:** seven-row bounded plan approved in Priority 3.3; no production change delivered
 > **Release scope:** unselected
 > **Adopted:** 2026-10-04
 
@@ -100,7 +100,7 @@ Linked records exist; other names are suggestions, not implied completed reports
 | [BASELINE-SCOPE.md](BASELINE-SCOPE.md) | Reachable/published provenance, profiles and prior-evidence applicability |
 | [FINDINGS.md](FINDINGS.md) | Complete seven-row ledger, owners, acceptance and unresolved dispositions |
 | [ALLOCATION-INVESTIGATION.md](ALLOCATION-INVESTIGATION.md) | Frozen experiments, all samples, attribution and remaining limits |
-| `FIX-DECISION.md` | Explicit maintainer approvals, local boundaries, acceptance and rollback |
+| [FIX-DECISION.md](FIX-DECISION.md) | Approved seven-row plan, acceptance/rollback and scope exclusions |
 | `FIX-EVIDENCE.md` | Per-finding implementation/no-change evidence, ownership and costs |
 | `VERIFICATION.md` | Mock/consumer/Boot/AOT/native/API and final matched evidence |
 | `MAINTAINER-GUIDANCE.md` | Retained costs, reproducible investigations and operations limits |
@@ -234,62 +234,118 @@ The sealed checklist copy excludes this anchor to avoid a self-referential hash.
 
 ## Priority 3 - Specify Bounded Fixes for Every Workstream
 
-### [ ] 3.1 Specify reproduced need and the smallest correction
+### [x] 3.1 Specify reproduced need and the smallest correction
 
-- [ ] For every inventory row, identify unnecessary work/defect or intentional
+- [x] For every inventory row, identify unnecessary work/defect or intentional
       cost, affected profiles/phases, source owner and local candidate boundary.
-- [ ] Map semantic, extension, optional-loading and lifetime dependencies; name
+- [x] Map semantic, extension, optional-loading and lifetime dependencies; name
       cross-cutting effects instead of hiding them in a combined improvement.
-- [ ] Compare no change with each candidate. C004 value reuse requires new
+- [x] Compare no change with each candidate. C004 value reuse requires new
       evidence, not reinstating the failed V34 patch under a new label.
 
-### [ ] 3.2 Define acceptance and rollback per candidate
+### [x] 3.2 Define acceptance and rollback per candidate
 
-- [ ] Freeze untimed regression witnesses, matched cost selection, expected
+- [x] Freeze untimed regression witnesses, matched cost selection, expected
       benefit or reproduced hardening, attribution limits and rollback criteria.
-- [ ] Preserve discovery/materialization timing, full policy mutation checks,
+- [x] Preserve discovery/materialization timing, full policy mutation checks,
       body/context/terminal ownership, coldness and selected-feature behavior.
-- [ ] Keep patches independently reviewable and reversible. Specify retention
+- [x] Keep patches independently reviewable and reversible. Specify retention
       checks so reduced allocation cannot trade for longer request lifetimes.
 
-### [ ] 3.3 Obtain explicit bounded implementation approval
+### [x] 3.3 Obtain explicit bounded implementation approval
 
-- [ ] Record the maintainer's concrete approved plans before production edits;
+- [x] Record the maintainer's concrete approved plans before production edits;
       adoption and a reproduction alone are not implementation approval.
-- [ ] Cover all seven workstreams in the decision. Approval for one row does not
+- [x] Cover all seven workstreams in the decision. Approval for one row does not
       silently defer the others; scope reduction requires an explicit decision.
-- [ ] Record rejected/no-change alternatives with supporting evidence. A need
+- [x] Record rejected/no-change alternatives with supporting evidence. A need
       outside the roadmap's compatibility/default boundaries stops that change
       for separate scope approval; it cannot enter by implication.
 
+Completed 2026-10-07. [FIX-DECISION.md](FIX-DECISION.md) covers every ledger row
+with source-supported need/limits, local owners, no-change alternatives,
+semantic/extension/lifetime dependencies, untimed witnesses, matched cost rows
+and independent acceptance/rollback rules. It preserves P2's explanation without
+a performance pass, all six open implementation workstreams, and V34's rollback.
+The maintainer explicitly selected "Approve the seven-row plan (Recommended)".
+This supersedes the earlier P1/P2 pending-approval state, not their measurements.
+Only the documented candidate boundaries and evidence-backed no-change routes are
+approved for later execution; no finding is silently dropped or marked fixed.
+No production edits or release/version decision are made by this priority.
+
+Verification: **238 tests across 11 classes** passed, zero failures/errors/skips,
+with explicit GC disabled: 96 documentation/archive/readiness cases and 142
+existing contract/ownership controls. The earlier pre-approval run overlaps this
+total. The new specification guard first failed with the missing decision record
+as intended. P2's 254-file inventory rehashes unchanged; it is reused attribution,
+not new scoring. Production, benchmark, module coordinates and V1-V34 records
+remain unchanged. Commands, XML, proposal/approval provenance, source copies and
+readiness are retained under `target/release-evidence/v35/priority3/`.
+The final documentation-only rerun passed **96 cases**, overlapping the 238.
+The sealed source copy excludes the external integrity anchor below.
+
+Priority 3 integrity anchor: **49 files**; SHA-256 of `priority3/SHA256SUMS`:
+`286c77f2cccc18f10f492c6d3ab8bc2a7e704eef7fef48c0a267d53d357dd665`.
+
 ## Priority 4 - C001 - Dynamic Discovery and Composition Cost
 
-### [ ] 4.1 Isolate provider and composition work
+### [x] 4.1 Isolate provider and composition work
 
-- [ ] Separate provider lookup, streams/lists, empty fallback and composite work
+- [x] Separate provider lookup, streams/lists, empty fallback and composite work
       across empty/single/multiple/ordered/prototype consumers and custom providers.
-- [ ] Record invocation-time capture versus publisher resubscription, per-client
+- [x] Record invocation-time capture versus publisher resubscription, per-client
       support checks and provider result/failure behavior before changing code.
-- [ ] Attribute actual removable cost; helper totals cannot stand in for complete
+- [x] Attribute actual removable cost; helper totals cannot stand in for complete
       factory/proxy calls or justify caching provider results globally.
 
-### [ ] 4.2 Implement the approved local reduction or prove no change
+### [x] 4.2 Implement the approved local reduction or prove no change
 
-- [ ] Implement only Priority 3.3's boundary, preserving late registrations,
+- [x] Implement only Priority 3.3's boundary, preserving late registrations,
       materialization/order/support timing and custom-provider failures/results.
-- [ ] Do not equate an empty ordered stream with every other provider operation;
+- [x] Do not equate an empty ordered stream with every other provider operation;
       no permanent negative lookup cache, forced singleton or skipped callback.
-- [ ] If no change is justified, retain measured/structural evidence of required
+- [x] If no change is justified, retain measured/structural evidence of required
       work and rejected alternatives, not just the previous deferral.
 
-### [ ] 4.3 Verify dynamic behavior and matched cost
+### [x] 4.3 Verify dynamic behavior and matched cost
 
-- [ ] Test empty-to-present registration, multiple ordered/prototype consumers,
+- [x] Test empty-to-present registration, multiple ordered/prototype consumers,
       per-client support, concurrent first calls and new versus existing publishers.
-- [ ] Preserve no-registry and master-off application observers/hooks plus
+- [x] Preserve no-registry and master-off application observers/hooks plus
       independent pool telemetry; absent exports do not mean absent behavior.
-- [ ] Compare approved production-path rows and helpers, record retained ownership,
+- [x] Compare approved production-path rows and helpers, record retained ownership,
       roll back failed candidates and update C001's ledger disposition.
+
+Completed 2026-10-08. [DISCOVERY-COMPOSITION.md](DISCOVERY-COMPOSITION.md) preserves
+the frozen plan, local/provider allocation attribution, custom-provider and
+dynamic capture contracts, and **224 scored forks** plus two separate diagnostic
+forks. All eight scored stages completed without retries. Reverse HOOK/GET has
+one allocation review flag; multiple-hook mean allocation increases in both
+orders. The candidate was **rolled back** under the frozen stop rule. C001 is
+**Resolved without production change**, not a performance pass or a claim that
+all provider cost is irreducible. The original production source is restored;
+the rejected patch remains an explicitly labeled experiment artifact.
+
+The final restored-source suite passes **204 cases across eight classes**:
+107 contract/ownership cases (including 36 discovery/ownership cases, 21 new)
+and 97 documentation cases, zero failures/errors/skips. Earlier baseline,
+candidate and restored-control runs overlap this total. The candidate benchmark
+correctness suite passed **40 cases**; **26 Python checks** passed. The final
+documentation-only rerun passed **97 cases**, overlapping the 204 above.
+Tests disable explicit GC; no timing/allocation/collection assertion is introduced.
+Source/classpath audit matches 39 harness files and
+120 non-starter dependencies; only handler implementation classes changed in the
+candidate. Raw samples, intervals, commands/exits, host snapshots, candidate
+source and input hashes are retained under `target/release-evidence/v35/priority4/`.
+Five implementation workstreams remain open; release scope stays unselected.
+No fresh native, API, Central-consumer or full-matrix performance pass is claimed.
+The restored local Maven artifact's **310 classes** match the saved baseline;
+the rejected candidate is no longer installed. P2/P3 sealed inventories rehash
+unchanged. Final sources, readiness, analysis and commands are sealed separately
+from the external integrity anchor; the sealed checklist copy excludes the anchor.
+
+Priority 4 integrity anchor: **187 files**; SHA-256 of `priority4/SHA256SUMS`:
+`c07ef8241405cf725f2b3f3364873c0e955a02d4286e9df7350927439c56b174`.
 
 ## Priority 5 - C002 - Body and Reporting-State Ownership
 
