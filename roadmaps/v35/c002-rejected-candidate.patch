@@ -1,0 +1,13 @@
+diff --git a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+index 2a71543e..2ed8f30a 100644
+--- a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
++++ b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+@@ -628 +628 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
+-        RequestBodyOwnership requestBodyOwnership = new RequestBodyOwnership(resolved.body());
++        RequestBodyOwnership requestBodyOwnership = resolved.body() == null ? null : new RequestBodyOwnership(resolved.body());
+@@ -1571 +1571 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
+-        return requestBodyOwnership.requiresCleanup()
++        return requestBodyOwnership != null && requestBodyOwnership.requiresCleanup()
+@@ -1578 +1578 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
+-        return requestBodyOwnership.requiresCleanup()
++        return requestBodyOwnership != null && requestBodyOwnership.requiresCleanup()

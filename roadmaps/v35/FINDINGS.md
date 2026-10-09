@@ -9,12 +9,13 @@ using the [reachable baseline](BASELINE-SCOPE.md). Owners below are maintainer
 roles, not assumptions about an assigned person. Priority 1 initialized all seven
 as unresolved. [Priority 2](ALLOCATION-INVESTIGATION.md) now explains the measured
 allocation split without production changes. Priority 4 rejects C001's bounded
-candidate with evidence-backed no change; five implementation workstreams
-remain open. Priority 3.3 approves the concrete bounded plan below, not a
+candidate with evidence-backed no change. Priority 5 likewise investigates body
+and reporting-state ownership and rolls back the null-holder candidate; four
+implementation workstreams remain open. Priority 3.3 approves the concrete bounded plan below, not a
 delivered fix. V34's limited approval did not carry into V35.
 
 Approved production boundaries and no-change routes are specified in the dated
-decision below; no V35 production patch is delivered. The allocation and C001 rows
+decision below; no V35 production patch is delivered. The allocation, C001 and C002 rows
 have dated no-change evidence; later execution must attach
 evidence and a disposition to the remaining rows, preserving
 contrary results. Fixed/verified and substantiated no-change outcomes require the
@@ -110,13 +111,20 @@ made. Further experiments require new bounded scope, not automatic refinement.
 ## V34-C002
 
 **Owner:** invocation/body maintainer; execution Priority 5.
-**Status:** unresolved/blocking; ownership is characterized, savings are not.
+**Status:** Resolved without production change, 2026-10-09; null-body candidate
+rolled back after matched review, not a performance pass.
 **Profiles:** V34-P01/P02 stateless owners; P03/P04/P06 stateful callers; P08 replays.
 
 **Current evidence:** handler `RequestBodyOwnership` exists per invocation even
 without a body; `usesSubscriptionState()` selects state per subscribed logical
 call. [V34 body/context evidence](../v34/BODY-CONTEXT-OWNERSHIP.md) verifies cleanup,
 not that required holders are redundant or retained after termination.
+[Priority 5](BODY-REPORTING-OWNERSHIP.md) now samples actual null-body holder
+allocation separately from subscription reporting state, inventories every body
+shape and state consumer, and verifies cleanup/terminal boundaries. The three-line
+candidate passes 431 ownership cases and repeats a 40 B/op minimal warm-publisher
+reduction, but 384 scored forks retain adverse flags in both orders. No production
+change remains; no state reuse or non-null ownership shortcut is adopted.
 **Reproduction:** `DefaultPathCostOwnershipTest` state/owner counters and
 `StreamingUploadOwnershipTest` for complete, error, pre-dispatch rejection,
 timeout, cancellation and discard. Separate no-body, immutable body and
@@ -130,9 +138,14 @@ composition controls. Cancellation must await cleanup ownership; ordinary tests
 remain independent of GC. Use controlled reachability lanes for collection claims.
 **Acceptance:** exact transfer/release/discard and terminal ordering remain intact;
 measured benefit or an approved correctness-cost tradeoff, otherwise evidence for
-a no-change result. No retained-heap/RSS claim inferred from B/op.
-**Open questions:** whether no-body/immutable holders escape, which allocations
-are required by repeat subscription, and whether any changed lifetime is safe.
+a no-change result. The no-change route is met through allocation-site evidence,
+the body/state lifetime inventory, terminal/cleanup regressions and the rejected
+local alternative; the cost gate did not pass. No retained-heap/RSS claim inferred
+from B/op. Required reporting state, one-shot cleanup and publisher/resource inner
+ownership are preserved rather than treated as avoidable because exports are off.
+**Open questions:** candidate compiler modes and noisy loopback timing are not
+causally isolated; no universal performance claim is made. Null holders are not
+declared indispensable, but any new optimization needs separate bounded scope.
 
 ## V34-C003
 
@@ -247,5 +260,6 @@ Fresh P1 tests and exactly reused suites are distinguished in
 retain in each later workstream, not a claim that every named suite was freshly
 run in P1. Reproduction commands for ordinary controls and historical artifacts
 are linked there. New profiling/scoring needs the Priority 2 frozen experiment;
-new production edits need Priority 3.3. The allocation-mechanism and C001 findings
-have their P2/P4 no-change dispositions; the inventory itself closes no other finding.
+new production edits need Priority 3.3. The allocation-mechanism, C001 and C002
+findings have their P2/P4/P5 no-change dispositions; the inventory itself closes
+no other finding.

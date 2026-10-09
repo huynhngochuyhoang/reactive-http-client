@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 5 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 6 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [x] 3.3 Obtain explicit bounded implementation approval",
@@ -307,6 +307,9 @@ class DocumentationReleaseArtifactTest {
                 assertThat(row).contains("**Status:** Resolved without production change", "(ALLOCATION-INVESTIGATION.md)");
             } else if (id.equals("V34-C001")) {
                 assertThat(row).contains("**Status:** Resolved without production change", "(DISCOVERY-COMPOSITION.md)",
+                        "rolled back", "not a performance pass");
+            } else if (id.equals("V34-C002")) {
+                assertThat(row).contains("**Status:** Resolved without production change", "(BODY-REPORTING-OWNERSHIP.md)",
                         "rolled back", "not a performance pass");
             } else {
                 assertThat(row).contains("**Status:** unresolved/blocking")
@@ -415,6 +418,41 @@ class DocumentationReleaseArtifactTest {
         assertThat(patch.lines().filter(line -> line.startsWith("diff --git ")).toList()).hasSize(1);
         assertThat(patch).contains("ReactiveClientInvocationHandler.java", "stream.iterator()", "stream.isParallel()");
         for (String script : List.of("investigate-v35-discovery.py", "test_investigate_v35_discovery.py")) {
+            assertThat(root.resolve("scripts").resolve(script)).exists();
+        }
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v35BodyOwnershipEvidenceKeepsStateLifetimesAndRejectedResultsExplicit() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String record = Files.readString(directory.resolve("BODY-REPORTING-OWNERSHIP.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "6198a986decd35028501f8c76a7a834ecbd0d459", "Plan frozen", "384 scored forks",
+                "two separate diagnostic forks", "48 matched rows", "Resolved without production change",
+                "rolled back", "not a performance pass", "three latency flags and two allocation flags",
+                "zero latency flags and two allocation flags", "832 -> 792 B/op", "226 sampled",
+                "15 SubscriptionReportingState", "no refinement", "InputStream", "ReadableByteChannel",
+                "Reader", "DataBuffer", "Multipart", "Publisher body", "Resource", "DTO",
+                "Enabled-only resilience", "Generated idempotency", "Hidden refresh", "Shared miss load",
+                "Four implementation workstreams remain open", "one-shot", "cleanup acknowledgements",
+                "39 harness source files", "120 non-starter dependencies", "jdk.ObjectAllocationSample",
+                "Controlled reachability", "N/A", "private originals", "target/release-evidence/v35/priority5/",
+                "no candidate compiler trace", "Do not subtract 256 bytes");
+        String priority = Files.readString(directory.resolve("CHECKLIST.md"))
+                .split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0];
+        assertThat(priority.replaceAll("\\s+", " ")).contains("### [x] 5.1", "### [x] 5.2", "### [x] 5.3",
+                "(BODY-REPORTING-OWNERSHIP.md)", "not a performance pass").doesNotContain("[ ]");
+        String patch = Files.readString(directory.resolve("c002-rejected-candidate.patch"));
+        assertThat(patch.lines().filter(line -> line.startsWith("diff --git ")).toList()).hasSize(1);
+        assertThat(patch).contains("ReactiveClientInvocationHandler.java", "resolved.body() == null ? null",
+                "requestBodyOwnership != null && requestBodyOwnership.requiresCleanup()");
+        for (String script : List.of("investigate-v35-body-ownership.py", "test_investigate_v35_body_ownership.py")) {
             assertThat(root.resolve("scripts").resolve(script)).exists();
         }
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
