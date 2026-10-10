@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 8 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 9 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [x] 3.3 Obtain explicit bounded implementation approval",
@@ -317,6 +317,9 @@ class DocumentationReleaseArtifactTest {
             } else if (id.startsWith("V34-C004 ")) {
                 assertThat(row).contains("**Status:** Resolved without production change", "(OPTIONAL-PREPARATION.md)",
                         "rolled back", "not a performance pass");
+            } else if (id.equals("V34-C005")) {
+                assertThat(row).contains("**Status:** Resolved without production change", "(CONSTRUCTION-LIFECYCLE.md)",
+                        "No framework patch was selected", "not a performance pass");
             } else {
                 assertThat(row).contains("**Status:** unresolved/blocking")
                         .doesNotContain("Fixed and verified", "Resolved without production change");
@@ -531,6 +534,34 @@ class DocumentationReleaseArtifactTest {
         assertThat(reuse.lines().filter(line -> line.startsWith("diff --git ")).toList()).hasSize(1);
         assertThat(reuse).contains("EffectiveCachePolicy.java", "METHOD_DISABLED_SELECTION", "DISABLED_DECISION");
         for (String script : List.of("investigate-v35-optional.py", "test_investigate_v35_optional.py")) {
+            assertThat(root.resolve("scripts").resolve(script)).exists();
+        }
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v35LifecycleEvidenceSeparatesReusedScoresFromFreshAttributionAndParity() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String record = Files.readString(directory.resolve("CONSTRUCTION-LIFECYCLE.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "7b2f133ae35d2b3217a87e1a04806ac473a5d1b8", "Plan frozen", "eight fresh diagnostic JFR forks",
+                "120 previously scored forks", "not fresh scores", "11,989 allocation samples",
+                "--stack-depth 128", "export correction", "not another measurement",
+                "Resolved without production change", "not a performance pass", "No production patch was selected",
+                "lifetime-bounded, not fixed-cardinality", "No normal-runtime history growth",
+                "not their garbage collection", "559 cases across 13 classes", "(243)",
+                "Global reuse", "Stopping after the first AOT lookup", "unknown",
+                "target/release-evidence/v35/priority8/", "final combined", "Priority 9 gate");
+        String priority = Files.readString(directory.resolve("CHECKLIST.md"))
+                .split("## Priority 8 - ", 2)[1].split("## Priority 9 - ", 2)[0];
+        assertThat(priority).contains("### [x] 8.1", "### [x] 8.2", "### [x] 8.3",
+                "(CONSTRUCTION-LIFECYCLE.md)").doesNotContain("[ ]");
+        for (String script : List.of("investigate-v35-lifecycle.py", "test_investigate_v35_lifecycle.py")) {
             assertThat(root.resolve("scripts").resolve(script)).exists();
         }
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);

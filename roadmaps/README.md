@@ -38,8 +38,10 @@ regressions. The [static planning/projection review](v35/STATIC-PLANNING-PROJECT
 rejects interface-annotation reuse after testing metadata/fallback semantics and
 matched cost in both orders. The [optional-preparation review](v35/OPTIONAL-PREPARATION.md)
 separates dormant holders from acquired resources and independently rejects both
-C004 experiments after matched scoring and ownership/absence controls. Only C005
-remains open; no production change is delivered.
+C004 experiments after matched scoring and ownership/absence controls. The
+[construction/lifecycle review](v35/CONSTRUCTION-LIFECYCLE.md) attributes cold work
+and verifies C005's runtime/AOT ownership without a patch. All seven findings have
+no-change dispositions; combined verification and release gates remain open.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

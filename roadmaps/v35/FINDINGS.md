@@ -13,13 +13,14 @@ candidate with evidence-backed no change. Priority 5 likewise investigates body
 and reporting-state ownership and rolls back the null-holder candidate. Priority 6
 audits static planning/dynamic projection and rolls back interface-annotation reuse.
 Priority 7 inventories optional acquisition and independently rejects preparation
-and disabled-decision reuse. Only C005 remains open. Priority 3.3 approves the concrete bounded plan below, not a
+and disabled-decision reuse. Priority 8 attributes cold/runtime work and verifies
+C005 lifecycle/selection ownership without a production patch. All seven rows now
+have no-change dispositions; final combined verification remains open. Priority 3.3 approves the concrete bounded plan below, not a
 delivered fix. V34's limited approval did not carry into V35.
 
 Approved production boundaries and no-change routes are specified in the dated
-decision below; no V35 production patch is delivered. The allocation, C001, C002, C003 and both C004 rows
-have dated no-change evidence; later execution must attach
-evidence and a disposition to the remaining rows, preserving
+decision below; no V35 production patch is delivered. All seven rows
+have dated no-change evidence. Later combined acceptance must preserve
 contrary results. Fixed/verified and substantiated no-change outcomes require the
 checklist's acceptance rules; unresolved rows block complete-scope closure unless
 the maintainer explicitly reduces scope. No new API, dependency, default, feature
@@ -262,13 +263,20 @@ optimization requires new bounded approval, not automatic refinement.
 ## V34-C005
 
 **Owner:** factory/AOT maintainer; execution Priority 8.
-**Status:** unresolved/blocking; no reproduced warm tracking leak, cold cost unattributed.
+**Status:** Resolved without production change, 2026-10-10; attributed construction
+work and lifecycle ownership verified, not a performance pass.
 **Profiles:** V34-P02/P03/P05/P06, public P01 construction and selected P08 controls.
 
 **Current evidence:** [PropertiesBindingLifecycle](../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/config/PropertiesBindingLifecycle.java)
 stops/clears normal runtime tracking. V34 context/proxy construction scores cover
 much more than warm invocation; [V33 selection behavior](../v33/AOT-PROPERTIES-SELECTION.md)
 is a published contract, not permission for a generic resolver rewrite.
+[Priority 8](CONSTRUCTION-LIFECYCLE.md) adds eight fresh diagnostic forks and seven
+deterministic lifecycle tests, reuses exactly 30 unchanged-artifact rows in both P7
+orders, and reruns 559 affected contract cases. Cold samples identify planning,
+validation and builder work alongside Spring/reflection/binding fixture cost;
+warm samples show request/reporting rather than AOT creation history. Tests verify
+normal stop, AOT lifetime, failure cleanup, repeated selection and isolated owners.
 **Reproduction:** `V34ConstructionBenchmark` separates context/proxy construction,
 first publisher and first subscription. `PropertiesBindingLifecycleTest` covers
 normal versus AOT lifecycle; `ResourceOwnershipReviewTest` covers failure/close
@@ -281,9 +289,13 @@ controlled reachability lanes. Keep owner cleanup and application resources inta
 **Acceptance:** runtime/AOT properties and metadata selection remain equivalent,
 no duplicate binding or early materialization, and measured same-phase benefit or
 substantiated intentional-cost conclusion. GC-disabled unit tests are not a heap proof.
-**Open questions:** which cold sites are attributable to starter work rather than
-framework/context fixture work; whether any surviving observation or resource
-has an invalid owner/lifetime; whether a narrower change is worth its complexity.
+The no-change route is met by fresh attribution, ownership and runtime/AOT parity,
+with explicit rejection of global selection caching, premature history stop,
+validation skipping and cost relocation. No framework patch was selected.
+**Open questions:** sampling does not price every cold site or AOT throughput;
+history is factory-lifetime-bounded, not fixed-cardinality during live AOT prototype
+churn. No exact per-site B/op, heap/RSS reduction or class unloading is claimed.
+A new reproduced defect or narrower optimization still requires bounded approval.
 
 ## Evidence Use
 
@@ -293,5 +305,6 @@ retain in each later workstream, not a claim that every named suite was freshly
 run in P1. Reproduction commands for ordinary controls and historical artifacts
 are linked there. New profiling/scoring needs the Priority 2 frozen experiment;
 new production edits need Priority 3.3. The allocation-mechanism, C001, C002,
-C003 and both C004 findings have their P2/P4/P5/P6/P7 no-change dispositions;
-C005 remains unresolved. The inventory itself closes no finding.
+C003, both C004 findings and C005 have their P2/P4/P5/P6/P7/P8 no-change dispositions.
+Final combined verification and release selection remain open; the inventory
+itself closes no finding.
