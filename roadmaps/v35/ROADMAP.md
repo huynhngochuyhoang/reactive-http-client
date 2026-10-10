@@ -62,8 +62,10 @@ and rolls back the null-holder candidate after its matched cost gate fails.
 and rolls back interface-annotation reuse after matched scoring finds no repeatable
 attributed benefit. [Priority 7](OPTIONAL-PREPARATION.md) inventories optional
 preparation/acquisition and independently rolls back view/scheduler preparation
-and disabled-decision reuse after their benefit gates fail. Only C005 remains
-open; no production change is delivered.
+and disabled-decision reuse after their benefit gates fail.
+[Priority 8](CONSTRUCTION-LIFECYCLE.md) attributes cold work and verifies C005
+lifecycle ownership and runtime/AOT parity without changing production. All seven
+findings now have no-change dispositions; final combined verification remains open.
 [Priority 3's specifications](FIX-DECISION.md) define local candidate boundaries,
 no-change routes and acceptance/rollback for all seven rows. The maintainer approved
 this bounded plan in Priority 3.3; execution and release selection remain separate.

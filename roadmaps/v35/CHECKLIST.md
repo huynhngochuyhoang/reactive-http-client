@@ -30,7 +30,7 @@ in scope; approval of one patch does not silently remove the others.
 | V34-C003 | Priority 6; planning/resolver maintainer | Resolved without production change; static/dynamic ownership reviewed and annotation-reuse candidate rolled back, not a performance pass |
 | V34-C004 optional preparation | Priority 7.1-7.2; handler/factory maintainer | Resolved without production change; acquisition/ownership reviewed and preparation candidate rolled back, not a performance pass |
 | V34-C004 rolled-back value reuse | Priority 7.3; effective-policy maintainer | Resolved without production change; independent V35 experiment rolled back, low-mode comparisons do not establish benefit |
-| V34-C005 | Priority 8; factory/AOT maintainer | Pending cold/runtime lifecycle evidence |
+| V34-C005 | Priority 8; factory/AOT maintainer | Resolved without production change; cold work attributed and runtime/AOT ownership verified, not a performance pass |
 
 All seven rows are mandatory. Maintain a ledger with owner, reproduction, approved
 boundary, affected profiles, patch or no-change evidence, acceptance and remaining
@@ -580,32 +580,79 @@ documentation rerun passes again and is not added to the 740-case total.
 
 ## Priority 8 - C005 - Construction, AOT and Runtime Lifecycle Cost
 
-### [ ] 8.1 Attribute cold, first-use and runtime work
+### [x] 8.1 Attribute cold, first-use and runtime work
 
-- [ ] Separate context/proxy creation, first invocation/subscription and warm calls;
+- [x] Separate context/proxy creation, first invocation/subscription and warm calls;
       identify removable static work and exact owners before proposing caches.
-- [ ] Verify AOT-only bookkeeping stops at the proper runtime boundary and does
+- [x] Verify AOT-only bookkeeping stops at the proper runtime boundary and does
       not retain per-instance/request state or add warm-path tracking.
-- [ ] Require new reproduction before broadening V33's framework-selection review;
+- [x] Require new reproduction before broadening V33's framework-selection review;
       cold fixture allocation alone does not establish a defect or optimization.
 
-### [ ] 8.2 Implement only the approved lifecycle correction
+### [x] 8.2 Implement only the approved lifecycle correction
 
-- [ ] Preserve properties/metadata preference, parent/scoped/FactoryBean selection,
+- [x] Preserve properties/metadata preference, parent/scoped/FactoryBean selection,
       awareness/binding/initialization order and post-processor restoration.
-- [ ] Keep selected failures and non-eager unrelated business-bean behavior; do
+- [x] Keep selected failures and non-eager unrelated business-bean behavior; do
       not substitute defaults when supported application replacements exist.
-- [ ] Retain bounded AOT tracking and non-instantiating diagnostics. Document a
+- [x] Retain bounded AOT tracking and non-instantiating diagnostics. Document a
       justified no-change outcome where required work cannot safely be reduced.
 
-### [ ] 8.3 Verify recreation, failure cleanup and total cost
+### [x] 8.3 Verify recreation, failure cleanup and total cost
 
-- [ ] Test context recreation, class-loader isolation, partial creation failure,
+- [x] Test context recreation, class-loader isolation, partial creation failure,
       scoped/prototype products and destruction without resurrecting removed owners.
-- [ ] Compare construction plus first-use and warm cost together; merely moving
+- [x] Compare construction plus first-use and warm cost together; merely moving
       work into subscription cannot count as an overall improvement.
-- [ ] Verify resource/retention and runtime/AOT parity, then record C005 acceptance
+- [x] Verify resource/retention and runtime/AOT parity, then record C005 acceptance
       or rollback with evidence and any remaining limitation.
+
+Completed 2026-10-10. [CONSTRUCTION-LIFECYCLE.md](CONSTRUCTION-LIFECYCLE.md) records
+the frozen evidence-first plan, eight fresh diagnostic JFR forks (11,989 allocation
+samples), and exact reuse of P7's unchanged baseline: all six construction/first-use
+plus 24 warm rows in both orders, **120 previously scored forks**, not fresh scores.
+Cold sites include planning/validation/builders plus Spring/reflection/binding
+fixture work; warm samples show request/reporting, not AOT history. No profiled
+latency, missing sample or whole-context allocation is promoted into a benefit claim.
+
+C005 is **Resolved without production change**, not a performance pass. The owner
+inventory and regressions support current lifetime boundaries; no framework patch
+was selected. AOT history is lifetime-bounded, not fixed-cardinality for arbitrary
+live prototype churn. Global selection reuse, early history stop, skipped validation
+and moving work into subscription are rejected with specific contract witnesses.
+
+Fresh verification passes **559 cases across 13 classes**, including seven new
+recreation/overlap/failure/class-loader/repeated-selection/concurrent-stop cases,
+243 properties-selection cases and 27 JVM AOT/hint cases. Explicit GC is disabled;
+structural cleanup is not collection evidence. The initial fixture compile error
+is retained, followed by the corrected 14-case focused run and the complete run.
+Native/assembled final checks remain Priority 9; no fresh native or heap/RSS pass
+is claimed. All seven finding rows have dispositions, but final combined cost,
+compatibility and release gates remain unchecked.
+
+Evidence: `target/release-evidence/v35/priority8/`, starting commit
+`7b2f133ae35d2b3217a87e1a04806ac473a5d1b8`. Frozen inputs, reused raw scores,
+commands/exits, fresh XML, source and allocation-only recordings are retained.
+Both five-frame and corrected full-depth JSON exports are preserved; the correction
+uses the same recordings without additional measurement. Private JFR originals
+stay outside the bundle. Release scope remains unselected.
+
+The fresh rebuild matches **310 starter classes** and **24,224 shaded benchmark
+classes**, with all **39 harness files**, **120 non-starter dependencies** and
+ordered classpaths unchanged. It passes **42 benchmark-contract cases**; all
+**40 Python checks** and **101 documentation cases** pass. Final affected
+functional/documentation total: **660 cases** (559 + 101), zero failures/errors/
+skips; overlapping focused/repeated runs are not added. Readiness stays active
+V35, `4.5.0-SNAPSHOT`, published/API baseline `4.4.2`, planned final version null.
+
+The P8 bundle seals **209 files**; `SHA256SUMS` SHA-256 is
+`614b01bdbb6afa35a27cdcda616b71abbce397f74d54a8d52de2b04d214c8979`.
+P2/P3/P4/P5/P6/P7 inventories were reverified unchanged. `final/` records the
+source, tests, full-depth attribution and unchanged-artifact/readiness audit;
+source copies precede this external integrity anchor to avoid self-reference.
+The initial seal's tuple-versus-JSON-list comparison was corrected without
+changing events or scores; its script/partial audit remain under `initial-seal/`.
+The final 101-case documentation rerun passes again, not added to the 660 total.
 
 ## Priority 9 - Cross-Path, Optional-Integration and Lifecycle Verification
 
