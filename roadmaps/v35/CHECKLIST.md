@@ -27,7 +27,7 @@ in scope; approval of one patch does not silently remove the others.
 | V34-P3/P10 allocation finding | Priority 2; performance maintainer | Resolved without production change for the observed split; not a performance pass |
 | V34-C001 | Priority 4; observer/hook maintainer | Resolved without production change; bounded candidate rolled back, not a performance pass |
 | V34-C002 | Priority 5; invocation/body maintainer | Resolved without production change; ownership reviewed and null-holder candidate rolled back, not a performance pass |
-| V34-C003 | Priority 6; planning/resolver maintainer | Pending attribution and fix/no-change evidence |
+| V34-C003 | Priority 6; planning/resolver maintainer | Resolved without production change; static/dynamic ownership reviewed and annotation-reuse candidate rolled back, not a performance pass |
 | V34-C004 optional preparation | Priority 7.1-7.2; handler/factory maintainer | Pending acquisition/lifetime evidence |
 | V34-C004 rolled-back value reuse | Priority 7.3; effective-policy maintainer | Rolled back in V34; new evidence required |
 | V34-C005 | Priority 8; factory/AOT maintainer | Pending cold/runtime lifecycle evidence |
@@ -421,31 +421,73 @@ not increase the 542-case total.
 
 ## Priority 6 - C003 - Static Planning and Dynamic Request Projection
 
-### [ ] 6.1 Separate invariant derivation from caller inputs
+### [x] 6.1 Separate invariant derivation from caller inputs
 
-- [ ] Inspect repeated interface logging-annotation traversal and static plan work
+- [x] Inspect repeated interface logging-annotation traversal and static plan work
       through existing metadata/plan owners; identify actual removable derivation.
-- [ ] Preserve public fresh/replacement metadata, inherited generics, API-ref
+- [x] Preserve public fresh/replacement metadata, inherited generics, API-ref
       precedence, interface identity and per-invocation selection behavior.
-- [ ] Identify aliasing/mutation dependencies before removing collection copies;
+- [x] Identify aliasing/mutation dependencies before removing collection copies;
       ordinary mutable arguments are not implicitly deep-snapshotted.
 
-### [ ] 6.2 Implement the approved static-work reduction
+### [x] 6.2 Implement the approved static-work reduction
 
-- [ ] Reuse only proven invariant data at existing plan/handler boundaries. No
+- [x] Reuse only proven invariant data at existing plan/handler boundaries. No
       second metadata model, pre-serialized body or per-caller resolved-request cache.
-- [ ] Preserve dynamic URI/query/header projection, charset, body presence,
+- [x] Preserve dynamic URI/query/header projection, charset, body presence,
       idempotency/context and custom codec behavior at their original boundaries.
-- [ ] Document evidence-backed no-change alternatives; reject hidden retention of
+- [x] Document evidence-backed no-change alternatives; reject hidden retention of
       arguments, identities, bodies or Reactor context in reusable plans.
 
-### [ ] 6.3 Verify exact request behavior and phase-specific cost
+### [x] 6.3 Verify exact request behavior and phase-specific cost
 
-- [ ] Assert dispatch method/target/headers/body/result for public, factory and mock
+- [x] Assert dispatch method/target/headers/body/result for public, factory and mock
       paths, including case aliases, order, null/empty, generic and API-ref cases.
-- [ ] Keep first-call, warm assembly, subscription and loopback measurements
+- [x] Keep first-call, warm assembly, subscription and loopback measurements
       distinct; correctness spies must not enter the scored path.
-- [ ] Record matched benefit/ownership acceptance or rollback and C003 disposition.
+- [x] Record matched benefit/ownership acceptance or rollback and C003 disposition.
+
+Completed 2026-10-10. [STATIC-PLANNING-PROJECTION.md](STATIC-PLANNING-PROJECTION.md)
+records the frozen plan, owner/aliasing audit, exact request regressions and all
+280 scored forks (35 matched rows per artifact, both orders), plus two separate
+diagnostic forks. Only immutable interface-annotation reuse was attempted.
+Forward review has two latency flags and one allocation flag; reverse has none.
+Minimal GET/TARGET warm publishers add 24 B/op in every fork/order and show no
+repeatable attributed benefit. C003 is **Resolved without production change**:
+the candidate is rolled back, not a performance pass. The
+[rejected patch](c003-rejected-candidate.patch) is evidence, not applied production
+code; dynamic metadata, generic plans, projection copies and logger discovery stay.
+
+Initial baseline/candidate runs each passed 215 starter cases plus 65 mock cases.
+The expanded candidate passed 217 plus 65, including all 15 new planning/logger
+regressions. Explicit GC was disabled. These overlapping runs are not additive
+distinct-test totals. First-use, no-network assembly/subscription and helper
+scores remain separate; real loopback tests establish wire semantics only.
+
+Evidence is under `target/release-evidence/v35/priority6/`: frozen prefix, starting
+commit `1f016a8000bb835fff8ae8a509b12f1194a6215d`, saved pair/patch, allocation-event
+exports, raw samples, commands/exits, host observations and test XML. The pair
+matches 39 harness files, 120 non-starter dependencies and ordered classpath.
+The initial incomplete test selection and JMH-lock-rejected duplicate launch are
+retained with corrections; the original scoring runner completed without reruns.
+No full 60-row, API, assembled-consumer, AOT/native or heap/RSS acceptance is claimed.
+Three implementation workstreams remain open. Release remains unselected.
+
+Final restored verification passed **316 starter cases across 15 classes**, including
+**99 documentation cases**, plus **65 mock cases**: **381 total**, zero failures,
+errors or skips. All **34 Python checks** and **41 benchmark-contract cases** passed.
+The fresh restored build matches all **310 starter classes** and **24,224 shaded
+benchmark classes** in the saved baseline. `tests-final/` and `final-checks/` retain
+the exact commands, fresh XML and class-identity audit. This is class-byte identity,
+not a whole-JAR hash claim or additional scored performance run.
+
+Final documentation-only verification passed **99 cases** again. The P6 bundle
+seals **278 files**; `SHA256SUMS` SHA-256 is
+`8de1acc0ef0d920fce1e7e00a6f1116be9ad35ba2068d509ead3377f8f579f1e`.
+P2/P3/P4/P5 inventories were reverified unchanged. `final/` records the source,
+tests, artifact and readiness audit; its source copies precede this external
+integrity anchor to avoid a self-referential checksum. Documentation reruns do
+not increase the 381-case total.
 
 ## Priority 7 - C004 - Unselected Feature Preparation and Resources
 

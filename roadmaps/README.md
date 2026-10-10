@@ -34,8 +34,10 @@ discovery and rejects its bounded candidate after matched scoring in both orders
 It records an evidence-backed no-change outcome, not a performance pass.
 The [body/reporting ownership review](v35/BODY-REPORTING-OWNERSHIP.md) likewise
 rejects its null-holder candidate after matched scoring and retains the ownership
-regressions. Four implementation workstreams remain open; no production change
-is delivered.
+regressions. The [static planning/projection review](v35/STATIC-PLANNING-PROJECTION.md)
+rejects interface-annotation reuse after testing metadata/fallback semantics and
+matched cost in both orders. Three implementation workstreams remain open; no
+production change is delivered.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

@@ -58,7 +58,10 @@ all-clear. [Priority 4](DISCOVERY-COMPOSITION.md) characterizes C001 and rejects
 its bounded accumulation candidate after matched scoring; no production change
 remains. [Priority 5](BODY-REPORTING-OWNERSHIP.md) audits body/reporting ownership
 and rolls back the null-holder candidate after its matched cost gate fails.
-Four implementation workstreams remain open; no production change is delivered.
+[Priority 6](STATIC-PLANNING-PROJECTION.md) reviews static/dynamic planning ownership
+and rolls back interface-annotation reuse after matched scoring finds no repeatable
+attributed benefit. Three implementation workstreams remain open; no production
+change is delivered.
 [Priority 3's specifications](FIX-DECISION.md) define local candidate boundaries,
 no-change routes and acceptance/rollback for all seven rows. The maintainer approved
 this bounded plan in Priority 3.3; execution and release selection remain separate.

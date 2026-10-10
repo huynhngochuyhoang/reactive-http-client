@@ -10,12 +10,13 @@ roles, not assumptions about an assigned person. Priority 1 initialized all seve
 as unresolved. [Priority 2](ALLOCATION-INVESTIGATION.md) now explains the measured
 allocation split without production changes. Priority 4 rejects C001's bounded
 candidate with evidence-backed no change. Priority 5 likewise investigates body
-and reporting-state ownership and rolls back the null-holder candidate; four
-implementation workstreams remain open. Priority 3.3 approves the concrete bounded plan below, not a
+and reporting-state ownership and rolls back the null-holder candidate. Priority 6
+audits static planning/dynamic projection and rolls back interface-annotation reuse;
+three implementation workstreams remain open. Priority 3.3 approves the concrete bounded plan below, not a
 delivered fix. V34's limited approval did not carry into V35.
 
 Approved production boundaries and no-change routes are specified in the dated
-decision below; no V35 production patch is delivered. The allocation, C001 and C002 rows
+decision below; no V35 production patch is delivered. The allocation, C001, C002 and C003 rows
 have dated no-change evidence; later execution must attach
 evidence and a disposition to the remaining rows, preserving
 contrary results. Fixed/verified and substantiated no-change outcomes require the
@@ -150,7 +151,8 @@ declared indispensable, but any new optimization needs separate bounded scope.
 ## V34-C003
 
 **Owner:** planning/resolver maintainer; execution Priority 6.
-**Status:** unresolved/blocking; repeated static work is a hypothesis, not a fix.
+**Status:** Resolved without production change, 2026-10-10; annotation-reuse
+candidate rolled back, not a performance pass.
 **Profiles:** V34-P01/P02/P03/P04/P06; P08 cache/auth identity controls.
 
 **Current evidence:** cached concrete plans remain stable, while
@@ -158,6 +160,12 @@ declared indispensable, but any new optimization needs separate bounded scope.
 [URI building](../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/DeclarativeRequestUri.java)
 and interface log lookup repeat appropriate dynamic or potentially static work.
 V34 helper measurements do not imply the difference between TARGET and GET is removable.
+[Priority 6](STATIC-PLANNING-PROJECTION.md) now inventories invariant versus dynamic
+owners, preserves public metadata and aliasing/mutation contracts, and executes
+280 scored forks in both orders. The candidate preserves tested behavior but
+minimal GET/TARGET publisher allocation grows by 24 B/op in every fork/order.
+Forward review retains two latency flags and one allocation flag; reverse has
+none. No repeatable attributed production-path benefit justifies the extra state.
 **Reproduction:** `V33PlanningCostBenchmark` and `StarterInvocationInternalsBenchmark`
 under the frozen matched harness; `DefaultPathCostOwnershipTest` for cached-plan
 identity. Separate cold parsing, warm plan lookup and dynamic header/query projection.
@@ -170,9 +178,13 @@ identity tests. Preserve fresh public metadata extensions, concrete generics,
 API-ref precedence, wire order, null/empty, URI escaping and mutation checks.
 **Acceptance:** equivalent public/static metadata and effective wire identity,
 with bounded lifetime and matched benefit or justified no-change evidence.
-**Open questions:** which derived values are truly immutable; how extension
-overrides and annotation inheritance constrain lifetime; whether lookup adds more
-cost/retention than it removes.
+The no-change route is met by the owner inventory, sampled interface-array work,
+precedence/fallback and wire regressions, and rejected bounded bookkeeping tradeoff.
+No collection copy, metadata-extension lookup or dynamic projection is removed.
+**Open questions:** exact compiler causes of allocation modes and noisy latency
+are not isolated; sampled baseline arrays do not establish annotation allocation.
+No universal performance or heap/RSS benefit is claimed. Further optimization
+requires new bounded scope, not automatic refinement of this rejected candidate.
 
 ## V34-C004 optional preparation
 
