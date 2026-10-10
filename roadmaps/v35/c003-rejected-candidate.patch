@@ -1,0 +1,24 @@
+diff --git a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+index 2a71543e..96289a9e 100644
+--- a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
++++ b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+@@ -105,0 +106,2 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
++    private LogHttpExchange concreteInterfaceLogAnnotation;
++    private volatile boolean concreteInterfaceLogAnnotationResolved;
+@@ -2277 +2279,2 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
+-            for (Class<?> candidate : proxy.getClass().getInterfaces()) {
++            Class<?>[] interfaces = proxy.getClass().getInterfaces();
++            for (Class<?> candidate : interfaces) {
+@@ -2279 +2282,11 @@ public class ReactiveClientInvocationHandler implements InvocationHandler {
+-                    LogHttpExchange annotation = candidate.getAnnotation(LogHttpExchange.class);
++                    LogHttpExchange annotation;
++                    if (candidate == clientInterface && interfaces.length == 1
++                            && java.lang.reflect.Proxy.isProxyClass(proxy.getClass())) {
++                        if (!concreteInterfaceLogAnnotationResolved) {
++                            concreteInterfaceLogAnnotation = candidate.getAnnotation(LogHttpExchange.class);
++                            concreteInterfaceLogAnnotationResolved = true;
++                        }
++                        annotation = concreteInterfaceLogAnnotation;
++                    } else {
++                        annotation = candidate.getAnnotation(LogHttpExchange.class);
++                    }

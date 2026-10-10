@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 6 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 7 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [x] 3.3 Obtain explicit bounded implementation approval",
@@ -310,6 +310,9 @@ class DocumentationReleaseArtifactTest {
                         "rolled back", "not a performance pass");
             } else if (id.equals("V34-C002")) {
                 assertThat(row).contains("**Status:** Resolved without production change", "(BODY-REPORTING-OWNERSHIP.md)",
+                        "rolled back", "not a performance pass");
+            } else if (id.equals("V34-C003")) {
+                assertThat(row).contains("**Status:** Resolved without production change", "(STATIC-PLANNING-PROJECTION.md)",
                         "rolled back", "not a performance pass");
             } else {
                 assertThat(row).contains("**Status:** unresolved/blocking")
@@ -453,6 +456,42 @@ class DocumentationReleaseArtifactTest {
         assertThat(patch).contains("ReactiveClientInvocationHandler.java", "resolved.body() == null ? null",
                 "requestBodyOwnership != null && requestBodyOwnership.requiresCleanup()");
         for (String script : List.of("investigate-v35-body-ownership.py", "test_investigate_v35_body_ownership.py")) {
+            assertThat(root.resolve("scripts").resolve(script)).exists();
+        }
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v35PlanningReviewPreservesDynamicContractsAndRejectedEvidence() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String record = Files.readString(directory.resolve("STATIC-PLANNING-PROJECTION.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "1f016a8000bb835fff8ae8a509b12f1194a6215d", "Plan frozen", "280 scored forks",
+                "35 matched rows", "two latency flags and one allocation flag",
+                "zero latency flags and zero allocation flags", "Resolved without production change",
+                "rolled back", "not a performance pass", "no refinement", "not applied production code",
+                "832 -> 856 B/op", "jdk.ObjectAllocationSample", "Class.getInterfaces()",
+                "method metadata wins", "client logging is live", "declaring fallback",
+                "Query elements may still be mutable", "case-insensitively", "API-ref",
+                "39 harness source files", "120 non-starter dependencies", "javap -c -p",
+                "Three implementation workstreams remain open", "Private original JFR",
+                "target/release-evidence/v35/priority6/", "zero scored retries",
+                "not freshly rebuilt before scoring", "No loopback performance row",
+                "217 starter cases and 65 mock cases", "15 cases", "not a fresh Central download");
+        String priority = Files.readString(directory.resolve("CHECKLIST.md"))
+                .split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0];
+        assertThat(priority).contains("### [x] 6.1", "### [x] 6.2", "### [x] 6.3",
+                "(STATIC-PLANNING-PROJECTION.md)").doesNotContain("[ ]");
+        String patch = Files.readString(directory.resolve("c003-rejected-candidate.patch"));
+        assertThat(patch.lines().filter(line -> line.startsWith("diff --git ")).toList()).hasSize(1);
+        assertThat(patch).contains("ReactiveClientInvocationHandler.java", "interfaces.length == 1",
+                "java.lang.reflect.Proxy.isProxyClass", "concreteInterfaceLogAnnotationResolved");
+        for (String script : List.of("investigate-v35-planning.py", "test_investigate_v35_planning.py")) {
             assertThat(root.resolve("scripts").resolve(script)).exists();
         }
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
