@@ -28,8 +28,8 @@ in scope; approval of one patch does not silently remove the others.
 | V34-C001 | Priority 4; observer/hook maintainer | Resolved without production change; bounded candidate rolled back, not a performance pass |
 | V34-C002 | Priority 5; invocation/body maintainer | Resolved without production change; ownership reviewed and null-holder candidate rolled back, not a performance pass |
 | V34-C003 | Priority 6; planning/resolver maintainer | Resolved without production change; static/dynamic ownership reviewed and annotation-reuse candidate rolled back, not a performance pass |
-| V34-C004 optional preparation | Priority 7.1-7.2; handler/factory maintainer | Pending acquisition/lifetime evidence |
-| V34-C004 rolled-back value reuse | Priority 7.3; effective-policy maintainer | Rolled back in V34; new evidence required |
+| V34-C004 optional preparation | Priority 7.1-7.2; handler/factory maintainer | Resolved without production change; acquisition/ownership reviewed and preparation candidate rolled back, not a performance pass |
+| V34-C004 rolled-back value reuse | Priority 7.3; effective-policy maintainer | Resolved without production change; independent V35 experiment rolled back, low-mode comparisons do not establish benefit |
 | V34-C005 | Priority 8; factory/AOT maintainer | Pending cold/runtime lifecycle evidence |
 
 All seven rows are mandatory. Maintain a ledger with owner, reproduction, approved
@@ -491,44 +491,92 @@ not increase the 381-case total.
 
 ## Priority 7 - C004 - Unselected Feature Preparation and Resources
 
-### [ ] 7.1 Inventory optional preparation and actual acquisition
+### [x] 7.1 Inventory optional preparation and actual acquisition
 
-- [ ] Attribute cache identity WebClient construction, scheduler access and manager
+- [x] Attribute cache identity WebClient construction, scheduler access and manager
       lifetime separately for factory/static-create and legacy public constructors.
-- [ ] Distinguish dormant holder/shared reference from worker, connection, cache,
+- [x] Distinguish dormant holder/shared reference from worker, connection, cache,
       meter lease and scheduled refresh; classpath presence is not acquisition.
-- [ ] Count behavior on selected/unselected and physically absent optional paths
+- [x] Count behavior on selected/unselected and physically absent optional paths
       without changing validation timing or forcing lazy diagnostic materialization.
 
-### [ ] 7.2 Apply approved preparation or ownership improvements
+### [x] 7.2 Apply approved preparation or ownership improvements
 
-- [ ] Elide/defer only demonstrated unnecessary work permitted by effective policy
+- [x] Elide/defer only demonstrated unnecessary work permitted by effective policy
       and complete mutation guards. Keep supported public/factory/mock entry points.
-- [ ] Preserve selected-cache finalized-request probes through all required filters,
+- [x] Preserve selected-cache finalized-request probes through all required filters,
       auth/tenant/key validation and per-call gates, including cache hits.
-- [ ] Retain caller/load/refresh admission, coalescing/deadline ownership, byte/entry
+- [x] Retain caller/load/refresh admission, coalescing/deadline ownership, byte/entry
       bounds, response eligibility, publication checks and same-tag meter ownership.
-- [ ] Record substantiated no-change outcomes for each preparation boundary;
+- [x] Record substantiated no-change outcomes for each preparation boundary;
       laziness cannot move startup failures, skip checks or revive closed resources.
 
-### [ ] 7.3 Re-evaluate rolled-back value reuse separately
+### [x] 7.3 Re-evaluate rolled-back value reuse separately
 
-- [ ] Preserve the V34 failed experiment and first seek new attributed benefit
+- [x] Preserve the V34 failed experiment and first seek new attributed benefit
       distinguishable from fork noise; fewer source constructors are not proof.
-- [ ] Reopen implementation only under the explicit Priority 3.3 approval. Keep
+- [x] Reopen implementation only under the explicit Priority 3.3 approval. Keep
       disabled sources distinct and selected/invalid decisions unshared as required.
-- [ ] Retain every whole-interface mutation check, including sibling methods and
+- [x] Retain every whole-interface mutation check, including sibling methods and
       disabled-to-selected changes. Record independent acceptance/rollback or an
       evidence-backed no-change conclusion; this cannot replace 7.1-7.2 work.
 
-### [ ] 7.4 Verify optional absence, races and lifetime boundaries
+### [x] 7.4 Verify optional absence, races and lifetime boundaries
 
-- [ ] Gate concurrent first use, cancellation, failed construction and close races;
+- [x] Gate concurrent first use, cancellation, failed construction and close races;
       prove no unintended acquisition, continuation or publication after closure.
-- [ ] Verify optional classes physically absent, selected-feature behavior,
+- [x] Verify optional classes physically absent, selected-feature behavior,
       no-registry terminal consumers and diagnostics' supported unknown states.
-- [ ] Compare cold plus first-use cost and lifetime, retain application/shared
+- [x] Compare cold plus first-use cost and lifetime, retain application/shared
       ownership, and update both C004 ledger rows with distinct evidence.
+
+Completed 2026-10-10. [OPTIONAL-PREPARATION.md](OPTIONAL-PREPARATION.md) preserves
+the frozen independent experiments, acquisition/lifetime inventory and **408 scored
+forks** (34 rows per artifact, both orders). All 18 stages completed with zero
+scored retries. Preparation has three reverse allocation flags and no demonstrated
+cold/first-use benefit; reuse has no flags but no attributed saving against low-mode
+baseline forks. Both are **Resolved without production change**, not a performance
+pass. View/scheduler and disabled-decision patches are retained only as rejected
+experiment artifacts. Legacy manager removal/reownership was not attempted.
+
+Preparation passed 89 focused cases, reuse 127, and each candidate build 42
+benchmark-contract cases. Restored production passes **567 starter cases across
+24 classes** plus **72 mock cases across three classes**, all with explicit GC
+disabled. These cover the 15 new preparation cases, selected auth/filter/key
+behavior, mutation validation, admission/deadline/close races, byte/entry bounds,
+same-tag meter ownership, no-registry terminal consumers and lazy/unknown
+diagnostics. Overlapping runs are not additive distinct-test totals.
+
+The physically optional-absent Boot 4.0.0 built-JAR consumer passes one case on
+preparation and again on restored production, with enabled-only resilience and
+two real GET dispatches. Caffeine, four Resilience4j registries, Micrometer,
+OpenTelemetry and the test helper are absent. This is not a new Central or Boot
+matrix check. No native/AOT, strict API, full 60-row or collection/heap/RSS pass
+is claimed. Only C005 remains open; no release is selected.
+
+Evidence is under `target/release-evidence/v35/priority7/`: source commit
+`69db22d60f54fc6673908a78dc1a15e28f9aa602`, exact independent patches/binaries,
+raw fork samples/intervals, commands/exits, host observations and fresh test XML.
+Both comparisons match 39 harness files, 120 non-starter dependencies and ordered
+classpaths. Earlier evidence is retained unchanged, including the two corrected
+fixture setup errors before the intended baseline red run.
+
+Final restoration passes **42 benchmark-contract cases**, **38 Python checks**
+and **100 documentation cases**. All 310 starter classes and 24,224 shaded
+benchmark classes match the saved baseline byte-for-byte. Tracked rejected
+patches reproduce their saved candidate source. Final functional/documentation
+verification totals **740 cases** (567 starter, 72 mock, 100 documentation, one
+restored consumer); preliminary and repeated runs are not added. The initial
+documentation run's stale unchecked-7.3 assertion is retained, with its corrected
+100-case run recorded separately. Readiness still has active V35, `4.5.0-SNAPSHOT`,
+published/API baseline `4.4.2` and unselected release scope.
+
+The P7 bundle seals **316 files**; `SHA256SUMS` SHA-256 is
+`dfd7e7a7d990a1b28e4873873410204309f5b21b8726481cbef1031574aa6ced`.
+P2/P3/P4/P5/P6 inventories were reverified unchanged. `final/` records source,
+tests, artifact restoration and readiness; source copies precede this external
+integrity anchor to avoid a self-referential checksum. The final 100-case
+documentation rerun passes again and is not added to the 740-case total.
 
 ## Priority 8 - C005 - Construction, AOT and Runtime Lifecycle Cost
 

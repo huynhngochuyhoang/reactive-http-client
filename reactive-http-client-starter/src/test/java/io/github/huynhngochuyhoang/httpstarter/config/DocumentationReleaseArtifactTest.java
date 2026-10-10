@@ -260,11 +260,11 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 7 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 8 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [x] 3.3 Obtain explicit bounded implementation approval",
-                "### [ ] 7.3 Re-evaluate rolled-back value reuse separately",
+                "### [x] 7.3 Re-evaluate rolled-back value reuse separately",
                 "### [ ] 12.4 Verify publication or explicit no-release closure");
         assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v35/CHECKLIST.md)");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
@@ -313,6 +313,9 @@ class DocumentationReleaseArtifactTest {
                         "rolled back", "not a performance pass");
             } else if (id.equals("V34-C003")) {
                 assertThat(row).contains("**Status:** Resolved without production change", "(STATIC-PLANNING-PROJECTION.md)",
+                        "rolled back", "not a performance pass");
+            } else if (id.startsWith("V34-C004 ")) {
+                assertThat(row).contains("**Status:** Resolved without production change", "(OPTIONAL-PREPARATION.md)",
                         "rolled back", "not a performance pass");
             } else {
                 assertThat(row).contains("**Status:** unresolved/blocking")
@@ -492,6 +495,42 @@ class DocumentationReleaseArtifactTest {
         assertThat(patch).contains("ReactiveClientInvocationHandler.java", "interfaces.length == 1",
                 "java.lang.reflect.Proxy.isProxyClass", "concreteInterfaceLogAnnotationResolved");
         for (String script : List.of("investigate-v35-planning.py", "test_investigate_v35_planning.py")) {
+            assertThat(root.resolve("scripts").resolve(script)).exists();
+        }
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v35OptionalPreparationKeepsIndependentDecisionsAndAcquisitionEvidence() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String record = Files.readString(directory.resolve("OPTIONAL-PREPARATION.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "69db22d60f54fc6673908a78dc1a15e28f9aa602", "Plan frozen", "408 scored forks",
+                "34 rows per artifact", "three allocation flags", "zero scored retries",
+                "Resolved without production change", "not a performance pass", "not applied production code",
+                "never stacked", "Legacy late selection", "Shared Reactor scheduler access",
+                "Independent non-single-flight caller work can outlive close", "without MeterRegistry",
+                "832 -> 832 B/op", "whole-interface validator", "no 256-byte subtraction",
+                "39 harness files", "120 non-starter dependencies", "physically optional-absent consumer",
+                "567 starter cases across 24 classes", "72 mock cases", "42 benchmark-contract cases",
+                "target/release-evidence/v35/priority7/", "Only C005 remains open");
+        String priority = Files.readString(directory.resolve("CHECKLIST.md"))
+                .split("## Priority 7 - ", 2)[1].split("## Priority 8 - ", 2)[0];
+        assertThat(priority).contains("### [x] 7.1", "### [x] 7.2", "### [x] 7.3", "### [x] 7.4",
+                "(OPTIONAL-PREPARATION.md)").doesNotContain("[ ]");
+        String preparation = Files.readString(directory.resolve("c004-preparation-rejected.patch"));
+        assertThat(preparation.lines().filter(line -> line.startsWith("diff --git ")).toList()).hasSize(2);
+        assertThat(preparation).contains("LocalResponseCacheManager.java", "ReactiveClientInvocationHandler.java",
+                "createForSelectedClient", "responseCacheManager == null");
+        String reuse = Files.readString(directory.resolve("c004-reuse-rejected.patch"));
+        assertThat(reuse.lines().filter(line -> line.startsWith("diff --git ")).toList()).hasSize(1);
+        assertThat(reuse).contains("EffectiveCachePolicy.java", "METHOD_DISABLED_SELECTION", "DISABLED_DECISION");
+        for (String script : List.of("investigate-v35-optional.py", "test_investigate_v35_optional.py")) {
             assertThat(root.resolve("scripts").resolve(script)).exists();
         }
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);

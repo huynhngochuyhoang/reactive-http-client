@@ -11,12 +11,13 @@ as unresolved. [Priority 2](ALLOCATION-INVESTIGATION.md) now explains the measur
 allocation split without production changes. Priority 4 rejects C001's bounded
 candidate with evidence-backed no change. Priority 5 likewise investigates body
 and reporting-state ownership and rolls back the null-holder candidate. Priority 6
-audits static planning/dynamic projection and rolls back interface-annotation reuse;
-three implementation workstreams remain open. Priority 3.3 approves the concrete bounded plan below, not a
+audits static planning/dynamic projection and rolls back interface-annotation reuse.
+Priority 7 inventories optional acquisition and independently rejects preparation
+and disabled-decision reuse. Only C005 remains open. Priority 3.3 approves the concrete bounded plan below, not a
 delivered fix. V34's limited approval did not carry into V35.
 
 Approved production boundaries and no-change routes are specified in the dated
-decision below; no V35 production patch is delivered. The allocation, C001, C002 and C003 rows
+decision below; no V35 production patch is delivered. The allocation, C001, C002, C003 and both C004 rows
 have dated no-change evidence; later execution must attach
 evidence and a disposition to the remaining rows, preserving
 contrary results. Fixed/verified and substantiated no-change outcomes require the
@@ -189,7 +190,8 @@ requires new bounded scope, not automatic refinement of this rejected candidate.
 ## V34-C004 optional preparation
 
 **Owner:** handler/factory maintainer; execution Priority 7.1-7.2.
-**Status:** unresolved/blocking; acquisition/lifetime evidence still required.
+**Status:** Resolved without production change, 2026-10-10; preparation candidate
+rolled back, not a performance pass.
 **Profiles:** V34-P01/P02/P04/P05/P07, with P08 selected-cache/work sentinels.
 
 **Current evidence:** the structural witness sees no factory-selected cache manager
@@ -197,6 +199,11 @@ without a policy, but does see a separately built cache-identity WebClient. Lega
 public construction can retain a lazy manager. A dormant scheduler handle is not
 evidence of a task/thread leak. [V34 inactive-resource review](../v34/INACTIVE-LIFECYCLE.md)
 distinguishes starter-owned and application-owned resources.
+[Priority 7](OPTIONAL-PREPARATION.md) now separates view construction, shared
+scheduler access, lazy manager state and actual cache/meter/refresh acquisition.
+The independent preparation artifact passes focused ownership controls and the
+physically optional-absent consumer, but has three reverse allocation flags and
+no repeatable attributed cold/first-use benefit in the 408-fork comparison.
 **Reproduction:** `DefaultPathCostOwnershipTest.inactivePolicyChecksScanTheWholeInterfaceButNotEverySubscription`,
 `ResourceOwnershipReviewTest` and public/factory/auto-configured path controls;
 observe creation, lazy use, failed construction, close and same-tag recreation.
@@ -208,19 +215,30 @@ builders/executors. No registry lookup merely to populate diagnostics.
 **Acceptance:** same effective behavior and cleanup with lazy/non-acquisition
 witnesses, selected-feature parity and bounded cost/retention benefit or a
 substantiated no-change disposition. A disabled flag alone is insufficient.
-**Open questions:** actual allocation/retention of identity-client and scheduler
-holders, public-constructor differences, and safe reuse versus delayed acquisition.
+The no-change route is supported by the owner inventory, selected probe/lifecycle
+regressions and rejected view/scheduler experiment. Legacy late selection requires
+its retained manager/view; no removal or ownership transfer was approved.
+**Open questions:** isolated retained bytes and scheduler-internal thread allocation
+are not measured; no heap/RSS or universal zero-cost claim is made. View/scheduler
+elision remains technically possible but requires new bounded benefit evidence.
 
 ## V34-C004 rolled-back value reuse
 
 **Owner:** effective-policy maintainer; execution Priority 7.3.
-**Status:** unresolved/blocking; V34 experiment rolled back, not approved for reuse.
+**Status:** Resolved without production change, 2026-10-10; independently approved
+V35 experiment rolled back, not a performance pass.
 **Profiles:** V34-P01/P02/P04/P05; P08 selection-mutation sentinels.
 
 **Current evidence:** [V34 experiment](../v34/HARDENING-EVIDENCE.md) failed its
 repeatable-benefit gate; no production change remains. Every invocation still
 runs [CacheWorkPolicy](../../reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/CacheWorkPolicy.java)
 whole-interface mutation validation, including excluded sibling methods.
+[Priority 7](OPTIONAL-PREPARATION.md) executes newly frozen independent reuse
+against the unchanged baseline in both orders. No review flags occur, but low-mode
+baseline and candidate publisher bytes match; high-mode-only apparent reductions
+do not meet the benefit gate. Selected/invalid decisions remain independent and
+all mutation checks are retained. The new evidence, not V34's rollback alone,
+supports this no-change disposition.
 **Reproduction:** `DefaultPathCostOwnershipTest.inactivePolicyChecksScanTheWholeInterfaceButNotEverySubscription`
 counts two decisions per invocation of its two-method interface, not per repeat
 subscription. `CacheWorkPolicyEnforcementTest` changes sibling selection and
@@ -234,10 +252,12 @@ invocations, no selected infrastructure when policy is absent.
 **Acceptance:** explicit Priority 3.3 approval and new stable matched benefit,
 with full mutation rejection, or a reasoned no-change conclusion backed by new
 investigation. V34's failed attempt alone resolves neither C004 row.
+The route is now met by P2 attribution, independent P7 fork evidence, distinct
+source/selection controls and the preserved whole-interface validation contract.
 **Open questions:** P2 establishes that disabled Selection materialization is
-compiler-dependent; whether value reuse has stable benefit across those modes
-remains unproven. What bounded alternative can be justified without changing
-validation semantics or restoring V34's failed experiment by assumption?
+compiler-dependent; a fresh candidate compiler intervention was not selected.
+No mode subtraction, threshold waiver or universal causality is inferred. Another
+optimization requires new bounded approval, not automatic refinement.
 
 ## V34-C005
 
@@ -272,6 +292,6 @@ Fresh P1 tests and exactly reused suites are distinguished in
 retain in each later workstream, not a claim that every named suite was freshly
 run in P1. Reproduction commands for ordinary controls and historical artifacts
 are linked there. New profiling/scoring needs the Priority 2 frozen experiment;
-new production edits need Priority 3.3. The allocation-mechanism, C001 and C002
-findings have their P2/P4/P5 no-change dispositions; the inventory itself closes
-no other finding.
+new production edits need Priority 3.3. The allocation-mechanism, C001, C002,
+C003 and both C004 findings have their P2/P4/P5/P6/P7 no-change dispositions;
+C005 remains unresolved. The inventory itself closes no finding.
