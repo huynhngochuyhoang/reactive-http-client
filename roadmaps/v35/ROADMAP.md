@@ -60,8 +60,10 @@ remains. [Priority 5](BODY-REPORTING-OWNERSHIP.md) audits body/reporting ownersh
 and rolls back the null-holder candidate after its matched cost gate fails.
 [Priority 6](STATIC-PLANNING-PROJECTION.md) reviews static/dynamic planning ownership
 and rolls back interface-annotation reuse after matched scoring finds no repeatable
-attributed benefit. Three implementation workstreams remain open; no production
-change is delivered.
+attributed benefit. [Priority 7](OPTIONAL-PREPARATION.md) inventories optional
+preparation/acquisition and independently rolls back view/scheduler preparation
+and disabled-decision reuse after their benefit gates fail. Only C005 remains
+open; no production change is delivered.
 [Priority 3's specifications](FIX-DECISION.md) define local candidate boundaries,
 no-change routes and acceptance/rollback for all seven rows. The maintainer approved
 this bounded plan in Priority 3.3; execution and release selection remain separate.

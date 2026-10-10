@@ -36,8 +36,10 @@ The [body/reporting ownership review](v35/BODY-REPORTING-OWNERSHIP.md) likewise
 rejects its null-holder candidate after matched scoring and retains the ownership
 regressions. The [static planning/projection review](v35/STATIC-PLANNING-PROJECTION.md)
 rejects interface-annotation reuse after testing metadata/fallback semantics and
-matched cost in both orders. Three implementation workstreams remain open; no
-production change is delivered.
+matched cost in both orders. The [optional-preparation review](v35/OPTIONAL-PREPARATION.md)
+separates dormant holders from acquired resources and independently rejects both
+C004 experiments after matched scoring and ownership/absence controls. Only C005
+remains open; no production change is delivered.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

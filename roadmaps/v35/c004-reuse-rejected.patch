@@ -1,0 +1,14 @@
+diff --git a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/EffectiveCachePolicy.java b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/EffectiveCachePolicy.java
+--- a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/EffectiveCachePolicy.java
++++ b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/EffectiveCachePolicy.java
+@@ -18,0 +19,4 @@
++    private static final Selection DISABLED_SELECTION = new Selection(false, Source.DISABLED, null, null);
++    private static final Selection METHOD_DISABLED_SELECTION = new Selection(false, Source.METHOD_DISABLED, null, null);
++    private static final Decision DISABLED_DECISION = new Decision(Eligibility.DISABLED, DISABLED_SELECTION, null);
++    private static final Decision METHOD_DISABLED_DECISION = new Decision(Eligibility.DISABLED, METHOD_DISABLED_SELECTION, null);
+@@ -104 +108 @@
+-            return new Decision(Eligibility.DISABLED, selection, null);
++            return selection.source() == Source.METHOD_DISABLED ? METHOD_DISABLED_DECISION : DISABLED_DECISION;
+@@ -416,0 +421,2 @@
++            if (source == Source.DISABLED) return DISABLED_SELECTION;
++            if (source == Source.METHOD_DISABLED) return METHOD_DISABLED_SELECTION;

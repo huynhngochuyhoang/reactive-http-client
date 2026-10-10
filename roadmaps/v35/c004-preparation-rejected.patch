@@ -1,0 +1,30 @@
+diff --git a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/LocalResponseCacheManager.java b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/LocalResponseCacheManager.java
+--- a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/LocalResponseCacheManager.java
++++ b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/LocalResponseCacheManager.java
+@@ -139 +139,4 @@
+-        return createForClient(clientInterface, clientName, metadataCache, clientConfig,
++        if (!hasSelectedCachePolicy(clientInterface, metadataCache, clientConfig)) {
++            return null;
++        }
++        return createForSelectedClient(clientInterface, clientName, metadataCache, clientConfig,
+@@ -155,0 +159,14 @@
++        return createForSelectedClient(clientInterface, clientName, metadataCache, clientConfig,
++                classLoader, observability, meterRegistry, ticker, refreshScheduler);
++    }
++
++    private static LocalResponseCacheManager createForSelectedClient(
++            Class<?> clientInterface,
++            String clientName,
++            MethodMetadataCache metadataCache,
++            ReactiveHttpClientProperties.ClientConfig clientConfig,
++            ClassLoader classLoader,
++            ReactiveHttpClientProperties.ObservabilityConfig observability,
++            Object meterRegistry,
++            LongSupplier ticker,
++            Scheduler refreshScheduler) {
+diff --git a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+--- a/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
++++ b/reactive-http-client-starter/src/main/java/io/github/huynhngochuyhoang/httpstarter/core/ReactiveClientInvocationHandler.java
+@@ -289 +289 @@
+-        this.cacheIdentityWebClient = webClient.mutate()
++        this.cacheIdentityWebClient = responseCacheManager == null ? Objects.requireNonNull(webClient) : webClient.mutate()
