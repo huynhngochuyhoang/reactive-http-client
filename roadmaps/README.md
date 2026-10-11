@@ -41,7 +41,11 @@ separates dormant holders from acquired resources and independently rejects both
 C004 experiments after matched scoring and ownership/absence controls. The
 [construction/lifecycle review](v35/CONSTRUCTION-LIFECYCLE.md) attributes cold work
 and verifies C005's runtime/AOT ownership without a patch. All seven findings have
-no-change dispositions; combined verification and release gates remain open.
+no-change dispositions. [Cross-path verification](v35/VERIFICATION.md) records fresh
+Boot, ownership and native evidence, with the historical evidence loss explicitly
+separated. [Final matched evidence](v35/FINAL-ACCEPTANCE.md) regenerates API and
+cost verification; the approved diagnostic follow-up attributes AUTO_NO_REGISTRY,
+but AUTO_REGISTRY and HOOK keep cost acceptance open. Release gates remain open.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

@@ -52,6 +52,12 @@ decision can silently turn an unresolved finding into a completed investigation.
 
 ## Evidence Rules
 
+The 2026-10-10 root-clean incident deleted local ignored evidence. The maintainer
+requested regeneration on 2026-10-11; see [recovery boundary](VERIFICATION.md).
+Historical hashes and performance samples cannot be recreated as the same runs.
+Fresh Priority 9 verification and Priority 10 evidence (cost acceptance still pending) must
+stand on new preserved artifacts, with external copies outside Maven build output.
+
 - Record exact commands/exits, actual totals, toolchain/settings, reachable source,
   clean/dirty state, resolved dependencies/classpaths and artifact/report hashes
   under `target/release-evidence/v35/priority<N>/`. Preserve failed/partial attempts.
@@ -103,6 +109,7 @@ Linked records exist; other names are suggestions, not implied completed reports
 | [FIX-DECISION.md](FIX-DECISION.md) | Approved seven-row plan, acceptance/rollback and scope exclusions |
 | `FIX-EVIDENCE.md` | Per-finding implementation/no-change evidence, ownership and costs |
 | `VERIFICATION.md` | Mock/consumer/Boot/AOT/native/API and final matched evidence |
+| [FINAL-ACCEPTANCE.md](FINAL-ACCEPTANCE.md) | Frozen final matched schedule, fresh API/cost results and acceptance limits |
 | `MAINTAINER-GUIDANCE.md` | Retained costs, reproducible investigations and operations limits |
 | `RELEASE-DECISION.md` | Exact scope, release/no-release choice, immutable evidence and closure |
 
@@ -656,76 +663,140 @@ The final 101-case documentation rerun passes again, not added to the 660 total.
 
 ## Priority 9 - Cross-Path, Optional-Integration and Lifecycle Verification
 
-### [ ] 9.1 Run final public, factory and mock regressions
+### [x] 9.1 Run final public, factory and mock regressions
 
-- [ ] Run affected contract/ownership tests and complete ordinary module suites
+- [x] Run affected contract/ownership tests and complete ordinary module suites
       against final combined changes; retain exact totals and failed attempts.
-- [ ] Cover body/context/terminal behavior, late extensions, mutable selection,
+- [x] Cover body/context/terminal behavior, late extensions, mutable selection,
       cache/auth/retry/redirect/deadline composition and caller/load distinctions.
-- [ ] Keep ordinary tests GC-independent; run controlled reachability only for
+- [x] Keep ordinary tests GC-independent; run controlled reachability only for
       actual collection claims and do not relabel structural tests as collection.
 
-### [ ] 9.2 Verify assembled consumers and optional boundaries
+### [x] 9.2 Verify assembled consumers and optional boundaries
 
-- [ ] Run artifact-based consumers with genuine Boot 4.0.0 and 4.1.0 parents,
+- [x] Run artifact-based consumers with genuine Boot 4.0.0 and 4.1.0 parents,
       matching runtime stacks; no reactor output masquerading as assembled JARs.
-- [ ] Exercise physical optional absence and selected auth/resilience/cache/metrics
+- [x] Exercise physical optional absence and selected auth/resilience/cache/metrics
       controls. Count all server dispatches and assert actual HTTP methods/results.
-- [ ] Use real API names/reporting paths for metered cases and distinguish caller,
+- [x] Use real API names/reporting paths for metered cases and distinguish caller,
       attempt, transport, coalesced and hidden-refresh evidence.
 
-### [ ] 9.3 Verify affected AOT and native execution
+### [x] 9.3 Verify affected AOT and native execution
 
-- [ ] Run final runtime/AOT selection, hints and JVM smoke on applicable Boot rows.
+- [x] Run final runtime/AOT selection, hints and JVM smoke on applicable Boot rows.
       Track overlay generation/reproduction commands; ignored files alone are not enough.
-- [ ] Compile and execute the native smoke from clean reachable final source,
+- [x] Compile and execute the native smoke from clean reachable final source,
       recording toolchain, source/tree, limits, logs, exits and binary hash.
-- [ ] Reconcile exact unchanged-input reuse explicitly; changed production/fixtures
+- [x] Reconcile exact unchanged-input reuse explicitly; changed production/fixtures
       require affected reruns. JVM/AOT success and a failed compile are not native passes.
 
-### [ ] 9.4 Recheck final resource and shutdown ownership
+### [x] 9.4 Recheck final resource and shutdown ownership
 
-- [ ] Verify failed creation, final cleanup, context/same-tag recreation and
+- [x] Verify failed creation, final cleanup, context/same-tag recreation and
       diagnostics without lazy-resource creation, including selected work limits.
-- [ ] Preserve application-owned connectors/registries/SDKs/shared schedulers.
+- [x] Preserve application-owned connectors/registries/SDKs/shared schedulers.
       Distinguish independent caller-owned loads from manager-owned shared/refresh work.
-- [ ] Record cancellation/discard acknowledgements, bounded retention and post-close
+- [x] Record cancellation/discard acknowledgements, bounded retention and post-close
       behavior without assuming removed meters still expose shutdown counter deltas.
+
+Priority 9 closure (2026-10-11): [verification and recovery record](VERIFICATION.md).
+Fresh clean-source native compilation/execution, full Boot 4.0.0/4.1.0 suites
+(2,229 starter + 80 helper + 62 OTel + 75 benchmark-contract = 2,446 per row),
+29 selected-consumer + one physical-absence case per row, six smoke fixture cases
+and ordinary/AOT-enabled execution per row all pass. Controlled cache/handoff/
+benchmark reachability passes 16/5/2 separately; 50 Python tooling tests pass.
+The final documentation guard passes 102 cases per Boot row, overlapping the
+full-suite documentation cases rather than increasing those full-suite totals.
+No production changes or prior scores are reused. Deleted historical raw evidence
+remains unavailable; final matched cost/API acceptance and release remain open.
+Fresh bundles are preserved outside build output in `verification-evidence/`
+as well as `target/release-evidence/v35/priority9/regenerated-20261011/`.
+The original conventional directory contains interrupted-attempt remnants;
+they are preserved separately and excluded from accepted evidence.
+
+The regenerated bundle seals **1,811 files**; `SHA256SUMS` SHA-256 is
+`e1f1ee5bb1004963a1c2aca7a4faa28da67193b8101af9ab522e80b0340599c0`.
+Archive `verification-evidence/v35-priority9-20261011.tar.gz` SHA-256 is
+`ca124e7ee2c18e999ba5c089b8cc2a488d71997dca49fc93e62fc81e42e0b8ba`.
+Every copied file and archived member was verified against the manifest. Source
+copies precede this external checksum anchor to avoid self-reference; no tested
+production or fixture input changed during closure.
 
 ## Priority 10 - Final Matched Cost and Compatibility Acceptance
 
-### [ ] 10.1 Run final matched workloads and confirmation
+### [x] 10.1 Run final matched workloads and confirmation
 
-- [ ] Use all 60 matched primary rows from V34 plus justified additions frozen
+- [x] Use all 60 matched primary rows from V34 plus justified additions frozen
       before scoring. Keep source/JAR hashes, isolated Central `4.4.2` provenance,
       identical harness/non-starter dependencies and untimed semantic witnesses.
-- [ ] Retain all samples/intervals and confirm every flagged row plus the historical
+- [x] Retain all samples/intervals and confirm every flagged row plus the historical
       enabled-only row in reversed order, with Priority 2 same-JAR controls as needed.
-- [ ] Apply the frozen >20% latency and >max(32 B/op, 5%) allocation review rules;
+- [x] Apply the frozen >20% latency and >max(32 B/op, 5%) allocation review rules;
       a zero command exit or complete row inventory is not performance acceptance.
-- [ ] Do not run competing builds/profilers alongside scored runs. State host/JVM
+- [x] Do not run competing builds/profilers alongside scored runs. State host/JVM
       limits and missing evidence; no best-fork selection or diagnostic-score substitution.
 
 ### [ ] 10.2 Accept individual fixes and the final combination
 
-- [ ] Require repeatable attributed benefit under equivalent behavior for each
+- [x] Require repeatable attributed benefit under equivalent behavior for each
       optimization, or reproduced correctness benefit with honest approved cost.
-- [ ] Roll back failed candidates independently and reverify the combined final
+- [x] Roll back failed candidates independently and reverify the combined final
       artifact and no-change controls; one gain cannot hide another unaccepted regression.
-- [ ] Keep unexplained allocation or required acceptance blocking. Explicit scope
+- [x] Keep unexplained allocation or required acceptance blocking. Explicit scope
       reduction cannot become a blanket performance all-clear or public speedup.
-- [ ] Follow existing report-promotion rules for any public number; no quantitative
+- [x] Follow existing report-promotion rules for any public number; no quantitative
       claim is required and allocation reduction is not a deployment-memory claim.
+- [x] Attribute the fresh AUTO_NO_REGISTRY GET publisher allocation flag with
+      ordinary high/low compiler traces and one-factor controls on both artifacts.
+- [ ] Resolve or explicitly disposition the fresh AUTO_REGISTRY and HOOK GET
+      publisher allocation flags before accepting the final combination.
 
-### [ ] 10.3 Verify compatibility, packaging and evidence integrity
+No retained optimization requires a benefit claim: all candidates remain rolled
+back. Their historical scores are not recreated; fresh class identity, untimed
+controls and Priority 9 reuse verify the final no-change artifact. The maintainer
+approved the bounded 36-fork follow-up on 2026-10-11; all forks completed. One of
+three primary allocation flags is attributed; AUTO_REGISTRY and HOOK remain
+open because ordinary traces did not reproduce their high mode. Forced
+non-inlining reproduces the increment but does not satisfy the frozen ordinary-
+trace gate. No extra runs, relaxed acceptance or scope reduction is authorized.
 
-- [ ] Run strict root and independent starter source/binary API comparisons against
+### [x] 10.3 Verify compatibility, packaging and evidence integrity
+
+- [x] Run strict root and independent starter source/binary API comparisons against
       Central `4.4.2`, with separate repositories, reports, provenance and exits.
       Run the second comparison even if the first fails; preserve both outcomes.
-- [ ] Reconcile behavior/default/extension/ownership compatibility beyond API tools,
+- [x] Reconcile behavior/default/extension/ownership compatibility beyond API tools,
       supported Boot/consumer/AOT/native rows, metadata/docs and artifact packaging.
-- [ ] Seal commands, actual totals, dependencies, samples/reports, artifact hashes
+- [x] Seal commands, actual totals, dependencies, samples/reports, artifact hashes
       and final source. Later input changes require affected reruns or precise reuse limits.
+
+Priority 10 evidence recorded 2026-10-11 in [FINAL-ACCEPTANCE.md](FINAL-ACCEPTANCE.md).
+10.1 and 10.3 are complete; **10.2 remains pending**, not a performance pass.
+Fresh primary scoring covers 60 rows per artifact, with zero latency and three
+allocation flags; four reverse-confirmation rows have zero flags. The original
+302-fork schedule and approved 36-fork follow-up total **338 forks**. Both benchmark
+correctness suites pass 75 cases; strict root/independent starter API, negative
+fixtures, Central provenance and both Boot packaging rows pass. Exact root API
+JARs were recaptured in a documented strict rerun after scoring, not inferred
+from the later Boot packaging outputs. Final verification passes 56 Python cases
+and 103 documentation cases per Boot row; overlapping runs are not added.
+
+All 1,811 Priority 9 manifest entries and its native binary were rehashed, with
+production/dependency/fixture/runner inputs unchanged. Its full suites, assembled
+consumers, AOT/native and controlled reachability are reused, not fresh P10 runs.
+Deleted historical scores remain unavailable. Local evidence is retained outside
+build output in `verification-evidence/v35-priority10/` and its dated archive,
+plus `target/release-evidence/v35/priority10/`. No production change, public
+performance claim, version change or release decision is made.
+
+The Priority 10 bundle seals **931 files**; `SHA256SUMS` SHA-256 is
+`62e4375ebb17f9d4591449b86b67f16795ab126d4419c24616af37435bb33ba4`.
+Archive `verification-evidence/v35-priority10-20261011.tar.gz` SHA-256 is
+`ee8f62205902af433aeb3da5b8d08203c22e0026af2664c9c6b89150a8e109e0`.
+Every copied file and archived member was verified against the manifest. Source
+copies precede this external checksum anchor to avoid self-reference. The seal
+preserves the original frozen runner/plan, later artifact-retention correction,
+approved follow-up and pending acceptance; it is not a performance or release GO.
 
 ## Priority 11 - Complete Findings and Maintainer Guidance
 

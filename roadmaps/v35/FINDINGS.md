@@ -15,7 +15,7 @@ audits static planning/dynamic projection and rolls back interface-annotation re
 Priority 7 inventories optional acquisition and independently rejects preparation
 and disabled-decision reuse. Priority 8 attributes cold/runtime work and verifies
 C005 lifecycle/selection ownership without a production patch. All seven rows now
-have no-change dispositions; final combined verification remains open. Priority 3.3 approves the concrete bounded plan below, not a
+have no-change dispositions; final cost acceptance remains open. Priority 3.3 approves the concrete bounded plan below, not a
 delivered fix. V34's limited approval did not carry into V35.
 
 Approved production boundaries and no-change routes are specified in the dated
@@ -25,6 +25,17 @@ contrary results. Fixed/verified and substantiated no-change outcomes require th
 checklist's acceptance rules; unresolved rows block complete-scope closure unless
 the maintainer explicitly reduces scope. No new API, dependency, default, feature
 switch, telemetry export or broad framework rewrite is selected.
+
+[Priority 9](VERIFICATION.md) regenerates cross-path, ownership, Boot and native
+verification. The 2026-10-10 incident deleted historical local raw evidence;
+the records below remain historical conclusions, not freshly rehashed samples.
+[Priority 10](FINAL-ACCEPTANCE.md) now records fresh cost/API evidence, not recovered
+historical samples. Its approved 36-fork follow-up attributes AUTO_NO_REGISTRY's
+primary allocation flag; AUTO_REGISTRY and HOOK remain unresolved because their
+ordinary traces did not reproduce the high mode. A clear reverse confirmation
+and forced non-inlining controls do not close that missing evidence. No historical
+finding is silently relabeled or removed; this additional final-combination gate
+remains open for Priority 11 reconciliation.
 
 ## Priority 3 Specifications
 
