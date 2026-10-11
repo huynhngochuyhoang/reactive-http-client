@@ -67,7 +67,10 @@ and disabled-decision reuse after their benefit gates fail.
 lifecycle ownership and runtime/AOT parity without changing production. All seven
 findings now have no-change dispositions. [Priority 9](VERIFICATION.md) regenerates
 cross-path, ownership, Boot and native evidence after the local evidence-loss
-incident; final matched cost/API acceptance and release gates remain open.
+incident. [Priority 10](FINAL-ACCEPTANCE.md) regenerates final matched cost/API
+evidence; AUTO_REGISTRY and HOOK allocation flags keep cost acceptance open after
+the approved follow-up attributes AUTO_NO_REGISTRY without a production change.
+Release gates remain open.
 [Priority 3's specifications](FIX-DECISION.md) define local candidate boundaries,
 no-change routes and acceptance/rollback for all seven rows. The maintainer approved
 this bounded plan in Priority 3.3; execution and release selection remain separate.

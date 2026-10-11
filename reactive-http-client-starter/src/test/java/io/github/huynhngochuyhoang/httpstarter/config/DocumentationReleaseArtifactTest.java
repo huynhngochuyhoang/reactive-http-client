@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 10 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 11 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [x] 3.3 Obtain explicit bounded implementation approval",
@@ -588,12 +588,44 @@ class DocumentationReleaseArtifactTest {
         String priority = checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0];
         assertThat(priority).contains("### [x] 9.1", "### [x] 9.2", "### [x] 9.3", "### [x] 9.4",
                 "(VERIFICATION.md)").doesNotContain("[ ]");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 10 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 11 - "))).doesNotContain("[x]");
         for (String script : List.of("verify-v35-parity.py", "test_verify_v35_parity.py",
                 "verify-v33-parity.py", "verify-v33-native.py")) {
             assertThat(root.resolve("scripts").resolve(script)).exists();
         }
         assertThat(Files.readString(root.resolve(".gitignore"))).contains("/verification-evidence/");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v35FinalAcceptancePreservesFrozenReviewAndReleaseBoundaries() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String record = Files.readString(directory.resolve("FINAL-ACCEPTANCE.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "beb8a237215529c9c8c7ddc285295c9564e4bce0", "60 primary rows",
+                "samples remain unavailable", "Central `4.4.2`", "current `4.5.0-SNAPSHOT`",
+                "Oracle Java 21.0.8", "46-fork schedule", "**>20% latency**",
+                "**>max(32 B/op, 5%) allocation**", "every primary flag",
+                "historical enabled-only GET publisher", "never reactor-root `clean`",
+                "Run the starter lane even if root fails", "No production change survived",
+                "not another native run", "Priority 12 still requires a maintainer decision",
+                "explicitly approved", "36 forks", "Diagnostic scores never replace",
+                "preserve absent modes as missing evidence", "338 forks",
+                "AUTO_REGISTRY and HOOK remain unresolved/blocking for 10.2");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(checklist).contains("(FINAL-ACCEPTANCE.md)");
+        String priority = checklist.split("## Priority 10 - ", 2)[1].split("## Priority 11 - ", 2)[0];
+        assertThat(priority).contains("### [x] 10.1", "### [ ] 10.2", "### [x] 10.3");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 11 - "))).doesNotContain("[x]");
+        for (String script : List.of("verify-v35-acceptance.py", "test_verify_v35_acceptance.py",
+                "investigate-v35-final-profiles.py")) {
+            assertThat(root.resolve("scripts").resolve(script)).exists();
+        }
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
         while (links.find()) {
             String target = links.group(1);
