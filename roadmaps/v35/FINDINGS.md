@@ -2,7 +2,18 @@
 
 > **Recorded:** 2026-10-04
 > **Implementation authorization:** seven-row bounded plan approved in Priority 3.3; no production change delivered
-> **Release scope:** unselected
+> **Release scope:** no release; V35 closed
+
+## Priority 12 Final Disposition
+
+On 2026-10-11 the maintainer approved [reduced-scope review-only/no-release
+closure](RELEASE-DECISION.md). The seven original no-change dispositions below
+remain evidence-backed investigations, not delivered fixes. AUTO_REGISTRY and
+HOOK remain unresolved for full-scope cost acceptance and are explicitly excluded
+from closure, **not passed**. Owner: performance maintainer; reopening requires
+a new bounded approval and ordinary high-mode compiler/class-load evidence.
+No new experiment or release is authorized. P1-P11 statements below are dated
+history; their then-pending decisions are superseded only by this scope decision.
 
 This is the seven-workstream inventory required by [Priority 1](CHECKLIST.md),
 using the [reachable baseline](BASELINE-SCOPE.md). Owners below are maintainer

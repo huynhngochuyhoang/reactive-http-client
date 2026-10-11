@@ -201,10 +201,12 @@ records its failed benefit gate and rollback, with behavioral regressions retain
 unresolved allocation finding, not a performance pass. Signing/publication gates
 are N/A for this review-only result. Runtime defaults and release coordinates are
 unchanged; no next release is selected.
-[V35's execution checklist](../roadmaps/v35/CHECKLIST.md) adopts investigation of
-all V34 deferrals and bounded fix design. It approves no production edit, default
-change or release: concrete implementation requires Priority 3.3 approval and
-release/no-release selection remains in Priority 12. V34's history stays closed.
+[V35's execution checklist](../roadmaps/v35/CHECKLIST.md) completes the approved
+reduced-scope review without a release. Its [closure decision](../roadmaps/v35/RELEASE-DECISION.md)
+retains all seven no-change outcomes and explicitly excludes AUTO_REGISTRY and
+HOOK allocation flags from closure, not from the unresolved evidence. No production
+optimization, default change or performance all-clear is delivered. V34's history
+stays closed; signing/publication gates are N/A for V35's no-release branch.
 [V32 publication and closure](../roadmaps/v32/CLOSURE-EVIDENCE.md#post-publication-closure)
 records the release tag, successful signing/staging/packaging/deployment workflow,
 13 verified signed Central artifacts and published-consumer results.
@@ -1147,12 +1149,12 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V32 is published and archived at `4.4.1`; V33 is published and archived at `4.4.2`.
-The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=v35` and
-`plannedFinalVersion=null`; V35's investigation is active, while implementation
-approval and release scope remain unselected. V34 remains closed review-only
-with no production improvement retained. Generated pending manual commands do
-not reopen V34 or select V35's release. Readiness follows checklist lifecycle,
-including a final-version cut, until verified roadmap closure.
+The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=null` and
+`plannedFinalVersion=null`; V34 and V35 are closed review-only with no production
+improvement retained. V35 has an explicitly approved reduced scope, not full-scope
+performance acceptance. Future scope and release lane remain unselected. Generated
+pending manual commands do not reopen V34/V35 or select a release. Readiness
+follows checklist lifecycle, including a final-version cut, until verified roadmap closure.
 V33 remained active through the release cut until verified publication and
 checklist closure; a version suffix
 does not decide roadmap lifecycle. The
