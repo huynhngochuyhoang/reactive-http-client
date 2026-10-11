@@ -110,7 +110,7 @@ Linked records exist; other names are suggestions, not implied completed reports
 | `FIX-EVIDENCE.md` | Per-finding implementation/no-change evidence, ownership and costs |
 | `VERIFICATION.md` | Mock/consumer/Boot/AOT/native/API and final matched evidence |
 | [FINAL-ACCEPTANCE.md](FINAL-ACCEPTANCE.md) | Frozen final matched schedule, fresh API/cost results and acceptance limits |
-| `MAINTAINER-GUIDANCE.md` | Retained costs, reproducible investigations and operations limits |
+| [MAINTAINER-GUIDANCE.md](MAINTAINER-GUIDANCE.md) | Reconciled findings, retained costs, reproducible investigations and operations limits |
 | `RELEASE-DECISION.md` | Exact scope, release/no-release choice, immutable evidence and closure |
 
 ## Priority 1 - Post-V34 Baseline and Complete Deferred-Scope Integrity
@@ -800,32 +800,68 @@ approved follow-up and pending acceptance; it is not a performance or release GO
 
 ## Priority 11 - Complete Findings and Maintainer Guidance
 
-### [ ] 11.1 Reconcile every finding against final evidence
+### [x] 11.1 Reconcile every finding against final evidence
 
-- [ ] Reconcile all seven ledger rows to patches or evidence-backed no-change
+- [x] Reconcile all seven ledger rows to patches or evidence-backed no-change
       conclusions, preserving owners, controls, costs and limitations.
-- [ ] Identify unresolved/blocking work and obtain explicit scope reduction if
+- [x] Identify unresolved/blocking work and obtain explicit scope reduction if
       proposed. Repeated deferral is not resolution and must not be marked fixed.
-- [ ] Separate validated new explanations from V34's historical observations;
+- [x] Separate validated new explanations from V34's historical observations;
       do not rewrite failed experiments or unaccepted measurements into past passes.
 
-### [ ] 11.2 Document retained semantics and reproducible investigation
+### [x] 11.2 Document retained semantics and reproducible investigation
 
-- [ ] Update relevant performance/customizer/context/lifecycle/operations guidance
+- [x] Update relevant performance/customizer/context/lifecycle/operations guidance
       with actual delivered behavior, intentional costs and supported alternatives.
-- [ ] Publish tracked reproduction commands and bounded diagnostic methods; separate
+- [x] Publish tracked reproduction commands and bounded diagnostic methods; separate
       profiling overhead, allocation, retention/direct memory and RSS.
-- [ ] Keep capture synthetic and sanitized; no production payload/identity/key
+- [x] Keep capture synthetic and sanitized; no production payload/identity/key
       collection, automatic mesh diagnosis or snapshot-upgrade remedy is implied.
 
-### [ ] 11.3 Verify guidance and remaining limits
+### [x] 11.3 Verify guidance and remaining limits
 
-- [ ] Verify examples, local links, current configuration/metadata, version state
+- [x] Verify examples, local links, current configuration/metadata, version state
       and generated readiness using actual test totals and source applicability.
-- [ ] Distinguish candidate behavior from published `4.4.2` and preserve V1-V34
+- [x] Distinguish candidate behavior from published `4.4.2` and preserve V1-V34
       history; no new feature/default or universal zero-overhead promise.
-- [ ] Record owners, workarounds, reopening triggers and explicit missing evidence
+- [x] Record owners, workarounds, reopening triggers and explicit missing evidence
       for any reduced scope before requesting the Priority 12 decision.
+
+Completed 2026-10-11: [maintainer guidance](MAINTAINER-GUIDANCE.md) and the dated
+[ledger reconciliation](FINDINGS.md). Documentation proceeds at the maintainer's
+request while **10.2 remains pending**; this dependency exception does not clear
+AUTO_REGISTRY or HOOK. All seven original no-change dispositions retain owners,
+controls, costs, supported alternatives and reopening triggers. No scope reduction
+is proposed or approved (approval N/A), and no production optimization, version
+change or release is selected. V1-V34 history and the P9/P10 records are unchanged.
+
+Fresh final verification passes **273 starter cases across ten classes per Boot
+row** (4.0.0 and 4.1.0), including 104 documentation and four public-example cases,
+plus **56 Python checks**. Metadata/configuration, links/anchors, both Bash-block
+syntax checks and generated readiness pass; explicit GC is disabled. The initial
+three documentation failures and the corrected run are preserved. Overlapping
+reruns are not added to distinct totals.
+
+P9/P10 reuse verifies 1,811/931 manifest entries, both archive hashes, unchanged
+production/dependency/fixture/V33-runner inputs and 39 harness/POM hashes. The V35
+parity runner matches its sealed P9 copy: it was introduced during that execution,
+not present in its starting commit. The initial audit comparison and its corrected
+recorded-runner comparison are both retained.
+Saved-score review preserves all three primary flags; the two unclosed profiles
+remain named. No new score, native, API or full-reactor run is claimed. Historical
+lost raw evidence remains unavailable. Durable evidence is retained outside Maven
+output at `verification-evidence/v35-priority11/` and its dated archive, plus the
+conventional `target/release-evidence/v35/priority11/` copy. Readiness stays active
+V35, `4.5.0-SNAPSHOT`, baseline `4.4.2`, planned final version null and release
+lane unselected. Priority 12 still requires explicit scope/release decisions.
+
+The Priority 11 bundle seals **210 files**; `SHA256SUMS` SHA-256 is
+`b8d580e78d3bcf8c24b8b14371d7a80310f688dd49731f1727c4efdbc6ee3af0`.
+Archive `verification-evidence/v35-priority11-20261011.tar.gz` SHA-256 is
+`5ebf81ad9e39de30167d76a2d0c533be34725f22eb8237770291566060aa97bf`.
+Every copied file and archived member was verified. Source copies precede this
+external checksum anchor to avoid self-reference; the anchor adds no tested
+behavior or new acceptance claim.
 
 ## Priority 12 - Conditional Release and Closure
 

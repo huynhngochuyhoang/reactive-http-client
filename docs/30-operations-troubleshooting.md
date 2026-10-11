@@ -51,7 +51,7 @@ historical evidence.
 | Pod memory grows after enabling response caching | Published/development version, selected policy count, TTL, entry occupancy, cache activity, post-GC heap, direct memory, pool gauges, threads, and deployment changes | [Cache-memory triage (`4.2.0`+)](#cache-memory-triage-420) |
 | Local cache-work rejection or skipped refresh (V30 / `4.3.0`+) | Selected work bounds, policy current/maximum gauges, fixed rejection/skip reasons, pre-close counter samples | [Cache-work saturation](#cache-work-saturation-v30-430) |
 | Repeated rejected construction or resources remaining across context replacement | Version, construction phase/outcome counts, bounded context ordinals, pre-close meter samples and application-owned lifecycle completion | [Construction and extension ownership](#construction-and-extension-ownership) |
-| Increased CPU or allocation on ordinary calls | Effective features and available integrations, construction versus subscribed phase, matched payload-size range, dispatch outcomes and a time-aligned process window | [Default-path cost and ownership](25-performance-troubleshooting.md#default-path-cost-and-ownership); [V34 review](../roadmaps/v34/MAINTAINER-GUIDANCE.md), not a published optimization |
+| Increased CPU or allocation on ordinary calls | Effective features and available integrations, construction versus subscribed phase, matched payload-size range, dispatch outcomes and a time-aligned process window | [Default-path cost and ownership](25-performance-troubleshooting.md#default-path-cost-and-ownership); [V35 reconciliation](../roadmaps/v35/MAINTAINER-GUIDANCE.md), not a published optimization or cleared cost gate |
 | Category and stage appear inconsistent or stage is absent | Outermost exception plus bounded cause chain, category, stage, status, cancellation, final attempt | [Failure attribution](#failure-attribution) |
 
 ## Construction and extension ownership
@@ -97,6 +97,16 @@ heap, decoded cache bytes and RSS measure different things. Follow
 Do not export raw retained objects, heap dumps, request material, credential or
 identity data, cache keys/digests or arbitrary exception text. This review adds
 no new diagnostic metric or deployment-memory/mesh finding.
+
+[V35's seven-workstream review](../roadmaps/v35/MAINTAINER-GUIDANCE.md#operations-and-privacy)
+does not change these ownership responsibilities. Separate allocation from
+retained heap, direct/native buffers, application-container RSS and sidecar
+memory before attributing growth. Its two blocking cost flags are a benchmark
+evidence gap, not a proved application leak; passing cleanup tests is not a
+deployment leak all-clear either. No new capture fields or snapshot upgrade are
+required to investigate published `4.4.2` incidents.
+The [V34 guide](../roadmaps/v34/MAINTAINER-GUIDANCE.md) remains historical
+review-only evidence, not a retrospectively passed cost gate.
 
 ## Inbound header and context triage
 

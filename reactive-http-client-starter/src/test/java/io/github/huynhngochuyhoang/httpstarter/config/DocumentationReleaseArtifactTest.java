@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 11 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 12 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [x] 3.3 Obtain explicit bounded implementation approval",
@@ -588,7 +588,7 @@ class DocumentationReleaseArtifactTest {
         String priority = checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0];
         assertThat(priority).contains("### [x] 9.1", "### [x] 9.2", "### [x] 9.3", "### [x] 9.4",
                 "(VERIFICATION.md)").doesNotContain("[ ]");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 11 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 12 - "))).doesNotContain("[x]");
         for (String script : List.of("verify-v35-parity.py", "test_verify_v35_parity.py",
                 "verify-v33-parity.py", "verify-v33-native.py")) {
             assertThat(root.resolve("scripts").resolve(script)).exists();
@@ -621,7 +621,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist).contains("(FINAL-ACCEPTANCE.md)");
         String priority = checklist.split("## Priority 10 - ", 2)[1].split("## Priority 11 - ", 2)[0];
         assertThat(priority).contains("### [x] 10.1", "### [ ] 10.2", "### [x] 10.3");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 11 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 12 - "))).doesNotContain("[x]");
         for (String script : List.of("verify-v35-acceptance.py", "test_verify_v35_acceptance.py",
                 "investigate-v35-final-profiles.py")) {
             assertThat(root.resolve("scripts").resolve(script)).exists();
@@ -631,6 +631,62 @@ class DocumentationReleaseArtifactTest {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
         }
+    }
+
+    @Test
+    void v35MaintainerGuidanceReconcilesEveryFindingWithoutWaivingCostOrRelease() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String guide = Files.readString(directory.resolve("MAINTAINER-GUIDANCE.md"));
+        List<String> ids = List.of("V34-P3/P10 allocation finding", "V34-C001", "V34-C002", "V34-C003",
+                "V34-C004 optional preparation", "V34-C004 rolled-back value reuse", "V34-C005");
+        List<String> rows = guide.lines().filter(line -> line.startsWith("| V34-")).toList();
+        assertThat(rows.stream().map(row -> row.substring(2, row.indexOf(';'))).toList())
+                .containsExactlyElementsOf(ids);
+        for (String row : rows) {
+            List<String> cells = List.of(row.split("\\|"));
+            assertThat(cells).hasSize(5);
+            assertThat(cells.subList(1, 5)).allSatisfy(cell -> assertThat(cell).isNotBlank());
+            assertThat(row).contains("maintainer", "](", "Reopen");
+        }
+        assertThat(guide.replaceAll("\\s+", " ")).contains(
+                "10.2 remains pending", "documentation-only dependency exception", "Scope reduction:** none proposed or approved",
+                "AUTO_REGISTRY and HOOK remain unresolved/blocking for 10.2", "ordinary high-mode",
+                "36-fork follow-up is exhausted", "338 forks", "no V35 application migration",
+                "4.4.2", "4.5.0-SNAPSHOT", "not rehashed historical evidence", "No snapshot upgrade",
+                "85948837c4f4001f648b15adb3efd80b9de05abd", "Priority 12", "-XX:+DisableExplicitGC",
+                "application-container and sidecar memory", "cache keys/digests", "activeRoadmap=v35",
+                "releaseLane=unselected", "plannedFinalVersion=null", "not fresh API, performance, native or full-reactor",
+                "No automatic mesh diagnosis", "sha256sum -c SHA256SUMS");
+        assertThat(guide).contains("> **Status:** Priority 11 complete; 10.2 cost acceptance remains pending",
+                "273 passed on Boot 4.0.0 and 4.1.0", "56 passed");
+        String ledger = Files.readString(directory.resolve("FINDINGS.md"));
+        for (String id : ids) {
+            String row = ledger.split(Pattern.quote("## " + id + "\n"), 2)[1].split("\n## ", 2)[0];
+            assertThat(row).contains("**Owner:**", "**Status:** Resolved without production change",
+                    "**Final evidence (P11):**", "**Controls:**", "**Open questions:**");
+        }
+        List<Path> documents = new ArrayList<>(List.of(directory.resolve("MAINTAINER-GUIDANCE.md"),
+                directory.resolve("FINDINGS.md")));
+        for (String name : List.of("15-customizer.md", "19-lifecycle-hooks.md", "21-diagnostic-contexts.md",
+                "22-benchmarks.md", "25-performance-troubleshooting.md", "30-operations-troubleshooting.md")) {
+            Path path = root.resolve("docs").resolve(name);
+            assertThat(Files.readString(path)).as(name).contains("../roadmaps/v35/MAINTAINER-GUIDANCE.md");
+            documents.add(path);
+        }
+        for (Path path : documents) {
+            Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(Files.readString(path));
+            while (links.find()) {
+                String target = links.group(1);
+                if (!target.contains(":")) assertThat(path.getParent().resolve(target).normalize()).as(target).exists();
+            }
+        }
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 11 - ", 2)[1].split("## Priority 12 - ", 2)[0];
+        assertThat(priority).contains("### [x] 11.1", "### [x] 11.2", "### [x] 11.3",
+                "(MAINTAINER-GUIDANCE.md)").doesNotContain("[ ]");
+        assertThat(checklist).contains("### [ ] 10.2");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 12 - "))).doesNotContain("[x]");
     }
 
     @Test

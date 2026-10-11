@@ -96,6 +96,13 @@ waiter stays transport-empty rather than inheriting the shared load's retries,
 status, URL, or headers. The load remains visible through bounded cache work
 meters.
 
+The [V35 ownership reconciliation](../roadmaps/v35/MAINTAINER-GUIDANCE.md#retained-semantics-and-migration)
+retains these per-subscription boundaries. Do not pool mutable reporting state,
+cache resolved request/context values, or treat an envelope terminal as inner-body
+cleanup. Application queues, loggers and explicit-handoff envelopes own copies
+they retain. No global context-propagation hook, map normalization or lifecycle
+shortcut is introduced, and allocation evidence does not diagnose mesh behavior.
+
 ## Header handling
 
 Custom `HttpExchangeLogger` implementations receive raw final outbound request

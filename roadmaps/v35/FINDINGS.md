@@ -35,7 +35,26 @@ primary allocation flag; AUTO_REGISTRY and HOOK remain unresolved because their
 ordinary traces did not reproduce the high mode. A clear reverse confirmation
 and forced non-inlining controls do not close that missing evidence. No historical
 finding is silently relabeled or removed; this additional final-combination gate
-remains open for Priority 11 reconciliation.
+remains open after Priority 11 reconciliation. The
+[maintainer guide](MAINTAINER-GUIDANCE.md#final-finding-reconciliation) records
+each owner, retained contract, supported alternative and reopening trigger.
+
+## Priority 11 Reconciliation
+
+Reconciled 2026-10-11 without production changes or scope reduction. The seven
+dated dispositions below are retained, not promoted into delivered fixes or
+performance passes. **AUTO_REGISTRY and HOOK remain unresolved/blocking for
+10.2** under the performance maintainer; their missing ordinary high-mode traces
+cannot be replaced by forced non-inlining, clear reverse scores or API success.
+The approved diagnostic schedule is exhausted. Additional work or reduced scope
+needs a new explicit decision; Priority 12 remains unselected.
+
+P9's regenerated contract/ownership/consumer/AOT/native controls and P10's fresh
+matched inputs/API/cost evidence support the current no-change artifact. P2-P8
+raw score/recording bundles were lost; their counts and candidate outcomes below
+describe historical executions, not reverified raw evidence. Tracked rejected
+patches remain reviewable. P11 checks available P9/P10 bundles and source identity
+and runs guidance/contract tests, not new benchmark or native executions.
 
 ## Priority 3 Specifications
 
@@ -63,6 +82,9 @@ on each same saved JAR, records constructor inlining blocked by an unloaded
 CachePolicyConfig signature type in high forks, and observes Selection elimination
 in low forks. A no-inline intervention reproduces the high level on both artifacts;
 forcing resolver inlining alone does not guarantee constructor elimination.
+**Final evidence (P11):** P10 regenerates this enabled-only attribution and also
+attributes AUTO_NO_REGISTRY. It does not close AUTO_REGISTRY/HOOK or generalize
+to other JVMs. The guide preserves those additional blocking profiles separately.
 
 **Reproduction:** the frozen experiment ran repeated forks of
 the **same saved JAR** and matched pairs in both orders for
@@ -102,7 +124,11 @@ allocation-site evidence, 21 regression cases and 224 matched scored forks in
 both orders. Sequential scalar/iterator accumulation preserves the tested
 semantics but fails acceptance: reverse HOOK/GET has an allocation review flag,
 multiple-hook means increase in both orders, and compiler-sensitive modes cannot
-be claimed as C001 savings. The rejected patch and raw results are preserved.
+be claimed as C001 savings. The rejected patch is tracked; the historical raw
+results are unavailable after the evidence-loss incident.
+**Final evidence (P11):** P9 reruns the dynamic discovery/terminal controls on the
+unchanged implementation. P10 retains a HOOK flag; no later result retroactively
+accepts the rejected candidate or removes per-invocation discovery.
 **Reproduction:** use `DefaultPathCostOwnershipTest` cases
 `latePrototypeConsumersAreDiscoveredPerInvocationNotPerSubscription` and
 `concurrentFirstInvocationsStillMaterializeIndependentPrototypeConsumers`;
@@ -139,6 +165,9 @@ shape and state consumer, and verifies cleanup/terminal boundaries. The three-li
 candidate passes 431 ownership cases and repeats a 40 B/op minimal warm-publisher
 reduction, but 384 scored forks retain adverse flags in both orders. No production
 change remains; no state reuse or non-null ownership shortcut is adopted.
+**Final evidence (P11):** P9 regenerates body/terminal/cancellation/discard and
+separate reachability controls; P10 verifies the unchanged combined artifact.
+The candidate's historical local saving is not a delivered or freshly repeated benefit.
 **Reproduction:** `DefaultPathCostOwnershipTest` state/owner counters and
 `StreamingUploadOwnershipTest` for complete, error, pre-dispatch rejection,
 timeout, cancellation and discard. Separate no-body, immutable body and
@@ -179,6 +208,9 @@ owners, preserves public metadata and aliasing/mutation contracts, and executes
 minimal GET/TARGET publisher allocation grows by 24 B/op in every fork/order.
 Forward review retains two latency flags and one allocation flag; reverse has
 none. No repeatable attributed production-path benefit justifies the extra state.
+**Final evidence (P11):** P9 reruns public metadata/wire/cache-identity contracts;
+P10 matches the final harness, dependencies and executable classes. Neither
+recreates the rejected annotation-reuse scores nor makes dynamic projection static.
 **Reproduction:** `V33PlanningCostBenchmark` and `StarterInvocationInternalsBenchmark`
 under the frozen matched harness; `DefaultPathCostOwnershipTest` for cached-plan
 identity. Separate cold parsing, warm plan lookup and dynamic header/query projection.
@@ -216,6 +248,9 @@ scheduler access, lazy manager state and actual cache/meter/refresh acquisition.
 The independent preparation artifact passes focused ownership controls and the
 physically optional-absent consumer, but has three reverse allocation flags and
 no repeatable attributed cold/first-use benefit in the 408-fork comparison.
+**Final evidence (P11):** P9 regenerates physical-absence, selected features,
+cleanup/recreation and application-owner controls. P10 checks final class/input
+equivalence. A dormant manager/view is still not proof of an acquired task or leak.
 **Reproduction:** `DefaultPathCostOwnershipTest.inactivePolicyChecksScanTheWholeInterfaceButNotEverySubscription`,
 `ResourceOwnershipReviewTest` and public/factory/auto-configured path controls;
 observe creation, lazy use, failed construction, close and same-tag recreation.
@@ -251,6 +286,9 @@ baseline and candidate publisher bytes match; high-mode-only apparent reductions
 do not meet the benefit gate. Selected/invalid decisions remain independent and
 all mutation checks are retained. The new evidence, not V34's rollback alone,
 supports this no-change disposition.
+**Final evidence (P11):** P9 revalidates mutation enforcement and P10 regenerates
+the enabled-only mechanism. Its remaining flags prohibit claiming that disabled
+value reuse would now have a repeatable benefit; the rejected patch stays unapplied.
 **Reproduction:** `DefaultPathCostOwnershipTest.inactivePolicyChecksScanTheWholeInterfaceButNotEverySubscription`
 counts two decisions per invocation of its two-method interface, not per repeat
 subscription. `CacheWorkPolicyEnforcementTest` changes sibling selection and
@@ -288,6 +326,9 @@ orders, and reruns 559 affected contract cases. Cold samples identify planning,
 validation and builder work alongside Spring/reflection/binding fixture cost;
 warm samples show request/reporting rather than AOT creation history. Tests verify
 normal stop, AOT lifetime, failure cleanup, repeated selection and isolated owners.
+**Final evidence (P11):** P9 regenerates both Boot rows, assembled runtime/AOT,
+native and ownership checks; P10 rehashes those inputs and verifies API/packaging.
+This is lifecycle parity, not newly timed AOT throughput or a fixed-size history bound.
 **Reproduction:** `V34ConstructionBenchmark` separates context/proxy construction,
 first publisher and first subscription. `PropertiesBindingLifecycleTest` covers
 normal versus AOT lifecycle; `ResourceOwnershipReviewTest` covers failure/close
@@ -317,5 +358,6 @@ run in P1. Reproduction commands for ordinary controls and historical artifacts
 are linked there. New profiling/scoring needs the Priority 2 frozen experiment;
 new production edits need Priority 3.3. The allocation-mechanism, C001, C002,
 C003, both C004 findings and C005 have their P2/P4/P5/P6/P7/P8 no-change dispositions.
-Final combined verification and release selection remain open; the inventory
-itself closes no finding.
+Final combined correctness/compatibility verification is recorded in P9/P10;
+cost acceptance and release selection remain open. P11's guidance and dated
+reconciliation neither close the two blocking flags nor authorize reduced scope.
