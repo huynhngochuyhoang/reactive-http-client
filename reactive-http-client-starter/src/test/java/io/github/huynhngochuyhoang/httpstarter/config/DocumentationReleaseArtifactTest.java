@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
                 "real API", "all 60 matched primary rows", "reversed order", "second comparison even if the first fails",
                 "target/release-evidence/v35/priority<N>/", "compatible patch first", "N/A", "unresolved findings stay named",
                 "Creating this checklist completes no execution item");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 9 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 10 - "))).doesNotContain("[x]");
         assertThat(checklist).contains(
                 "### [x] 2.4 Record causal evidence or the unresolved gate",
                 "### [x] 3.3 Obtain explicit bounded implementation approval",
@@ -564,6 +564,36 @@ class DocumentationReleaseArtifactTest {
         for (String script : List.of("investigate-v35-lifecycle.py", "test_investigate_v35_lifecycle.py")) {
             assertThat(root.resolve("scripts").resolve(script)).exists();
         }
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v35RegeneratedParitySeparatesLostHistoryAndPreservesLaterAcceptanceGates() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v35");
+        String record = Files.readString(directory.resolve("VERIFICATION.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "Priority 9 complete", "f38fb8d22486d35401a7af9cb9e80f5e5e8c75ef",
+                "f1b8ceea8319587d4736c4a88bad57ce4588e0b3", "unavailable", "not reconstructed or rehashed",
+                "Priority 10 must regenerate", "not Central", "without root `clean`",
+                "verification-evidence/", "2,229", "2,446", "16 / 5 / 2",
+                "GC disabled", "Boot 4.1 evidence is JVM/AOT", "Independent non-single-flight loads",
+                "Removed meters cannot report post-close counter deltas", "not a performance pass",
+                "66de72017d7c8e8a33e1a4a593f55a0736813ffb479d88ccd3bbd7ec77bd7271");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 9 - ", 2)[1].split("## Priority 10 - ", 2)[0];
+        assertThat(priority).contains("### [x] 9.1", "### [x] 9.2", "### [x] 9.3", "### [x] 9.4",
+                "(VERIFICATION.md)").doesNotContain("[ ]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 10 - "))).doesNotContain("[x]");
+        for (String script : List.of("verify-v35-parity.py", "test_verify_v35_parity.py",
+                "verify-v33-parity.py", "verify-v33-native.py")) {
+            assertThat(root.resolve("scripts").resolve(script)).exists();
+        }
+        assertThat(Files.readString(root.resolve(".gitignore"))).contains("/verification-evidence/");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
         while (links.find()) {
             String target = links.group(1);

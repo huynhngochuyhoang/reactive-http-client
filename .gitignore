@@ -1,4 +1,5 @@
 target/
+/verification-evidence/
 *.class
 *.jar
 *.war

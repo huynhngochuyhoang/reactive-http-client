@@ -52,6 +52,12 @@ decision can silently turn an unresolved finding into a completed investigation.
 
 ## Evidence Rules
 
+The 2026-10-10 root-clean incident deleted local ignored evidence. The maintainer
+requested regeneration on 2026-10-11; see [recovery boundary](VERIFICATION.md).
+Historical hashes and performance samples cannot be recreated as the same runs.
+Fresh Priority 9 verification and the still-pending Priority 10 acceptance must
+stand on new preserved artifacts, with external copies outside Maven build output.
+
 - Record exact commands/exits, actual totals, toolchain/settings, reachable source,
   clean/dirty state, resolved dependencies/classpaths and artifact/report hashes
   under `target/release-evidence/v35/priority<N>/`. Preserve failed/partial attempts.
@@ -656,41 +662,64 @@ The final 101-case documentation rerun passes again, not added to the 660 total.
 
 ## Priority 9 - Cross-Path, Optional-Integration and Lifecycle Verification
 
-### [ ] 9.1 Run final public, factory and mock regressions
+### [x] 9.1 Run final public, factory and mock regressions
 
-- [ ] Run affected contract/ownership tests and complete ordinary module suites
+- [x] Run affected contract/ownership tests and complete ordinary module suites
       against final combined changes; retain exact totals and failed attempts.
-- [ ] Cover body/context/terminal behavior, late extensions, mutable selection,
+- [x] Cover body/context/terminal behavior, late extensions, mutable selection,
       cache/auth/retry/redirect/deadline composition and caller/load distinctions.
-- [ ] Keep ordinary tests GC-independent; run controlled reachability only for
+- [x] Keep ordinary tests GC-independent; run controlled reachability only for
       actual collection claims and do not relabel structural tests as collection.
 
-### [ ] 9.2 Verify assembled consumers and optional boundaries
+### [x] 9.2 Verify assembled consumers and optional boundaries
 
-- [ ] Run artifact-based consumers with genuine Boot 4.0.0 and 4.1.0 parents,
+- [x] Run artifact-based consumers with genuine Boot 4.0.0 and 4.1.0 parents,
       matching runtime stacks; no reactor output masquerading as assembled JARs.
-- [ ] Exercise physical optional absence and selected auth/resilience/cache/metrics
+- [x] Exercise physical optional absence and selected auth/resilience/cache/metrics
       controls. Count all server dispatches and assert actual HTTP methods/results.
-- [ ] Use real API names/reporting paths for metered cases and distinguish caller,
+- [x] Use real API names/reporting paths for metered cases and distinguish caller,
       attempt, transport, coalesced and hidden-refresh evidence.
 
-### [ ] 9.3 Verify affected AOT and native execution
+### [x] 9.3 Verify affected AOT and native execution
 
-- [ ] Run final runtime/AOT selection, hints and JVM smoke on applicable Boot rows.
+- [x] Run final runtime/AOT selection, hints and JVM smoke on applicable Boot rows.
       Track overlay generation/reproduction commands; ignored files alone are not enough.
-- [ ] Compile and execute the native smoke from clean reachable final source,
+- [x] Compile and execute the native smoke from clean reachable final source,
       recording toolchain, source/tree, limits, logs, exits and binary hash.
-- [ ] Reconcile exact unchanged-input reuse explicitly; changed production/fixtures
+- [x] Reconcile exact unchanged-input reuse explicitly; changed production/fixtures
       require affected reruns. JVM/AOT success and a failed compile are not native passes.
 
-### [ ] 9.4 Recheck final resource and shutdown ownership
+### [x] 9.4 Recheck final resource and shutdown ownership
 
-- [ ] Verify failed creation, final cleanup, context/same-tag recreation and
+- [x] Verify failed creation, final cleanup, context/same-tag recreation and
       diagnostics without lazy-resource creation, including selected work limits.
-- [ ] Preserve application-owned connectors/registries/SDKs/shared schedulers.
+- [x] Preserve application-owned connectors/registries/SDKs/shared schedulers.
       Distinguish independent caller-owned loads from manager-owned shared/refresh work.
-- [ ] Record cancellation/discard acknowledgements, bounded retention and post-close
+- [x] Record cancellation/discard acknowledgements, bounded retention and post-close
       behavior without assuming removed meters still expose shutdown counter deltas.
+
+Priority 9 closure (2026-10-11): [verification and recovery record](VERIFICATION.md).
+Fresh clean-source native compilation/execution, full Boot 4.0.0/4.1.0 suites
+(2,229 starter + 80 helper + 62 OTel + 75 benchmark-contract = 2,446 per row),
+29 selected-consumer + one physical-absence case per row, six smoke fixture cases
+and ordinary/AOT-enabled execution per row all pass. Controlled cache/handoff/
+benchmark reachability passes 16/5/2 separately; 50 Python tooling tests pass.
+The final documentation guard passes 102 cases per Boot row, overlapping the
+full-suite documentation cases rather than increasing those full-suite totals.
+No production changes or prior scores are reused. Deleted historical raw evidence
+remains unavailable; final matched cost/API acceptance and release remain open.
+Fresh bundles are preserved outside build output in `verification-evidence/`
+as well as `target/release-evidence/v35/priority9/regenerated-20261011/`.
+The original conventional directory contains interrupted-attempt remnants;
+they are preserved separately and excluded from accepted evidence.
+
+The regenerated bundle seals **1,811 files**; `SHA256SUMS` SHA-256 is
+`e1f1ee5bb1004963a1c2aca7a4faa28da67193b8101af9ab522e80b0340599c0`.
+Archive `verification-evidence/v35-priority9-20261011.tar.gz` SHA-256 is
+`ca124e7ee2c18e999ba5c089b8cc2a488d71997dca49fc93e62fc81e42e0b8ba`.
+Every copied file and archived member was verified against the manifest. Source
+copies precede this external checksum anchor to avoid self-reference; no tested
+production or fixture input changed during closure.
 
 ## Priority 10 - Final Matched Cost and Compatibility Acceptance
 
