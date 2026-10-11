@@ -83,6 +83,10 @@ reverse results and forced non-inlining controls do not replace the missing
 ordinary high-mode traces. The bounded schedule is exhausted, not permission
 to rerun until favorable. No V35 numbers are promoted as public performance claims.
 
+[V35 closure](../roadmaps/v35/RELEASE-DECISION.md) is explicitly reduced-scope,
+review-only/no release. The maintainer excluded these two unresolved flags from
+closure obligations, not from the evidence or performance acceptance rules.
+
 [Fresh P9/P10 evidence](../roadmaps/v35/FINAL-ACCEPTANCE.md) is separate from
 historical raw evidence lost during root cleanup. Keep durable bundles outside
 Maven output and use the [tracked reproduction rules](../roadmaps/v35/MAINTAINER-GUIDANCE.md#reproduction-and-evidence-availability).

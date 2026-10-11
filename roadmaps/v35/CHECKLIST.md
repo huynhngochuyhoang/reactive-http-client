@@ -1,13 +1,20 @@
 # Reactive HTTP Client - Roadmap V35 Execution Checklist
 
-> **Status:** active
+> **Status:** completed; review-only, no release; explicitly reduced scope
 > **Theme:** resolve V34 deferred performance and default-path findings
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Investigation scope:** all V34-C001 through V34-C005 and the unresolved P3/P10 allocation finding
 > **Implementation authorization:** seven-row bounded plan approved in Priority 3.3; no production change delivered
-> **Release scope:** unselected
+> **Release scope:** no release; V35 closed
 > **Adopted:** 2026-10-04
+> **Closed:** 2026-10-11
+
+[Priority 12](RELEASE-DECISION.md) records approved reduced-scope/no-release
+closure. AUTO_REGISTRY and HOOK remain unresolved and are excluded from closure,
+not passed; the 10.2 heading and their acceptance checkbox intentionally remain
+unchecked. No production optimization or new release is delivered. P1-P11 are
+dated evidence checkpoints, not rewritten closure decisions.
 
 Execution companion to [ROADMAP.md](ROADMAP.md). Adoption authorizes the baseline,
 reproduction and bounded fix-design work, not production edits, a version change,
@@ -111,7 +118,7 @@ Linked records exist; other names are suggestions, not implied completed reports
 | `VERIFICATION.md` | Mock/consumer/Boot/AOT/native/API and final matched evidence |
 | [FINAL-ACCEPTANCE.md](FINAL-ACCEPTANCE.md) | Frozen final matched schedule, fresh API/cost results and acceptance limits |
 | [MAINTAINER-GUIDANCE.md](MAINTAINER-GUIDANCE.md) | Reconciled findings, retained costs, reproducible investigations and operations limits |
-| `RELEASE-DECISION.md` | Exact scope, release/no-release choice, immutable evidence and closure |
+| [RELEASE-DECISION.md](RELEASE-DECISION.md) | Scope reconciliation, evidence inventory and pending explicit release/no-release decision |
 
 ## Priority 1 - Post-V34 Baseline and Complete Deferred-Scope Integrity
 
@@ -865,62 +872,129 @@ behavior or new acceptance claim.
 
 ## Priority 12 - Conditional Release and Closure
 
-### [ ] 12.1 Reconcile scope and obtain release intent
+Initial preparation recorded 2026-10-11 in [RELEASE-DECISION.md](RELEASE-DECISION.md).
+All seven original dispositions are reconciled and P9-P11 evidence revalidated.
+Review-only/no-release closure with explicit exclusion of the unresolved
+AUTO_REGISTRY and HOOK flags was proposed, **not approved at that checkpoint**.
+The then-pending scope/release decision kept 10.2, this priority and closure
+criteria unchecked. The subsequent explicit approval below supersedes that
+pending decision, not its sealed source or evidence. No new measurement,
+production change, candidate or release is selected.
 
-- [ ] Match every required row to accepted fixes/no-change outcomes or explicitly
+Preparation verification: **274 cases across ten classes per Boot row** (4.0.0
+and 4.1.0), including 105 documentation cases, plus **56 Python checks** pass;
+zero failures/errors/skips. Reuse rehashes all **2,952 files** in P9-P11 and all
+three archives; no new native, API or scored benchmark execution is claimed.
+The separate preparation seal preserves this pending-decision state, not a
+completed 12.3 or approved closure.
+
+Preparation integrity anchor: **109 files** in
+`verification-evidence/v35-priority12-preparation/`; `SHA256SUMS` SHA-256:
+`4570d4129101658cf2c54747cf63e23ea021d1023c65962b21d54d06c78077e6`.
+Archive `verification-evidence/v35-priority12-preparation-20261011.tar.gz` SHA-256:
+`26b04de5e085e0b1d439e239099a1874c9fbd34ec6217f785914b2ab985a3a3c`.
+All copied files and archived members were verified. The source copy precedes
+this external anchor; the pending decision and unaccepted flags are unchanged.
+
+### [x] 12.1 Reconcile scope and obtain release intent
+
+- [x] Match every required row to accepted fixes/no-change outcomes or explicitly
       unresolved scope. Obtain maintainer approval for any reduced scope; do not
       present partial resolution as fixing all V34 deferrals.
-- [ ] Obtain release preparation or review-only/no-release approval. Evaluate a
+- [x] Obtain release preparation or review-only/no-release approval. Evaluate a
       compatible patch first; `4.5.0-SNAPSHOT` does not select a minor version.
-- [ ] Stop incompatible/out-of-scope needs for a separate migration decision and
+- [x] Stop incompatible/out-of-scope needs for a separate migration decision and
       record unresolved release evidence as no-go/pending, not passed.
 
-### [ ] 12.2 Select the exact candidate or no-release branch
+### [x] 12.2 Select the exact candidate or no-release branch
 
-- [ ] For release, approve an exact candidate after compatibility/claims review;
+- [x] For release, approve an exact candidate after compatibility/claims review;
       update reactor/modules/fixtures, matrix/version guards, current docs,
       changelog and readiness together, preserving original evidence coordinates.
-- [ ] Keep baseline `4.4.2` until verified publication and V35 active through the
+      **N/A:** no-release branch approved; no candidate or coordinate edit.
+- [x] Keep baseline `4.4.2` until verified publication and V35 active through the
       final-version cut. Preparation is neither publication nor final release GO.
-- [ ] For no release, record rationale and delivered/rolled-back/unresolved scope;
+      Baseline unchanged; final-version cut **N/A**. V35 closes only by this review decision.
+- [x] For no release, record rationale and delivered/rolled-back/unresolved scope;
       label candidate/signing/publication gates N/A with the explicit decision.
 
-### [ ] 12.3 Assemble immutable release or review evidence
+### [x] 12.3 Assemble immutable release or review evidence
 
-- [ ] Inventory clean reachable final source, decisions, correctness, ownership,
+- [x] Inventory clean reachable final source, decisions, correctness, ownership,
       API, Boot/consumer/AOT/native, matched cost and guidance evidence.
-- [ ] Seal exact commands/statuses, actual counts, toolchains, effective dependencies,
+- [x] Seal exact commands/statuses, actual counts, toolchains, effective dependencies,
       artifacts/reports/hashes and failures. Preserve local-bundle availability limits.
-- [ ] Revalidate after final code/fixture/coordinate edits, separating exact reuse
+- [x] Revalidate after final code/fixture/coordinate edits, separating exact reuse
       from fresh final-coordinate executions. Never claim a new commit for a dirty patch.
-- [ ] For release, verify applicable packaging/unsigned/staged checks; signing,
+- [x] For release, verify applicable packaging/unsigned/staged checks; signing,
       version-matched tag/workflow, publication and Central consumption remain separate.
+      **N/A:** no release; no new packaging, signing or staged execution is claimed.
 
-### [ ] 12.4 Verify publication or explicit no-release closure
+### [x] 12.4 Verify publication or explicit no-release closure
 
-- [ ] For release, verify signing/staged signatures, tag/source/workflow and Central
+- [x] For release, verify signing/staged signatures, tag/source/workflow and Central
       provenance. Authorize signing locally; never put passphrases in evidence.
-- [ ] Verify isolated published assembled consumption with versions/signatures/
+      **N/A:** approved no-release branch, not successful signing/publication.
+- [x] Verify isolated published assembled consumption with versions/signatures/
       hashes, not local installation or reactor shadows; only then advance baselines.
-- [ ] For no release, record approved final disposition and any explicit scope
+      **N/A:** no new publication; `4.4.2` baselines remain unchanged.
+- [x] For no release, record approved final disposition and any explicit scope
       reduction. Unrun release gates are N/A, not passes; unresolved findings stay named.
-- [ ] Close roadmap/checklist/index/readiness together with closure revision and
+- [x] Close roadmap/checklist/index/readiness together with closure revision and
       evidence links. Leave future scope unselected; keep V34 closed and unchanged.
+
+Approved 2026-10-11: **"Approve reduced-scope, no-release closure (Recommended)"**.
+[RELEASE-DECISION.md](RELEASE-DECISION.md) reconciles all seven original no-change
+outcomes and the exact exclusion: AUTO_REGISTRY and HOOK allocation flags remain
+unresolved under the performance maintainer, with ordinary high-mode attribution
+missing. The 10.2 acceptance markers stay unchecked and explicitly excluded from
+closure; this is not a blanket performance pass or a claim that every deferral
+was fixed. Patch `4.4.3` was considered first but not selected: no production
+improvement survives. All release-only gates are N/A, not executed passes.
+
+Clean preparation source `3ccbeb73947517a0eea5d1e33a88a656ffb2c4d6`, tree
+`f273faed8d8d0f602acb816e68544cddb776db1a`, plus this separately sealed dirty
+closure patch identifies the final review input. No commit/tag/publication is
+created. P9-P11 source/input reuse, all 2,952 manifest entries, three archives
+and the 109-file pending preparation bundle remain preserved. No new benchmark,
+API, full-reactor or native execution is claimed. V1-V34 history is unchanged.
+
+Fresh approved-state verification passes **274 cases across ten classes per Boot
+row**, including **105 documentation cases**, with zero failures/errors/skips;
+**56 Python checks**, reproduction syntax and `git diff --check` pass. Final
+reruns overlap, not additional distinct tests. The final closure bundle separately
+seals approval, revalidated inputs, actual reports, source/patch and generated
+readiness; the pending preparation bundle is not overwritten. Local ignored
+bundles and lost historical raw evidence retain the limits in the decision record.
+
+Roadmap/checklist/index/readiness close together; reactor
+`4.5.0-SNAPSHOT`, baseline `4.4.2`, planned final version null, release lane and
+future scope unselected. Generated future manual checks do not reopen V35.
+
+Final closure integrity anchor: **213 files** in
+`verification-evidence/v35-priority12/`; `SHA256SUMS` SHA-256:
+`073353a4aa26c735f8af4e1678480f250f4adab1b16d17c741614a3c542358a9`.
+Archive `verification-evidence/v35-priority12-20261011.tar.gz` SHA-256:
+`9a0a5554993d4178b68161a777f0f67028d5620679ff83c7acc897c92f54674a`.
+All copied files and archived members were verified. The sealed source copy
+precedes only this external anchor; approval, tests and implementation inputs
+are unchanged. The 109-file pending preparation bundle remains separate.
 
 ## Completion Criteria
 
-- [ ] Every inventory row has an evidence-backed final disposition; any explicit
+- [x] Every inventory row has an evidence-backed final disposition; any explicit
       scope reduction is visible and does not claim all deferred findings were fixed.
-- [ ] The allocation split is explained and validated, or clearly excluded by an
+- [x] The allocation split is explained and validated, or clearly excluded by an
       explicit reduced-scope decision with no performance all-clear.
-- [ ] Each retained production change has approval, reproduced need, semantic and
+- [x] Each retained production change has approval, reproduced need, semantic and
       ownership acceptance, plus matched benefit or approved correctness cost.
-- [ ] Dynamic extensions, mutation validation, body/context/terminal semantics,
+      **N/A:** no retained production change; no failed candidate is accepted.
+- [x] Dynamic extensions, mutation validation, body/context/terminal semantics,
       optional integrations, AOT selection and resource cleanup remain compatible.
-- [ ] Final public/mock/factory/assembled/Boot/AOT/native/API/cost/packaging evidence
+- [x] Final public/mock/factory/assembled/Boot/AOT/native/API/cost/packaging evidence
       identifies actual inputs, outcomes, failures and unchanged-input reuse limits.
-- [ ] Guidance and public claims reflect measured workloads and release availability.
-- [ ] Release/no-release choice and final scope/archive/readiness are verifiable.
+- [x] Guidance and public claims reflect measured workloads and release availability.
+- [x] Release/no-release choice and final scope/archive/readiness are verifiable.
 
 Creating this checklist completes no execution item. All seven investigations
 remain required; Priority 3.3 approves bounded production work and Priority 12

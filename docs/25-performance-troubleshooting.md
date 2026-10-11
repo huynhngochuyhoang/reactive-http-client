@@ -155,6 +155,8 @@ cost acceptance still lacks ordinary high-mode evidence for AUTO_REGISTRY and
 HOOK. Review all profiles and forks rather than treating a lower confirmation
 score as a fix. Published `4.4.2` remains the application baseline; no V35
 migration, release, new meter or snapshot-upgrade remedy is selected.
+[V35's approved no-release closure](../roadmaps/v35/RELEASE-DECISION.md) excludes
+the two unresolved flags from closure scope, without accepting their cost.
 
 B/op measures allocation per operation, not retained heap. Compare time-aligned
 post-GC heap, direct/native memory, protocol-aware pool gauges, threads and RSS

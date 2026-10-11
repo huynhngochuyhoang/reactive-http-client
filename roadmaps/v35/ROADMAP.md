@@ -1,14 +1,23 @@
 # Reactive HTTP Client - Roadmap V35
 
-> **Status:** active
+> **Status:** completed; review-only, no release; explicitly reduced scope
 > **Theme:** resolve V34 deferred performance and default-path findings
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Investigation scope:** all V34-C001 through V34-C005 and the unresolved P3/P10 allocation finding
 > **Implementation authorization:** seven-row bounded plan approved in Priority 3.3; no production change delivered
-> **Release scope:** unselected
+> **Release scope:** no release; V35 closed
 > **Draft date:** 2026-10-04
 > **Adopted:** 2026-10-04
+> **Closed:** 2026-10-11
+
+[Priority 12 closure](RELEASE-DECISION.md) records the maintainer's explicit
+reduced-scope/no-release approval. All seven workstreams have evidence-backed
+no-change outcomes; no production optimization remains. AUTO_REGISTRY and HOOK
+final-combination flags remain unresolved and are excluded from closure, not
+passed. Readiness is `activeRoadmap=null`, `plannedFinalVersion=null`; future
+scope is unselected. The proposal and dated execution checkpoints below preserve
+their original gates and limits, not a claim that all deferred findings were fixed.
 
 Follow-up to [V34's review-only closure](../v34/RELEASE-DECISION.md).
 V34 delivered regression controls, investigation tooling and guidance, but no
@@ -21,7 +30,7 @@ The [execution checklist](CHECKLIST.md) adopts baseline, reproduction and fix-de
 work without reopening V34, approving production edits, changing coordinates or
 selecting a release. Checklist creation completes no execution item. Concrete
 fixes require the maintainer decision in Priority 3.3; release selection remains
-separate in Priority 12. Index/archive/readiness identify active V35 with
+separate in Priority 12. At adoption, index/archive/readiness identified active V35 with
 `activeRoadmap=v35` and `plannedFinalVersion=null`.
 
 ## Objective and Completion Meaning
@@ -73,7 +82,8 @@ the approved follow-up attributes AUTO_NO_REGISTRY without a production change.
 The [Priority 11 guide](MAINTAINER-GUIDANCE.md) reconciles every original finding,
 retained contract and reopening trigger without reducing scope or clearing those
 two flags. Documentation proceeds independently of pending cost acceptance.
-Release gates remain open.
+That P11 checkpoint left release gates open; the explicit P12 no-release decision
+above closes only the approved reduced scope, without clearing cost acceptance.
 [Priority 3's specifications](FIX-DECISION.md) define local candidate boundaries,
 no-change routes and acceptance/rollback for all seven rows. The maintainer approved
 this bounded plan in Priority 3.3; execution and release selection remain separate.
