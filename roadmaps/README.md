@@ -46,6 +46,9 @@ Boot, ownership and native evidence, with the historical evidence loss explicitl
 separated. [Final matched evidence](v35/FINAL-ACCEPTANCE.md) regenerates API and
 cost verification; the approved diagnostic follow-up attributes AUTO_NO_REGISTRY,
 but AUTO_REGISTRY and HOOK keep cost acceptance open. Release gates remain open.
+The [V35 maintainer guide](v35/MAINTAINER-GUIDANCE.md) reconciles all seven original
+rows and the two blocking flags, with supported alternatives, reopening triggers
+and bounded operations guidance. It selects no scope reduction or release.
 
 [V34](v34/ROADMAP.md) and its [execution checklist](v34/CHECKLIST.md) cover
 performance and default-path hardening: equivalent workloads, measured

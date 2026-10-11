@@ -148,6 +148,14 @@ acceptance did not pass. [Review-only closure](../roadmaps/v34/RELEASE-DECISION.
 defers the unresolved allocation finding without a release. It does not diagnose
 an application memory incident or recommend a snapshot upgrade as a remedy.
 
+The [V35 reconciliation](../roadmaps/v35/MAINTAINER-GUIDANCE.md) investigates every
+V34 deferral, retains required behavior and delivers no production optimization.
+The observed enabled-only mechanism and AUTO_NO_REGISTRY are explained; final
+cost acceptance still lacks ordinary high-mode evidence for AUTO_REGISTRY and
+HOOK. Review all profiles and forks rather than treating a lower confirmation
+score as a fix. Published `4.4.2` remains the application baseline; no V35
+migration, release, new meter or snapshot-upgrade remedy is selected.
+
 B/op measures allocation per operation, not retained heap. Compare time-aligned
 post-GC heap, direct/native memory, protocol-aware pool gauges, threads and RSS
 under the existing [memory-triage procedure](30-operations-troubleshooting.md#cache-memory-triage-420).

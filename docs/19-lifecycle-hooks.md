@@ -65,6 +65,17 @@ their own downstream dispatch do not alter request or health metrics.
 Hook failures are isolated. If a hook throws from `supports(...)` or a callback,
 the starter logs a warning and continues the client call and the remaining hooks.
 
+For ordinary non-cache calls, providers are discovered for each Java client-method
+invocation; that publisher captures its selected consumers. Discovery is not repeated merely because the
+same cold publisher is subscribed again, but each caller still owns independent
+terminal state. Cache-selected caller reporting resolves providers per subscription;
+hidden refresh has no caller terminal hooks. Keep callbacks bounded and nonblocking.
+Do not replace dynamic
+provider discovery with a permanent cache or share mutable reporting state to
+reduce allocation. The [V35 review](../roadmaps/v35/MAINTAINER-GUIDANCE.md#retained-semantics-and-migration)
+retains these costs and contracts without a production optimization; built-in
+exports being off does not remove custom consumers or required cleanup.
+
 ## Context
 
 `ReactiveHttpClientLifecycleContext` exposes the logical client name, API name,

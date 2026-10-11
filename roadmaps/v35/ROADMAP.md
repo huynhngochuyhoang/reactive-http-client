@@ -70,6 +70,9 @@ cross-path, ownership, Boot and native evidence after the local evidence-loss
 incident. [Priority 10](FINAL-ACCEPTANCE.md) regenerates final matched cost/API
 evidence; AUTO_REGISTRY and HOOK allocation flags keep cost acceptance open after
 the approved follow-up attributes AUTO_NO_REGISTRY without a production change.
+The [Priority 11 guide](MAINTAINER-GUIDANCE.md) reconciles every original finding,
+retained contract and reopening trigger without reducing scope or clearing those
+two flags. Documentation proceeds independently of pending cost acceptance.
 Release gates remain open.
 [Priority 3's specifications](FIX-DECISION.md) define local candidate boundaries,
 no-change routes and acceptance/rollback for all seven rows. The maintainer approved

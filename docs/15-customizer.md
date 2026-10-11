@@ -145,6 +145,13 @@ changes none of these guarantees: no filter gate, customization classification,
 dynamic request projection or application-resource ownership is removed for a
 benchmark saving. V34 retains no production optimization after its rollback.
 
+The [V35 follow-up](../roadmaps/v35/MAINTAINER-GUIDANCE.md#retained-semantics-and-migration)
+retains the same contracts after investigating dynamic discovery and preparation
+costs. Keep filters safe to repeat, response-affecting variants explicit and
+application resources under their original owners. Do not cache provider results,
+skip a lookup gate or declare a customizer SAFE solely to reduce measured work.
+No V35 SPI, configuration migration or production optimization is delivered.
+
 ---
 
 ## Applying a customizer to all clients

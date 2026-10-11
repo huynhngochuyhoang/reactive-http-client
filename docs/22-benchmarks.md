@@ -73,6 +73,22 @@ defines the 60-row matrix, matched input checks and V34's review triggers;
 compatibility results and limits. These narrower rules do not replace the
 release-quality report promotion process below. No V34 public numbers are promoted.
 
+## V35 Deferred-Finding Follow-Up
+
+The [V35 maintainer guide](../roadmaps/v35/MAINTAINER-GUIDANCE.md) reconciles all
+seven workstreams without a retained production optimization. The historical
+enabled-only allocation mechanism and AUTO_NO_REGISTRY are attributed, but
+**AUTO_REGISTRY and HOOK remain blocking for final cost acceptance**. Clear
+reverse results and forced non-inlining controls do not replace the missing
+ordinary high-mode traces. The bounded schedule is exhausted, not permission
+to rerun until favorable. No V35 numbers are promoted as public performance claims.
+
+[Fresh P9/P10 evidence](../roadmaps/v35/FINAL-ACCEPTANCE.md) is separate from
+historical raw evidence lost during root cleanup. Keep durable bundles outside
+Maven output and use the [tracked reproduction rules](../roadmaps/v35/MAINTAINER-GUIDANCE.md#reproduction-and-evidence-availability).
+Attribution is not a JVM tuning recommendation or a pod-memory diagnosis;
+`4.5.0-SNAPSHOT` is not a selected release or upgrade remedy.
+
 ## Commands
 
 Compile the benchmark module without running benchmarks:
