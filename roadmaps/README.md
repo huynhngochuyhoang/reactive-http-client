@@ -14,10 +14,17 @@ V35 is completed as a reduced-scope review-only/no-release roadmap; no next rele
 The reactor is `4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are
 verified `4.4.2`.
 
+[V36](v36/ROADMAP.md) and its [execution checklist](v36/CHECKLIST.md) are active
+for baseline review, deterministic tooling tests and experiment planning around
+AUTO_REGISTRY/HOOK allocation and measurement reliability. No execution item is
+complete: new experiments require 3.3 approval, production edits 6.2 approval,
+and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`
+and `plannedFinalVersion=null`; no next release is selected.
+
 [V35 closure](v35/RELEASE-DECISION.md) records explicit maintainer approval to
 exclude the unresolved AUTO_REGISTRY and HOOK allocation flags from closure,
 not pass them. No production optimization remains; full-scope cost acceptance
-did not pass. No roadmap is active and future scope is unselected. The dated
+did not pass. V34 and V35 remain closed; V36's adoption does not reopen them. The dated
 V35 checkpoints below preserve their original measurements and decision gates.
 
 [V35](v35/ROADMAP.md) and its [execution checklist](v35/CHECKLIST.md) cover every V34 deferral:
@@ -155,3 +162,4 @@ automatically create another execution roadmap or reopen V32.
 | V33 | [Roadmap](v33/ROADMAP.md) | [Checklist](v33/CHECKLIST.md) | Completed and released as `4.4.2` |
 | V34 | [Roadmap](v34/ROADMAP.md) | [Checklist](v34/CHECKLIST.md) | Completed; review-only, no release |
 | V35 | [Roadmap](v35/ROADMAP.md) | [Checklist](v35/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |
+| V36 | [Roadmap](v36/ROADMAP.md) | [Checklist](v36/CHECKLIST.md) | Active |
