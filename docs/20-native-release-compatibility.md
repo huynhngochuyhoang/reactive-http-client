@@ -1149,10 +1149,13 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V32 is published and archived at `4.4.1`; V33 is published and archived at `4.4.2`.
-The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=null` and
+The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=v36` and
 `plannedFinalVersion=null`; V34 and V35 are closed review-only with no production
 improvement retained. V35 has an explicitly approved reduced scope, not full-scope
-performance acceptance. Future scope and release lane remain unselected. Generated
+performance acceptance. [V36's execution checklist](../roadmaps/v36/CHECKLIST.md)
+adopts baseline/evidence review and experiment planning only. New experiments,
+production changes and release/closure retain separate approval gates; adoption
+completes no execution item. Implementation and release lane remain unselected. Generated
 pending manual commands do not reopen V34/V35 or select a release. Readiness
 follows checklist lifecycle, including a final-version cut, until verified roadmap closure.
 V33 remained active through the release cut until verified publication and
