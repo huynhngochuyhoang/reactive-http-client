@@ -16,8 +16,10 @@ verified `4.4.2`.
 
 [V36](v36/ROADMAP.md) and its [execution checklist](v36/CHECKLIST.md) are active
 for baseline review, deterministic tooling tests and experiment planning around
-AUTO_REGISTRY/HOOK allocation and measurement reliability. No execution item is
-complete: new experiments require 3.3 approval, production edits 6.2 approval,
+AUTO_REGISTRY/HOOK allocation and measurement reliability. The
+[Priority 1 baseline and ledger](v36/BASELINE-SCOPE.md) reconcile reachable source
+and available V35 evidence without resolving either allocation flag.
+New experiments require 3.3 approval, production edits 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`
 and `plannedFinalVersion=null`; no next release is selected.
 

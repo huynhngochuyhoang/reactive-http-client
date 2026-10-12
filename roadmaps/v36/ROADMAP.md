@@ -103,6 +103,9 @@ defect outside these boundaries needs an explicit scope decision.
 
 Deliver a baseline and evidence-availability record before new measurement.
 
+[Priority 1 baseline and finding ledger](BASELINE-SCOPE.md) records the fresh
+source/evidence audit and verification; it authorizes no experiment or correction.
+
 ## 2. Audit Workloads, Fork Identity and Compiler Evidence
 
 - Inspect the existing [workload contract](../v34/WORKLOAD-CONTRACT.md),
