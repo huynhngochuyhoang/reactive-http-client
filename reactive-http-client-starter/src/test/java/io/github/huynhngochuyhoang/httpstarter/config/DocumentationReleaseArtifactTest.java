@@ -267,11 +267,49 @@ class DocumentationReleaseArtifactTest {
                 ">20% latency", ">max(32 B/op, 5%)", "60-row matrix", "does not implicitly extend",
                 "Central-only", "strict root and independent starter source/binary", "both even if the first fails",
                 "explicit GC disabled", "clean reachable source", "N/A, not passed",
-                "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval")
-                .doesNotContain("[x]");
+                "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 2 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=v36", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v36BaselinePreservesNarrowUnresolvedScopeAndEvidenceLimits() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v36");
+        String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(baseline.replaceAll("\\s+", " ")).contains(
+                "> **Published baseline:** `4.4.2`", "> **Development coordinate:** `4.5.0-SNAPSHOT`",
+                "728653e4fb3db911cddd362ab0c22708619bb68f", "9659c4869caa102593ebde7c05c5b5b0cd20730d",
+                "activeRoadmap=v36", "plannedFinalVersion=null", "releaseLane=unselected",
+                "3,274", "not fresh Central", "P2-P8", "not recovered", "not an ancestor",
+                "Priority 3.3", "Priority 6.2", "Priority 10", "338", "36-fork",
+                "MINIMAL", "AUTO_NO_REGISTRY", "RESILIENCE_ENABLED_ONLY",
+                "C001-C005", "both C004 subrows", "not a performance pass",
+                "target/release-evidence/v36/priority1/", "verification-evidence/v36-priority1/",
+                "No benchmark or diagnostic fork", "No production", "explicit GC disabled");
+        List<String> ids = List.of("V36-A001 / AUTO_REGISTRY", "V36-A002 / HOOK", "V36-E001 / evidence reliability");
+        assertThat(baseline.lines().filter(line -> line.startsWith("### V36-")).map(line -> line.substring(4)).toList())
+                .containsExactlyElementsOf(ids);
+        for (String id : ids) {
+            String row = baseline.split(Pattern.quote("### " + id + "\n"), 2)[1].split("\n##", 2)[0];
+            assertThat(row).as(id).contains("**Owner:**", "**Status:**", "**Evidence:**",
+                    "**Controls:**", "**Open questions:**", "**Acceptance:**", "**Stop conditions:**");
+            assertThat(row).contains(id.startsWith("V36-A") ? "Unresolved/blocking" : "not a confirmed defect");
+        }
+        String priority1 = checklist.substring(checklist.indexOf("## Priority 1 - "), checklist.indexOf("## Priority 2 - "));
+        assertThat(priority1).contains("### [x] 1.1", "### [x] 1.2", "### [x] 1.3", "(BASELINE-SCOPE.md)")
+                .doesNotContain("[ ]");
+        String previous = Files.readString(root.resolve("roadmaps/v35/CHECKLIST.md"));
+        assertThat(previous.lines().filter(line -> line.contains("[ ]")).toList()).hasSize(2);
+        assertThat(previous).contains("### [ ] 10.2", "explicitly reduced scope");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();

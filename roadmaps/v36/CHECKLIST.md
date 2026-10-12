@@ -78,26 +78,55 @@ where sound; no second benchmark framework is selected.
 
 ## Priority 1 - Post-V35 Baseline and Narrow Scope Integrity
 
-### [ ] 1.1 Verify adoption and version state
+### [x] 1.1 Verify adoption and version state
 
-- [ ] Verify roadmap/checklist/index/readiness agree on active V36, closed V1-V35,
+- [x] Verify roadmap/checklist/index/readiness agree on active V36, closed V1-V35,
       `4.5.0-SNAPSHOT`, baseline `4.4.2` and `plannedFinalVersion=null`.
-- [ ] Run archive/version/documentation guards; preserve V35's two unchecked
+- [x] Run archive/version/documentation guards; preserve V35's two unchecked
       acceptance markers and explicit reduced-scope/no-release decision.
 
-### [ ] 1.2 Reconcile reachable source and evidence availability
+### [x] 1.2 Reconcile reachable source and evidence availability
 
-- [ ] Record source/tree, worktree, toolchains and effective dependencies; inventory
+- [x] Record source/tree, worktree, toolchains and effective dependencies; inventory
       P9-P12 bundles, artifact/JDK/harness hashes and published provenance.
-- [ ] Rehash available inputs and state exact reuse limits. Record missing historical
+- [x] Rehash available inputs and state exact reuse limits. Record missing historical
       objects/bundles honestly; regeneration must not claim the lost run's identity.
 
-### [ ] 1.3 Initialize the narrow finding ledger
+### [x] 1.3 Initialize the narrow finding ledger
 
-- [ ] Record A001, A002 and E001 with owners, controls, open questions, evidence,
+- [x] Record A001, A002 and E001 with owners, controls, open questions, evidence,
       acceptance and stop conditions; keep the two profiles independent.
-- [ ] Identify possible MINIMAL/AUTO_NO_REGISTRY/RESILIENCE_ENABLED_ONLY controls
+- [x] Identify possible MINIMAL/AUTO_NO_REGISTRY/RESILIENCE_ENABLED_ONLY controls
       without approving their execution or reopening C001-C005.
+
+**Priority 1 record (2026-10-12):** [Baseline and narrow ledger](BASELINE-SCOPE.md).
+Clean inspected source `728653e4fb3db911cddd362ab0c22708619bb68f`; fresh guards
+use that base plus the retained documentation/test patch. All 3,274 files and
+five archives in available V35 P9-P12 bundles rehash, along with both benchmark
+artifacts, 121 classpath JARs per side and 39 harness/build inputs. P10's recorded
+source is locally available but not an ancestor; reachable input reconciliation
+does not relabel that run. P2-P8 lost recordings remain unavailable.
+
+The three ledger rows retain A001/A002 unresolved and E001 pending review, not a
+confirmed defect. V35's two unchecked acceptance markers and all V1-V35 records
+stay unchanged. No benchmark/diagnostic fork, runtime edit or release is selected;
+Priorities 3.3, 6.2 and 10 retain their separate approval gates.
+
+Fresh verification passes **108 documentation cases per Boot row** (4.0.0 and
+4.1.0), zero failures/errors/skips, plus reactor validation, baseline-provenance
+fixtures, matrix-script syntax and `git diff --check`. Both effective dependency
+inventories are captured with Java 21.0.8/Maven 3.9.9; ordinary test forks disable
+explicit GC. The new guard's expected initial missing-record failure is retained.
+No fresh full-module, API, consumer, AOT/native or performance run is claimed.
+
+The Priority 1 bundle seals **143 files** at
+`verification-evidence/v36-priority1/`, mirrored at
+`target/release-evidence/v36/priority1/`. Manifest SHA-256:
+`f97eed03840851470b58d060a1fd08d5b30d2b7d685ef9ba77924a128937dc02`.
+Archive `verification-evidence/v36-priority1-20261012.tar.gz` SHA-256:
+`f556547626e006dda88796ddfb09e563952cbb0e965387a8116005f38a0f1e4b`.
+Copied and archived contents were verified. This external integrity paragraph is
+added after sealing to avoid self-reference; it is the only excluded delta.
 
 ## Priority 2 - Audit Workloads, Fork Identity and Compiler Evidence
 
