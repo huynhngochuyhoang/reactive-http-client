@@ -46,16 +46,8 @@ def summarize(directory, side, profile, forks, extra, pair):
             or row['jdkVersion'] != '21.0.8' or row['jmhVersion'] != '1.37'):
         raise ValueError('Frozen diagnostic mismatch')
     result = review.metrics(row, forks)
-    traces = sorted((review.compiler(p) for p in directory.glob('compilation-*.xml')),
-                    key=lambda t: t['timeMillis'])
-    if len(traces) != forks or len({t['timeMillis'] for t in traces}) != forks:
-        raise ValueError('Incomplete/ambiguous compiler fork ordering')
-    for index, trace in enumerate(traces):
-        trace['fork'] = index + 1
-        trace['allocationBytesPerOp'] = result['allocation']['forkMeans'][index]
-        trace['loadedClasses'] = review.loaded_classes(
-            directory / ('classes-' + trace['process'] + '.log'), pair / ('build-' + side) / 'benchmarks.jar')
-    return {'metrics': result, 'traces': traces}
+    traces = review.diagnostic_traces(directory, row, pair / ('build-' + side) / 'benchmarks.jar')
+    return {'metrics': result, 'traces': traces, 'forkAssociation': 'unverified', 'measurementInterval': None}
 
 
 def main():

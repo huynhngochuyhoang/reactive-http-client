@@ -268,7 +268,7 @@ class DocumentationReleaseArtifactTest {
                 "Central-only", "strict root and independent starter source/binary", "both even if the first fails",
                 "explicit GC disabled", "clean reachable source", "N/A, not passed",
                 "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 2 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 3 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=v36", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
@@ -310,6 +310,30 @@ class DocumentationReleaseArtifactTest {
         assertThat(previous.lines().filter(line -> line.contains("[ ]")).toList()).hasSize(2);
         assertThat(previous).contains("### [ ] 10.2", "explicitly reduced scope");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v36EvidenceAuditSeparatesCompilerHistoryFromUnverifiedForkAttribution() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v36");
+        String audit = Files.readString(directory.resolve("EVIDENCE-AUDIT.md"));
+        assertThat(audit.replaceAll("\\s+", " ")).contains(
+                "18c64f7b6147189fc2c1229816e97c46bc6a9d39", "AUTO_REGISTRY", "HOOK",
+                "cold GET publisher", "40 untimed", "58 compiler", "22 diagnostic",
+                "timestamp order is not fork identity", "forkAssociation=unverified", "measurementInterval=null",
+                "task_done", "compile_id", "make_not_entrant", "superseded", "V36-E001",
+                "not a runtime defect", "No new benchmark", "Priority 3.3", "ordinary high-mode",
+                "A001 and A002 remain unresolved", "V1-V35", "not overwritten",
+                "target/release-evidence/v36/priority2/", "verification-evidence/v36-priority2/");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority2 = checklist.substring(checklist.indexOf("## Priority 2 - "), checklist.indexOf("## Priority 3 - "));
+        assertThat(priority2).contains("### [x] 2.1", "### [x] 2.2", "### [x] 2.3", "(EVIDENCE-AUDIT.md)")
+                .doesNotContain("[ ]");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(audit);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();

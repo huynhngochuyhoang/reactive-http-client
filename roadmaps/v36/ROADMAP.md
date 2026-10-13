@@ -131,6 +131,10 @@ source/evidence audit and verification; it authorizes no experiment or correctio
 Deliver an audit and deterministic synthetic parser fixtures. No new performance
 claim or production defect is inferred merely from an audit concern.
 
+[Priority 2 audit](EVIDENCE-AUDIT.md) verifies the workload and records bounded
+reader corrections. Historical per-fork association and measurement-time code
+identity remain unverified; no new experiment or allocation acceptance follows.
+
 ## 3. Freeze and Approve a New Bounded Investigation
 
 - Before launching measurement, specify competing hypotheses and a distinguishing

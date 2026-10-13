@@ -130,29 +130,58 @@ added after sealing to avoid self-reference; it is the only excluded delta.
 
 ## Priority 2 - Audit Workloads, Fork Identity and Compiler Evidence
 
-### [ ] 2.1 Verify effective workload boundaries
+### [x] 2.1 Verify effective workload boundaries
 
-- [ ] Inspect existing workload/runner/reviewer code and available saved records;
+- [x] Inspect existing workload/runner/reviewer code and available saved records;
       verify AUTO_REGISTRY/HOOK beans, features, GET scenario and publisher use.
-- [ ] Verify untimed semantic witnesses distinguish warm assembly, subscription,
+- [x] Verify untimed semantic witnesses distinguish warm assembly, subscription,
       transport, construction and first use; keep instrumentation outside scored work.
 
-### [ ] 2.2 Audit fork association and relevant compiler history
+### [x] 2.2 Audit fork association and relevant compiler history
 
-- [ ] Require unambiguous artifact/profile/process/trace association; review the
+- [x] Require unambiguous artifact/profile/process/trace association; review the
       existing timestamp ordering without assuming sorting proves identity.
-- [ ] Identify relevant tasks, installed code, recompilation and deoptimization
+- [x] Identify relevant tasks, installed code, recompilation and deoptimization
       relative to measurement; document unavailable timing/code-version facts.
-- [ ] Add deterministic synthetic fixtures for duplicate, missing, truncated,
+- [x] Add deterministic synthetic fixtures for duplicate, missing, truncated,
       reordered and mismatched records, including unrelated/superseded tasks.
 
-### [ ] 2.3 Record audit conclusions and bounded tooling corrections
+### [x] 2.3 Record audit conclusions and bounded tooling corrections
 
-- [ ] Distinguish verified behavior, reproduced parser/harness defects and unknowns.
+- [x] Distinguish verified behavior, reproduced parser/harness defects and unknowns.
       Preserve a failing fixture and affected conclusions for each actual defect.
-- [ ] Record any local tooling correction and its tests separately; require new
+- [x] Record any local tooling correction and its tests separately; require new
       affected evidence before relying on corrected conclusions. No runtime patch
       or new measured fork is authorized by an audit concern.
+
+**Priority 2 record (2026-10-13):** [Workload and compiler-evidence audit](EVIDENCE-AUDIT.md).
+Reachable base `18c64f7b6147189fc2c1229816e97c46bc6a9d39` plus the retained
+tooling/test/documentation patch. All 931 P10 files rehash. Corrected re-analysis
+reads 58 existing compiler processes across 22 diagnostic stages; it does not
+create new scores or forks. Unsupported timestamp-to-score joins are removed,
+command/trace validation is shared, and process-local compilation histories are
+retained without claiming measurement-time code identity.
+
+Workload semantics pass 40 untimed JUnit cases. E001 has reproduced local tooling
+defects and bounded corrections, but durable per-fork association and measurement
+boundaries remain unavailable in the old recordings. A001/A002 remain unresolved;
+Priority 3.3 must approve new capture. V1-V35 history and raw evidence are unchanged.
+
+Fresh verification passes **63 Python tooling tests**, **40 untimed workload
+cases**, and **109 documentation cases per Boot row** (4.0.0 and 4.1.0), zero
+failures/errors/skips in accepted runs. The original-reader failing reproduction
+is retained, not counted as passing. `git diff --check` passes. No production,
+timed harness, API, native or scored-performance change/run is claimed.
+
+The Priority 2 bundle seals **131 files** at
+`verification-evidence/v36-priority2/`, mirrored at
+`target/release-evidence/v36/priority2/`. Manifest SHA-256:
+`402a0f0c837eab3e6f0fe35dfd46a4cd17c866f53b4559c74b2b8e882ffb2967`.
+Archive `verification-evidence/v36-priority2-20261013.tar.gz` SHA-256:
+`b6d06ef27e939a1adcb478aeed948b3b6ca8675bfa5fbd775ee711c4f506512c`.
+Copied and archived contents were verified; all 22 derived stage metrics match
+their historical summaries. This external integrity paragraph is added after
+sealing to avoid self-reference and is the only excluded delta.
 
 ## Priority 3 - Freeze and Approve a New Bounded Investigation
 

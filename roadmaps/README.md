@@ -19,6 +19,9 @@ for baseline review, deterministic tooling tests and experiment planning around
 AUTO_REGISTRY/HOOK allocation and measurement reliability. The
 [Priority 1 baseline and ledger](v36/BASELINE-SCOPE.md) reconcile reachable source
 and available V35 evidence without resolving either allocation flag.
+The [Priority 2 audit](v36/EVIDENCE-AUDIT.md) verifies workload semantics and
+corrects unsupported trace-to-score pairing; the old recordings still lack
+durable fork identity and measurement boundaries.
 New experiments require 3.3 approval, production edits 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`
 and `plannedFinalVersion=null`; no next release is selected.

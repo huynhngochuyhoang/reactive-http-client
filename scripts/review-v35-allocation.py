@@ -7,6 +7,7 @@ import json
 import math
 from pathlib import Path
 import re
+import shlex
 import statistics
 import subprocess
 from urllib.parse import unquote, urlparse
@@ -40,6 +41,13 @@ def metrics(row, forks):
 
 def compiler(path):
     root = ET.parse(path).getroot()
+    if (root.tag != 'hotspot_log' or not (root.get('process') or '').isdigit()
+            or not (root.get('time_ms') or '').isdigit() or root.find('hotspot_log_done') is None):
+        raise ValueError('Incomplete compiler process evidence')
+    relevant = ('EffectiveCachePolicy', 'CacheWorkPolicy', 'ReactiveClientInvocationHandler',
+                'V34DefaultPathBenchmark', 'V34WorkloadFixture')
+    nmethods = [dict(e.attrib) for e in root.iter('nmethod')]
+    invalidations = [dict(e.attrib) for e in root.iter('make_not_entrant')]
     tasks = []
     for task in root.iter('task'):
         classes = {e.get('id'): e.get('name') for e in task.iter('klass')}
@@ -60,18 +68,29 @@ def compiler(path):
                 elif node.tag in ('inline_success', 'inline_fail') and last and 'EffectiveCachePolicy' in last:
                     calls.append({'caller': methods.get(parse.get('method'), parse.get('method')),
                                   'callee': last, 'decision': node.tag, 'reason': node.get('reason')})
-        if calls or any('httpstarter' in e['class'] for e in eliminated):
+        if (calls or any('httpstarter' in e['class'] for e in eliminated)
+                or any(name in task.get('method', '') for name in relevant)):
+            done = task.find('task_done')
             tasks.append({'compileId': task.get('compile_id'), 'method': task.get('method'),
-                          'stamp': task.get('stamp'), 'eliminations': eliminated, 'policyInlining': calls})
+                          'stamp': task.get('stamp'), 'eliminations': eliminated, 'policyInlining': calls,
+                          'completion': dict(done.attrib) if done is not None else None,
+                          'nmethods': [e for e in nmethods if e.get('compile_id') == task.get('compile_id')],
+                          'invalidations': [e for e in invalidations if e.get('compile_id') == task.get('compile_id')]})
+    ids = {t['compileId'] for t in tasks}
     return {'file': path.name, 'timeMillis': int(root.get('time_ms')), 'process': root.get('process'),
-            'tasks': tasks, 'nmethods': [dict(e.attrib) for e in root.iter('nmethod')
-                                         if 'CacheWorkPolicy' in e.get('method', '')
-                                         or 'ReactiveClientInvocationHandler invoke ' in e.get('method', '')],
-            'deoptimizations': [dict(e.attrib) for e in root.iter('make_not_entrant')]}
+            'vmArguments': shlex.split(root.findtext('vm_arguments/args', '')),
+            'classpaths': [line.partition('=')[2] for line in root.findtext('vm_arguments/properties', '').splitlines()
+                           if line.startswith('java.class.path=')],
+            'logDone': dict(root.find('hotspot_log_done').attrib), 'measurementInterval': None,
+            'tasks': tasks, 'nmethods': [e for e in nmethods if e.get('compile_id') in ids
+                                        or any(name in e.get('method', '') for name in relevant)],
+            'deoptimizations': invalidations}
 
 
 def loaded_classes(path, expected_jar):
     selected = []
+    required = {'io.github.huynhngochuyhoang.httpstarter.core.EffectiveCachePolicy$Selection',
+                'io.github.huynhngochuyhoang.httpstarter.config.ReactiveHttpClientProperties$CachePolicyConfig'}
     from_jar = 0
     for line in path.read_text().splitlines():
         match = re.match(r'\[([0-9.]+)s\]\[info\]\[class,load\] (\S+) source: (.*)', line)
@@ -83,11 +102,47 @@ def loaded_classes(path, expected_jar):
             if location.netloc or Path(unquote(location.path)) != expected_jar:
                 raise ValueError('Starter/harness class loaded outside the saved JAR')
             from_jar += 1
-        if name.endswith(('EffectiveCachePolicy$Selection', 'ReactiveHttpClientProperties$CachePolicyConfig')):
+        if name in required:
+            if not source.startswith('file:'):
+                raise ValueError('Missing selected-class artifact origin')
             selected.append({'class': name, 'seconds': float(timestamp), 'source': source})
-    if not from_jar or len(selected) != 2:
+    if not from_jar or Counter(e['class'] for e in selected) != Counter(required):
         raise ValueError('Missing loaded-class evidence')
     return {'starterAndHarnessClassesFromSavedJar': from_jar, 'selected': selected}
+
+
+def diagnostic_traces(directory, row, expected_jar):
+    command = json.loads((directory / 'command.json').read_text())
+    argv = command['argv']
+    def option(flag):
+        if argv.count(flag) != 1 or argv.index(flag) + 1 >= len(argv):
+            raise ValueError('Missing/duplicate diagnostic command option: ' + flag)
+        return argv[argv.index(flag) + 1]
+    parameters = [argv[i + 1] for i, arg in enumerate(argv[:-1]) if arg == '-p']
+    expected = {'-f': str(row['forks']), '-bm': 'avgt', '-tu': 'ns', '-t': '1',
+                '-wi': '5', '-w': '1s', '-i': '5', '-r': '1s', '-rf': 'json'}
+    if (command.get('exit') != 0 or option('-jar') != str(expected_jar)
+            or parameters != [f'profile={row["params"]["profile"]}', 'scenario=GET']
+            or any(option(flag) != value for flag, value in expected.items())
+            or shlex.split(option('-jvmArgs')) != row['jvmArgs']
+            or argv[argv.index('-jar') + 2] != RUNNER.BENCHMARK):
+        raise ValueError('Failed or mismatched diagnostic command')
+    # Legacy results have no worker PID or iteration timestamps. File order is not fork identity.
+    traces = [compiler(path) for path in sorted(directory.glob('compilation-*.xml'))]
+    if len(traces) != row['forks'] or len({t['process'] for t in traces}) != row['forks']:
+        raise ValueError('Missing/duplicate compiler process evidence')
+    expected_logs = {f'classes-{t["process"]}.log' for t in traces}
+    if {p.name for p in directory.glob('classes-*.log')} != expected_logs:
+        raise ValueError('Mismatched class-load inventory')
+    for trace in traces:
+        if trace['file'] != f'compilation-pid{trace["process"]}.xml':
+            raise ValueError('Compiler filename/process mismatch')
+        if trace['classpaths'] != [str(expected_jar)]:
+            raise ValueError('Compiler classpath differs from recorded artifact')
+        if trace['vmArguments'][:len(row['jvmArgs'])] != row['jvmArgs']:
+            raise ValueError('Compiler VM arguments differ from recorded workload')
+        trace['loadedClasses'] = loaded_classes(directory / f'classes-{trace["process"]}.log', expected_jar)
+    return traces
 
 
 def validate_jfr_summary(summary):
@@ -133,17 +188,12 @@ def summarize(root):
             if kind == 'scored':
                 raw[name] = rows
             else:
-                traces = sorted((compiler(p) for p in directory.glob('compilation-*.xml')), key=lambda x: x['timeMillis'])
-                if len(traces) != forks:
-                    raise ValueError('Missing compiler traces')
-                if len({t['timeMillis'] for t in traces}) != forks:
-                    raise ValueError('Ambiguous compiler fork ordering')
                 jar = Path(command['argv'][command['argv'].index('-jar') + 1])
-                for i, trace in enumerate(traces):
-                    trace['fork'] = i + 1
-                    trace['allocationBytesPerOp'] = summaries[0]['allocation']['forkMeans'][i]
-                    trace['loadedClasses'] = loaded_classes(directory / f'classes-{trace["process"]}.log', jar)
+                if len(rows) != 1:
+                    raise ValueError('Ambiguous multi-profile compiler evidence')
+                traces = diagnostic_traces(directory, rows[0], jar)
                 report[kind][name] = {'metrics': summaries, 'traces': traces,
+                                    'forkAssociation': 'unverified', 'measurementInterval': None,
                                     'jfrFiles': [str(p.relative_to(root)) for p in directory.rglob('*.jfr')]}
                 if jfr and not report[kind][name]['jfrFiles']:
                     raise ValueError('Missing JFR recording')
