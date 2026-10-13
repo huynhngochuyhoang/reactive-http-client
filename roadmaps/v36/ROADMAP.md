@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
-> **Experiment authorization:** unselected; V35's approved schedule is exhausted
+> **Experiment authorization:** V36-P3-1 approved; at most 48 worker forks, execution not started
 > **Implementation and release scope:** unselected
 > **Draft date:** 2026-10-11
 > **Adopted:** 2026-10-12
@@ -155,6 +155,11 @@ identity remain unverified; no new experiment or allocation acceptance follows.
   desired mode never appears; any extension needs a new recorded decision.
 
 Deliver the frozen plan and approval before running a benchmark or diagnostic JVM.
+
+[V36-P3-1 investigation plan](INVESTIGATION-PLAN.md) fixes 48 worker forks across
+ordinary, marker-only, traced and single-factor lanes, with bounded resources and
+no automatic retries. The maintainer approved it in 3.3 on 2026-10-13 for later
+Priorities 4/5 only; no experiment has started or finding been accepted.
 
 ## 4. Capture Ordinary Allocation Modes Per Profile
 

@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
-> **Experiment authorization:** unselected; V35's approved schedule is exhausted
+> **Experiment authorization:** V36-P3-1 approved; at most 48 worker forks, execution not started
 > **Implementation and release scope:** unselected
 > **Adopted:** 2026-10-12
 
@@ -185,29 +185,70 @@ sealing to avoid self-reference and is the only excluded delta.
 
 ## Priority 3 - Freeze and Approve a New Bounded Investigation
 
-### [ ] 3.1 Specify hypotheses and distinguishing observations
+### [x] 3.1 Specify hypotheses and distinguishing observations
 
-- [ ] Cover ordinary compiler modes, instrumentation perturbation, workload/phase
+- [x] Cover ordinary compiler modes, instrumentation perturbation, workload/phase
       mismatch and artifact/dependency differences with evidence that could refute each.
-- [ ] Separate lowest-perturbation ordinary, traced and intervention lanes; specify
+- [x] Separate lowest-perturbation ordinary, traced and intervention lanes; specify
       how missing modes and perturbation will limit attribution per profile.
 
-### [ ] 3.2 Freeze exact inputs, schedule and resource bounds
+### [x] 3.2 Freeze exact inputs, schedule and resource bounds
 
-- [ ] Freeze profiles/controls, artifacts, JDK/JMH/Boot/dependencies, VM flags,
+- [x] Freeze profiles/controls, artifacts, JDK/JMH/Boot/dependencies, VM flags,
       heap, threads, warmup/measurement, units, order and same-JAR controls.
-- [ ] Start from recorded Java 21.0.8/Boot 4.0.0 where available; changed stacks
+- [x] Start from recorded Java 21.0.8/Boot 4.0.0 where available; changed stacks
       are separate experiments, not silent replacements of historical comparisons.
-- [ ] Set a numerical fork ceiling, per-stage timeout, total resource/time bound,
+- [x] Set a numerical fork ceiling, per-stage timeout, total resource/time bound,
       host preconditions and abort policy covering every control/trace/intervention.
 
-### [ ] 3.3 Obtain explicit experiment approval
+### [x] 3.3 Obtain explicit experiment approval
 
-- [ ] Record the maintainer's approval of the frozen plan and stop rules before
+- [x] Record the maintainer's approval of the frozen plan and stop rules before
       launching any benchmark or diagnostic JVM, including pilots.
-- [ ] Confirm V35's 338-fork history and exhausted 36-fork extension grant no new
+- [x] Confirm V35's 338-fork history and exhausted 36-fork extension grant no new
       budget. Failures or absent modes do not authorize retries; extensions require
       a new recorded decision before additional execution.
+
+### Priority 3 Planning Record
+
+[V36-P3-1](INVESTIGATION-PLAN.md) freezes competing hypotheses, saved artifact/JDK
+hashes, exact measurement settings and the ordered **48-fork** O/M/T/I schedule.
+The numerical ceiling includes same-JAR and instrumentation controls; each stage
+has a 120-second deadline and the cumulative active investigation is capped at
+120 minutes. Failure aborts the schedule; neither failure nor missing modes grants
+retries. V35's 338 forks and exhausted extension confer no authorization.
+
+The new identity contract uses one worker per stage and a separately controlled
+iteration recorder. Its intervals are envelopes, not exact timed-loop boundaries
+or proof of executing code. Recorder/runner implementation and actual E001 capture
+verification remain Priority 4 work. A001/A002 remain unresolved.
+
+Started from clean `56bb5753cd1c247654360c86a5257a1c2aaf201c`; the planning delta
+contains only documentation and its regression guard. Eight pinned input hashes
+were rechecked without rebuilding saved artifacts. On 2026-10-13 the maintainer
+replied **"Approve V36-P3-1 (Recommended)"**, selecting this 48-fork / 120-minute
+investigation with fixed lanes and no retries after failure without a new decision.
+This authorizes later Priorities 4/5 only, not production edits or a release.
+**No benchmark or diagnostic fork was launched; all 48 slots remain unused.**
+
+Verification passes **63 Python tooling tests** and **110 documentation cases per
+Boot row** (4.0.0 and 4.1.0), with zero failures/errors/skips. The documentation
+guard checks exact lane order, contiguous stage IDs, 48-fork arithmetic, limits,
+links and the recorded approval. `git diff --check` passes. The initial Boot 4.0.0
+run passed, but its report-copy step used an incorrect filename; that failed
+collection attempt is retained separately from corrected complete runs.
+No fresh workload, full-reactor, API, consumer, native or performance run is claimed.
+Commands, input hashes, reports, readiness and base-plus-patch provenance are
+preserved at `verification-evidence/v36-priority3/`, mirrored at
+`target/release-evidence/v36/priority3/`; the external seal follows verification.
+
+The Priority 3 bundle seals **59 files**. Manifest SHA-256:
+`2ce190c822d2f64936038b3c051ea14b65a1701dd9111570100930a2d19edd1c`.
+Archive `verification-evidence/v36-priority3-20261013.tar.gz` SHA-256:
+`461b1920e9351050b009342e5093b53ed3509ac013821e37e279cb7e41257d69`.
+Copied and archived contents were verified, including the exact plan approved
+before its status update. This integrity paragraph is added after sealing to
+avoid self-reference and is the only excluded delta.
 
 ## Priority 4 - Capture Ordinary Allocation Modes Per Profile
 

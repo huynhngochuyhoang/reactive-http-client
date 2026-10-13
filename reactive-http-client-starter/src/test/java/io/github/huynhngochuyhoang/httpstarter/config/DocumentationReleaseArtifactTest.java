@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.replaceAll("\\s+", " ")).contains(
                 "(ROADMAP.md)", "V36-A001", "V36-A002", "V36-E001", "unresolved/blocking",
                 "Creating this checklist completes no execution item", "338-fork history", "exhausted 36-fork",
-                "### [ ] 3.3 Obtain explicit experiment approval", "### [ ] 6.2 Obtain implementation or no-change decision",
+                "### [x] 3.3 Obtain explicit experiment approval", "### [ ] 6.2 Obtain implementation or no-change decision",
                 "### [ ] 10.4 Verify publication or explicit no-release closure", "numerical fork ceiling",
                 "no new budget", "before any production edit", "before launching any benchmark or diagnostic JVM",
                 "timestamp ordering", "superseded tasks", "non-reproduction is not resolution",
@@ -268,7 +268,7 @@ class DocumentationReleaseArtifactTest {
                 "Central-only", "strict root and independent starter source/binary", "both even if the first fails",
                 "explicit GC disabled", "clean reachable source", "N/A, not passed",
                 "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 3 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 4 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=v36", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
@@ -334,6 +334,61 @@ class DocumentationReleaseArtifactTest {
         assertThat(priority2).contains("### [x] 2.1", "### [x] 2.2", "### [x] 2.3", "(EVIDENCE-AUDIT.md)")
                 .doesNotContain("[ ]");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(audit);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v36InvestigationPlanFreezesBudgetAndPreservesApprovalAndAttributionGates() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v36");
+        String plan = Files.readString(directory.resolve("INVESTIGATION-PLAN.md"));
+        assertThat(plan.lines().filter(line -> line.startsWith("> **Status:**")).toList())
+                .containsExactly("> **Status:** approved in Priority 3.3 on 2026-10-13; execution not started");
+        assertThat(plan.replaceAll("\\s+", " ")).contains(
+                "56bb5753cd1c247654360c86a5257a1c2aaf201c", "V36-P3-1", "AUTO_REGISTRY", "HOOK",
+                "H1:", "H2:", "H3:", "H4:", "H5:", "Java 21.0.8", "4.0.0", "1.37",
+                "1744 +/- 32 B/op", "2000 +/- 32 B/op", "other/mixed", "same-JAR",
+                "-f 1 -wf 0", "-wi 5 -w 1s -i 5 -r 1s", "-prof gc", "-Xms512m -Xmx512m",
+                "-XX:ActiveProcessorCount=2", "-XX:CompileCommand=dontinline,",
+                "iteration envelopes, not exact timed-loop boundaries", "superseded tasks",
+                "One `-f 1` row joins to that one worker, not sorted times",
+                "Keep O's measurement boundary unknown", "new recorded maintainer decision",
+                "120-second", "120 minutes", "3 GiB", "16 GiB", "2 GiB", "256 MiB", "8 GiB",
+                "two additional toolchain preflight JVMs", "No automatic retry or replacement stage",
+                "338-fork history", "exhausted 36-fork extension", "before any cleanup",
+                "A001/A002 remain unresolved/blocking", "Priority 6.2", "Priority 7", "Priority 10",
+                "Approve V36-P3-1 (Recommended)", "All 48 worker slots remain unused",
+                "342fd51e17fc94fe4a313b151bb347c1a256075d99f8f966b4ead12d7cc85bf2");
+
+        List<String> lanes = plan.lines().filter(line -> line.matches("\\| [OMTI] \\|.*")).toList();
+        assertThat(lanes).hasSize(4);
+        int nextStage = 1;
+        for (int index = 0; index < lanes.size(); index++) {
+            String[] columns = lanes.get(index).split("\\|", -1);
+            assertThat(columns[1].trim()).isEqualTo(List.of("O", "M", "T", "I").get(index));
+            String[] range = columns[2].trim().split("-");
+            int first = Integer.parseInt(range[0]);
+            int last = Integer.parseInt(range[1]);
+            int forks = Integer.parseInt(columns[4].trim());
+            assertThat(first).isEqualTo(nextStage);
+            assertThat(last - first + 1).isEqualTo(forks);
+            String slots = columns[3].trim();
+            assertThat(slots).isEqualTo(index % 2 == 0 ? "B C C B B B C C" : "B C C B");
+            assertThat(slots.split(" ").length * 2).isEqualTo(forks);
+            nextStage = last + 1;
+        }
+        assertThat(nextStage - 1).isEqualTo(48);
+        assertThat(plan.lines().filter(line -> line.matches("\\|.*`[0-9a-f]{64}`.*")).count()).isEqualTo(8);
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 3 - ", 2)[1].split("## Priority 4 - ", 2)[0];
+        assertThat(priority).contains("### [x] 3.1", "### [x] 3.2", "### [x] 3.3", "(INVESTIGATION-PLAN.md)")
+                .doesNotContain("[ ]");
+        assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md")))
+                .contains("(v36/INVESTIGATION-PLAN.md)");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(INVESTIGATION-PLAN.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(plan);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
