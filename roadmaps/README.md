@@ -34,6 +34,10 @@ JMH-internal probe-accounting exception, then explicitly approved
 forced non-inlining produces high allocation on both profiles/artifacts, but
 does not resolve either original flag. All 48 worker slots are exhausted; no
 further experiment is authorized.
+[Priority 6](v36/CORRECTION-DECISION.md) records the maintainer-approved
+no-production-change outcome, retaining the verified tooling and runtime contracts.
+Both allocation findings remain unresolved/blocking; implementation selection
+does not approve scope exclusion, closure or release.
 Experiments outside the plan need a new decision,
 production edits need 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`

@@ -6,7 +6,7 @@
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
 > **Experiment authorization:** V36-P3-1 plus V36-P5-1; 48/48 worker slots consumed, no further execution authorized
-> **Implementation and release scope:** unselected
+> **Implementation and release scope:** approved no production change (V36-P6-1); release unselected
 > **Draft date:** 2026-10-11
 > **Adopted:** 2026-10-12
 
@@ -231,6 +231,12 @@ verified within its recorded limits; no production fix or release is selected.
   without erasing its results or reopening unrelated rejected V35 patches.
 
 Deliver the explicit correction/no-change decision and any independently verified patch.
+
+[V36-P6-1](CORRECTION-DECISION.md) records explicit maintainer approval for no
+production change, retaining the verified tooling corrections and existing runtime
+contracts. A001/A002 remain unresolved/blocking. This selects implementation N/A,
+not finding acceptance, additional experiments, scope exclusion or release.
+Retained-behavior verification is recorded in the execution checklist.
 
 ## 7. Verify Matched Cost and Independent Acceptance
 

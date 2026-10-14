@@ -6,7 +6,7 @@
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
 > **Experiment authorization:** V36-P3-1 plus V36-P5-1; 48/48 worker slots consumed, no further execution authorized
-> **Implementation and release scope:** unselected
+> **Implementation and release scope:** approved no production change (V36-P6-1); release unselected
 > **Adopted:** 2026-10-12
 
 Execution companion to [ROADMAP.md](ROADMAP.md). Adoption authorizes baseline,
@@ -385,29 +385,67 @@ the only excluded delta.
 
 ## Priority 6 - Select a Bounded Correction or No-Change Outcome
 
-### [ ] 6.1 Compare the smallest justified options
+### [x] 6.1 Compare the smallest justified options
 
-- [ ] Evaluate bounded tooling correction, local production fix and no production
+- [x] Evaluate bounded tooling correction, local production fix and no production
       change against demonstrated need; required work or compiler variation alone
       does not justify optimization.
-- [ ] Name affected profiles, semantics, ownership, acceptance and rollback. Stop
+- [x] Name affected profiles, semantics, ownership, acceptance and rollback. Stop
       out-of-scope API/default/dependency or architectural needs for separate approval.
 
-### [ ] 6.2 Obtain implementation or no-change decision
+### [x] 6.2 Obtain implementation or no-change decision
 
-- [ ] Record explicit maintainer approval before any production edit. Tooling-only
+- [x] Record explicit maintainer approval before any production edit. Tooling-only
       authorization is not runtime authorization; no-change is an evidence-backed outcome.
-- [ ] Keep late registration, prototype/provider/order/support behavior, fresh public
+- [x] Keep late registration, prototype/provider/order/support behavior, fresh public
       metadata, full mutation validation and body/context/terminal ownership in scope.
 
-### [ ] 6.3 Implement and verify only the selected boundary
+### [x] 6.3 Implement and verify only the selected boundary
 
-- [ ] Verify approved corrections with focused regressions and selected cache/auth/
+- [x] Verify approved corrections with focused regressions and selected cache/auth/
       resilience controls. No shared mutable state, skipped cleanup or cached discovery.
-- [ ] Require repeatable attributed benefit or approved reproduced correctness cost;
+      Correction-specific work N/A; existing retained-behavior controls pass below.
+- [x] Require repeatable attributed benefit or approved reproduced correctness cost;
       roll back independently if acceptance fails and retain the evidence.
-- [ ] If no correction is selected, record implementation N/A and substantiate retained
+      Candidate acceptance/rollback N/A on 2026-10-14: no runtime correction selected.
+- [x] If no correction is selected, record implementation N/A and substantiate retained
       behavior; do not reinstate unrelated rejected V35 patches.
+
+**Priority 6 decision (2026-10-14):** [Correction/no-change record](CORRECTION-DECISION.md).
+The maintainer answered **"Approve no production change (Recommended)"** to
+V36-P6-1, retaining the verified tooling corrections and current runtime behavior.
+This approves no experiment, scope exclusion, closure or release. A001/A002 stay
+**unresolved/blocking**; E001 remains verified only for the new capture within its
+recorded limits. Implementation N/A because no runtime correction is selected;
+there is no new candidate to score or roll back. V35 candidates remain rejected.
+
+Fresh retained-behavior checks pass **141 cases across eight classes per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, plus **83 tooling tests**.
+Java tests disable explicit GC. The record identifies discovery, fresh metadata,
+full mutation validation, body/context/reporting ownership and selected cache/
+auth/resilience witnesses. All **798 P4/P5 files** and both archive hashes
+revalidate; **202 production/build/benchmark inputs** are unchanged from V36
+adoption. Verification uses reachable base `71f989f5492bcd8c38d1c63197f56b507fa311c9`
+plus this docs/guard patch. No new experiment, production change, full-reactor,
+API, assembled-consumer or native run is claimed. Priorities 7-10 remain pending.
+
+Final documentation/readiness/link guards pass **114 cases per Boot row**,
+zero failures/errors/skips: **255 Java cases per row** including the 141
+retained-behavior controls, not an additional distinct-contract count. The new
+guard's initial missing-record failure and the first full documentation run's
+stale unselected-scope assertion are preserved; the corrected rerun passes.
+`git diff --check` passes. Evidence is retained under
+`target/release-evidence/v36/priority6/` and copied to
+`verification-evidence/v36-priority6/` before cleanup; the external seal follows.
+
+The Priority 6 bundle seals **87 files**. Manifest SHA-256:
+`4ff957a173bda3af19e191695d4f1f0c7ae4b6b85a0a50d606ad9507cdddcce7`.
+Archive `verification-evidence/v36-priority6-20261014.tar.gz` SHA-256:
+`244bce01667664bfb60d069381b79753da22c3e1d28644dbec394d80c71e9cc8`.
+Copied and archived contents were verified, including the approval, source patch,
+unchanged-input inventory, failed guard attempts and successful final checks.
+This integrity paragraph is added after sealing to avoid self-reference and is
+the only excluded delta.
 
 ## Priority 7 - Verify Matched Cost and Independent Acceptance
 

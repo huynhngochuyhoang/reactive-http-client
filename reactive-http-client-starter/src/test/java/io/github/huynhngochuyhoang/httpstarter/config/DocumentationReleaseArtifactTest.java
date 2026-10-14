@@ -209,7 +209,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(roadmap.lines().filter(line -> line.startsWith("> **Status:**")).toList())
                 .containsExactly("> **Status:** active");
         assertThat(roadmap.lines().filter(line -> line.startsWith("> **Implementation and release scope:**")).toList())
-                .containsExactly("> **Implementation and release scope:** unselected");
+                .containsExactly("> **Implementation and release scope:** approved no production change (V36-P6-1); release unselected");
         assertThat(roadmap.lines().filter(line -> line.matches("## \\d+\\. .+")).toList()).hasSize(10);
         assertThat(roadmap.lines().filter(line -> line.startsWith("| V36-")).toList()).hasSize(3);
         assertThat(roadmap.replaceAll("\\s+", " ")).contains(
@@ -260,7 +260,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.replaceAll("\\s+", " ")).contains(
                 "(ROADMAP.md)", "V36-A001", "V36-A002", "V36-E001", "unresolved/blocking",
                 "Creating this checklist completes no execution item", "338-fork history", "exhausted 36-fork",
-                "### [x] 3.3 Obtain explicit experiment approval", "### [ ] 6.2 Obtain implementation or no-change decision",
+                "### [x] 3.3 Obtain explicit experiment approval", "### [x] 6.2 Obtain implementation or no-change decision",
                 "### [ ] 10.4 Verify publication or explicit no-release closure", "numerical fork ceiling",
                 "no new budget", "before any production edit", "before launching any benchmark or diagnostic JVM",
                 "timestamp ordering", "superseded tasks", "non-reproduction is not resolution",
@@ -268,7 +268,7 @@ class DocumentationReleaseArtifactTest {
                 "Central-only", "strict root and independent starter source/binary", "both even if the first fails",
                 "explicit GC disabled", "clean reachable source", "N/A, not passed",
                 "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 6 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 7 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=v36", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
@@ -521,6 +521,44 @@ class DocumentationReleaseArtifactTest {
         assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(INTERVENTION-RESULTS.md)");
         assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md"))).contains("(v36/INTERVENTION-RESULTS.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(results);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v36NoChangeDecisionPreservesUnresolvedFindingsAndRuntimeContracts() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v36");
+        String decision = Files.readString(directory.resolve("CORRECTION-DECISION.md"));
+        assertThat(decision.replaceAll("\\s+", " ")).contains(
+                "V36-P6-1", "Approve no production change (Recommended)", "2026-10-14",
+                "71f989f5492bcd8c38d1c63197f56b507fa311c9", "no production change",
+                "Tooling correction", "Local production fix", "No production change",
+                "A001 / AUTO_REGISTRY", "A002 / HOOK", "unresolved/blocking",
+                "E001 / evidence reliability", "verified for the new capture",
+                "legacy pairing", "executing-code identity", "individual probe census",
+                "48/48", "no further execution authorized", "not a performance pass",
+                "Implementation N/A", "acceptance and rollback N/A", "No V35 candidate is reinstated",
+                "late registration", "prototype", "provider", "ordering", "supports",
+                "fresh public metadata", "full mutation validation", "body/context/terminal ownership",
+                "DefaultPathCostOwnershipTest", "PublicStaticMetadataContractTest",
+                "CacheWorkPolicyEnforcementTest", "StreamingUploadOwnershipTest",
+                "RequestContextSnapshotTest", "SubscriptionLocalReportingStateTest",
+                "InvocationCompositionReviewTest", "ExplicitResilienceActivationContractTest",
+                "Priority 7", "Priority 10", "plannedFinalVersion=null", "releaseLane=unselected",
+                "target/release-evidence/v36/priority6/", "verification-evidence/v36-priority6/");
+        List<String> findings = decision.lines().filter(line -> line.matches("\\| A00[12] /.*")).toList();
+        assertThat(findings).hasSize(2).allSatisfy(row -> assertThat(row).contains("unresolved/blocking"));
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0];
+        assertThat(priority).contains("### [x] 6.1", "### [x] 6.2", "### [x] 6.3",
+                "(CORRECTION-DECISION.md)", "Implementation N/A").doesNotContain("[ ]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 7 - "))).doesNotContain("[x]");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(CORRECTION-DECISION.md)");
+        assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md")))
+                .contains("(v36/CORRECTION-DECISION.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
