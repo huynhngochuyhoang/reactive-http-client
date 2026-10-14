@@ -268,7 +268,7 @@ class DocumentationReleaseArtifactTest {
                 "Central-only", "strict root and independent starter source/binary", "both even if the first fails",
                 "explicit GC disabled", "clean reachable source", "N/A, not passed",
                 "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 7 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 8 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=v36", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
@@ -554,11 +554,50 @@ class DocumentationReleaseArtifactTest {
         String priority = checklist.split("## Priority 6 - ", 2)[1].split("## Priority 7 - ", 2)[0];
         assertThat(priority).contains("### [x] 6.1", "### [x] 6.2", "### [x] 6.3",
                 "(CORRECTION-DECISION.md)", "Implementation N/A").doesNotContain("[ ]");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 7 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 8 - "))).doesNotContain("[x]");
         assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(CORRECTION-DECISION.md)");
         assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md")))
                 .contains("(v36/CORRECTION-DECISION.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v36MatchedCostReviewPreservesFlagsAndIndependentNonAcceptance() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v36");
+        String record = Files.readString(directory.resolve("COST-ACCEPTANCE.md"));
+        assertThat(record.replaceAll("\\s+", " ")).contains(
+                "2026-10-14", "edb99ad2bfab1511079d57a3979fdefccb6cc158",
+                "Priority 7 review complete; full-scope cost acceptance blocked",
+                "V36-P6-1", "New scoring N/A", "zero new workers", "48/48",
+                "60 primary rows per artifact", "four reverse-confirmation rows per artifact",
+                "240 primary", "16 confirmation", "1,280", "2,560",
+                "Central-only 4.4.2", "4.5.0-SNAPSHOT", "39 harness/build inputs",
+                "120 non-starter JARs", "24,224", "310 starter classes",
+                "not a fresh Central download", "not a new native", "75 cases per artifact",
+                ">20% latency", ">max(32 B/op, 5%)", "three allocation flags", "zero latency flags",
+                "AUTO_NO_REGISTRY", "AUTO_REGISTRY", "HOOK", "RESILIENCE_ENABLED_ONLY",
+                "legacy fork/trace pairing", "executing-code identity", "individual probe census",
+                "No public performance claim", "clean reachable source", "sanitized",
+                "scenario", "metric", "Priority 10", "scope exclusion", "releaseLane=unselected",
+                "target/release-evidence/v36/priority7/", "verification-evidence/v36-priority7/");
+        List<String> findings = record.lines().filter(line -> line.matches("\\| A00[12] /.*")).toList();
+        assertThat(findings).hasSize(2).allSatisfy(row -> assertThat(row).contains("unresolved/blocking"));
+        assertThat(record.lines().filter(line -> line.startsWith("| Combined A001 + A002 |")).toList())
+                .singleElement().asString().contains("not accepted", "both findings");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 7 - ", 2)[1].split("## Priority 8 - ", 2)[0];
+        assertThat(priority).contains("### [x] 7.1", "### [x] 7.2", "### [x] 7.3",
+                "(COST-ACCEPTANCE.md)", "New scoring N/A", "unresolved/blocking",
+                "not a performance pass").doesNotContain("[ ]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 8 - "))).doesNotContain("[x]");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(COST-ACCEPTANCE.md)");
+        assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md")))
+                .contains("(v36/COST-ACCEPTANCE.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(record);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();

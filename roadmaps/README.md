@@ -38,6 +38,9 @@ further experiment is authorized.
 no-production-change outcome, retaining the verified tooling and runtime contracts.
 Both allocation findings remain unresolved/blocking; implementation selection
 does not approve scope exclusion, closure or release.
+[Priority 7 review](v36/COST-ACCEPTANCE.md) revalidates the unchanged scored pair
+and reverse confirmations without new workers. Original allocation flags remain;
+independent and combined cost acceptance is still blocked, with no public claim.
 Experiments outside the plan need a new decision,
 production edits need 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`

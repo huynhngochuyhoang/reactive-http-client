@@ -258,6 +258,11 @@ Retained-behavior verification is recorded in the execution checklist.
 Deliver matched acceptance or explicitly named unaccepted scope; no public number
 is required. Diagnostic results cannot become a promoted benchmark report.
 
+[Priority 7 review](COST-ACCEPTANCE.md) verifies exact reuse of the unchanged
+60-row scored pair and all reverse confirmations without new workers. Original
+flags remain; A001/A002 and their combination are not accepted. The completed
+review does not approve scope exclusion, further experiments, closure or release.
+
 ## 8. Compatibility, Cross-Path and Lifecycle Verification
 
 - Scale verification to the accepted delta. Tooling/docs-only work needs parser,

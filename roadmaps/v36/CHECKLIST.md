@@ -449,27 +449,69 @@ the only excluded delta.
 
 ## Priority 7 - Verify Matched Cost and Independent Acceptance
 
-### [ ] 7.1 Freeze final cost applicability and comparison scope
+### [x] 7.1 Freeze final cost applicability and comparison scope
 
-- [ ] Separate tooling/instrumentation changes from runtime changes; verify exact
+- [x] Separate tooling/instrumentation changes from runtime changes; verify exact
       unchanged-input reuse where justified, retaining coordinates and original flags.
-- [ ] Before new scoring, approve a frozen affected matrix and numerical budget under
+- [x] Before new scoring, approve a frozen affected matrix and numerical budget under
       the same 3.3 rules. Use the existing 60-row matrix for shared default-path changes;
       this priority does not implicitly extend the earlier diagnostic budget.
+      New scoring N/A on 2026-10-14: approved no production change; scored inputs unchanged.
 
-### [ ] 7.2 Execute applicable matched scoring and confirmation
+### [x] 7.2 Execute applicable matched scoring and confirmation
 
-- [ ] Keep a Central-only `4.4.2` baseline, matched harness/non-starter dependencies,
+- [x] Keep a Central-only `4.4.2` baseline, matched harness/non-starter dependencies,
       semantic witnesses and both artifact orders; retain every row/fork/interval.
-- [ ] Apply >20% latency and >max(32 B/op, 5%) allocation review triggers and reverse
+      Exact saved-input reuse, not new measurement or fresh Central resolution.
+- [x] Apply >20% latency and >max(32 B/op, 5%) allocation review triggers and reverse
       confirmation of every flag. Do not drop inconvenient rows or substitute diagnostics.
 
-### [ ] 7.3 Accept findings and final combination independently
+### [x] 7.3 Accept findings and final combination independently
 
-- [ ] Review A001/A002 individually and combined; unexplained required evidence stays
+- [x] Review A001/A002 individually and combined; unexplained required evidence stays
       blocking. Clear aggregates or forced modes are not blanket acceptance.
-- [ ] Apply public-report promotion rules only to qualified scores. No public number
+      Review completed with non-acceptance: both findings and their combination remain blocking.
+- [x] Apply public-report promotion rules only to qualified scores. No public number
       is required; explicit scope exclusion is not an explanation or speedup claim.
+
+**Priority 7 review (2026-10-14):** [Matched cost and acceptance](COST-ACCEPTANCE.md).
+New scoring N/A under V36-P6-1; no runtime or scored-harness change exists.
+The offline audit revalidates **1,816 files** and four archive hashes, **202
+production/build/benchmark inputs**, 39 harness/build inputs, both ordered
+121-JAR classpaths and all 24,224 shaded class entries. The saved Central-only
+4.4.2 / 4.5.0-SNAPSHOT pair retains original source coordinates and limits.
+
+Re-analysis exactly reproduces all **60 primary rows per artifact** and **four
+reverse-confirmation rows per artifact**, including all samples and intervals:
+zero primary latency flags, **three primary allocation flags**, zero reverse
+flags. Every primary flag and the historical enabled-only row has reverse
+confirmation. The 256 scored workers are reused V35 history, not new execution.
+V36's 48/48 worker budget remains exhausted; no new worker/probe is launched.
+
+A001/A002 remain **unresolved/blocking**, independently and combined. Completion
+records the acceptance review and named unaccepted scope, **not a performance pass**,
+scope exclusion, closure or release. E001 retains its limited new-capture
+verification. No public performance number/report is promoted. Priorities 8-10
+remain pending; V1-V35 and their original flags/closure decisions are unchanged.
+
+Verification passes **115 documentation/readiness/link cases per Boot row**
+(4.0.0/4.1.0), zero failures/errors/skips, and **83 Python tooling tests**.
+Ordinary Java tests disable explicit GC. The initial missing-record guard
+failure is preserved. `git diff --check` passes. No fresh full-reactor, API,
+assembled-consumer, native or benchmark run is claimed. Commands/exits, input
+hashes, full derived reviews and source patch are preserved under
+`target/release-evidence/v36/priority7/` and copied to
+`verification-evidence/v36-priority7/` before cleanup; the external seal follows.
+
+The Priority 7 bundle seals **63 files**. Manifest SHA-256:
+`c11a1e2854189d77e89757815c4f0e7c92c9da2094305dbb78f0836f2af76dfa`.
+Archive `verification-evidence/v36-priority7-20261014.tar.gz` SHA-256:
+`6ed0851e9fa0983a7258c06534540508fbe57aa0deb693cd4d35e433d2389516`.
+Copied and archived contents were verified, including the original input-manifest
+references, derived reviews, failed guard attempt, final tests and source patch.
+This integrity paragraph is added after sealing to avoid self-reference and is
+the only excluded delta. The four referenced historical bundles remain required
+for raw samples and binaries; this smaller audit archive does not replace them.
 
 ## Priority 8 - Compatibility, Cross-Path and Lifecycle Verification
 
