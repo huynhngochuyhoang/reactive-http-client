@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
-> **Experiment authorization:** V36-P3-1; 40/48 worker slots consumed, Priority 5 gated on revised probe accounting
+> **Experiment authorization:** V36-P3-1 plus V36-P5-1; 48/48 worker slots consumed, no further execution authorized
 > **Implementation and release scope:** unselected
 > **Adopted:** 2026-10-12
 
@@ -315,26 +315,73 @@ added after sealing to avoid self-reference and is the only excluded delta.
 
 ## Priority 5 - Test Causal Explanations Without Replacing Scores
 
-### [ ] 5.1 Execute only approved one-factor controls
+**Execution gate:** [V36-P5-1 accounting amendment](INTERVENTION-ACCOUNTING.md)
+approves eight remaining workers and sixteen inferred internal probes, with no
+new preflights or retries. The maintainer answered **"approve v36-p5-1"** on
+2026-10-14. That approval authorized only the run below; the original cumulative
+budget is not reset. All eight remaining slots have now been consumed.
 
-- [ ] Challenge the leading explanation with the approved interventions and preserve
+### [x] 5.1 Execute only approved one-factor controls
+
+- [x] Challenge the leading explanation with the approved interventions and preserve
       workload semantics, all results and budget accounting.
-- [ ] Label forced non-inlining, disabled escape analysis or controlled class loading
+- [x] Label forced non-inlining, disabled escape analysis or controlled class loading
       as diagnostics, not production advice, ordinary evidence or release scores.
 
-### [ ] 5.2 Build per-profile causal evidence chains
+### [x] 5.2 Build per-profile causal evidence chains
 
-- [ ] Link inputs, measured modes, relevant compiler history and interventions;
+- [x] Link inputs, measured modes, relevant compiler history and interventions;
       retain contrary evidence and distinguish sampling from exact object accounting.
-- [ ] Do not extend AUTO_NO_REGISTRY's explanation to A001/A002 without their own
+- [x] Do not extend AUTO_NO_REGISTRY's explanation to A001/A002 without their own
       evidence. State what an untraced historical fork cannot establish.
 
-### [ ] 5.3 Classify findings and remaining limits
+### [x] 5.3 Classify findings and remaining limits
 
-- [ ] Disposition A001 and A002 independently as explained without production change,
+- [x] Disposition A001 and A002 independently as explained without production change,
       reproduced defect requiring selection, or unresolved/blocking.
-- [ ] Disposition E001 with tests and affected-result applicability. Evidence-processing
+- [x] Disposition E001 with tests and affected-result applicability. Evidence-processing
       corrections must not erase raw observations; non-reproduction is not resolution.
+
+### Priority 5 Evidence
+
+[Intervention results](INTERVENTION-RESULTS.md) record all eight I workers,
+per-profile causal chains, contrary evidence and independent dispositions. The
+maintainer approved V36-P5-1 before execution. Reachable base
+`fe13031f171dd33fc86e6ee5392c2b83a14407e4` plus the sealed tooling/test/docs patch
+reused the exact saved JARs and recorder, without production or harness changes.
+
+Stages **41-48** exited zero and validated; all **40 measurement iterations**
+remain. No retries, preflights or extra profiles ran. New execution consumed
+**101.688487 seconds**, cumulative **603.828999 seconds**. All **48/48 worker
+slots are exhausted**. Sixteen new probes are inferred under the accepted
+accounting limit, not individually observed: combined accounting is 96 inferred
+probes plus 48 launchers, 48 workers and two historical preflights.
+
+Each profile/artifact produced two I-high forks near 2000 B/op versus four T-low
+forks near 1744 B/op. All eight I histories contain the requested compiler
+refusals; 28 call-site refusals and 763 relevant tasks/installations are retained.
+This supports a controlled inlining-boundary effect, not the cause of an
+untraced ordinary high mode. **A001 and A002 remain unresolved/blocking**. E001's
+new association/validation is verified with explicit limitations; no legacy
+pairing, exact executing-code identity or individual probe census is asserted.
+No additional experiment, production change or release is selected.
+
+Verification passes **83 tooling tests** and **113 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips. Re-analysis reproduced all 48 stage
+reports and rehashed 597 P4 and 931 P10 files. Prior workload/callback checks are
+reused, not fresh runs. `git diff --check` passes. No full reactor/API/consumer/
+native or release scoring rerun is claimed. Evidence is preserved under
+`target/release-evidence/v36/priority5/` and `verification-evidence/v36-priority5/`;
+the external seal follows verification.
+
+The Priority 5 bundle seals **201 files**. Manifest SHA-256:
+`b1b6a7ec0e180f959feb3fd4901ef9cc4ec65c7abc499e5ec43ecb6e92c4dc54`.
+Archive `verification-evidence/v36-priority5-20261014.tar.gz` SHA-256:
+`d963c7f7e8eddcc04c63bc72f61fc530310685b099feec826d0d6bef0952e905`.
+Copied and archived contents were verified, including the approved amendment,
+capture-time source patch, all eight raw stages and final result/test evidence.
+This integrity paragraph is added after sealing to avoid self-reference and is
+the only excluded delta.
 
 ## Priority 6 - Select a Bounded Correction or No-Change Outcome
 

@@ -25,11 +25,15 @@ durable fork identity and measurement boundaries.
 The [Priority 3 plan](v36/INVESTIGATION-PLAN.md) freezes a 48-fork investigation,
 separate instrumentation controls and stop rules. The maintainer approved that
 bounded plan in 3.3. [Priority 4 capture](v36/ORDINARY-CAPTURE.md) completed 40
-ordinary/control/trace workers; eight intervention slots remain. HOOK reproduced
+ordinary/control/trace workers. HOOK reproduced
 untraced high modes, but both allocation findings still lack ordinary high-mode
 compiler attribution. The maintainer accepted capture closure with the documented
-JMH-internal probe-accounting exception; Priority 5 requires revised accounting
-before further execution.
+JMH-internal probe-accounting exception, then explicitly approved
+[V36-P5-1](v36/INTERVENTION-ACCOUNTING.md).
+[Priority 5](v36/INTERVENTION-RESULTS.md) completed the eight remaining workers:
+forced non-inlining produces high allocation on both profiles/artifacts, but
+does not resolve either original flag. All 48 worker slots are exhausted; no
+further experiment is authorized.
 Experiments outside the plan need a new decision,
 production edits need 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`

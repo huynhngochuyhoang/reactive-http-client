@@ -247,6 +247,19 @@ def v36_stage(directory, expected):
         raise ValueError('V36 compiler worker mismatch')
     trace['loadedClasses'] = loaded_classes(logs[0], expected['jar'])
     result['trace'] = trace
+    if expected['lane'] == 'I':
+        directive = '-XX:CompileCommand=dontinline,' + RUNNER.TARGET
+        if expected['jvmArgs'].count(directive) != 1:
+            raise ValueError('Missing/duplicate intervention directive')
+        calls = [{'compileId': task['compileId'], 'taskMethod': task['method'], **call}
+                 for task in trace['tasks'] for call in task['policyInlining']
+                 if call['callee'] == RUNNER.TARGET]
+        result['intervention'] = {
+            'directive': directive,
+            'resolverInlining': calls,
+            'nonInliningObserved': any(c['decision'] == 'inline_fail' and 'CompileCommand' in (c['reason'] or '') for c in calls),
+            'inliningAlsoObserved': any(c['decision'] == 'inline_success' for c in calls),
+            'ordinaryHighWitness': False}
     # Envelopes bound the iteration, not the timed loop or the code actually executed.
     result['compilerEnvelopeEvents'] = [
         {'iteration': e['index'], 'events': [

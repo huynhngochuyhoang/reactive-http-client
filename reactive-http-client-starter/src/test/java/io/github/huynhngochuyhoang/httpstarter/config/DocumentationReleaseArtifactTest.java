@@ -268,7 +268,7 @@ class DocumentationReleaseArtifactTest {
                 "Central-only", "strict root and independent starter source/binary", "both even if the first fails",
                 "explicit GC disabled", "clean reachable source", "N/A, not passed",
                 "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 5 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 6 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=v36", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
@@ -440,6 +440,87 @@ class DocumentationReleaseArtifactTest {
         assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v36/ORDINARY-CAPTURE.md)");
         assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(ORDINARY-CAPTURE.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(capture);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v36InterventionAccountingRequiresApprovalWithoutResettingBudget() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v36");
+        String amendment = Files.readString(directory.resolve("INTERVENTION-ACCOUNTING.md"));
+        assertThat(amendment.replaceAll("\\s+", " ")).contains(
+                "V36-P5-1", "approved on 2026-10-14; execution recorded separately", "approve v36-p5-1",
+                "fe13031f171dd33fc86e6ee5392c2b83a14407e4", "inferred accounting, not an observed process census",
+                "Individual probe PID, exit status and peak RSS remain unavailable",
+                "502.14051217597444", "6697.859487824026", "7,200-second", "120-second",
+                "no automatic retry", "No O/M/T rerun", "Include Priority 4 raw output",
+                "exact executing-code", "unresolved/blocking", "All current raw scores remain unchanged");
+        List<String> rows = amendment.lines().filter(line -> line.matches("\\| 4[1-8] \\|.*")).toList();
+        assertThat(rows).hasSize(8);
+        for (int i = 0; i < rows.size(); i++) {
+            String[] columns = rows.get(i).split("\\|", -1);
+            assertThat(Integer.parseInt(columns[1].trim())).isEqualTo(41 + i);
+            assertThat(columns[2].trim()).isEqualTo(List.of("AUTO_REGISTRY", "HOOK", "HOOK", "AUTO_REGISTRY",
+                    "AUTO_REGISTRY", "HOOK", "HOOK", "AUTO_REGISTRY").get(i));
+            assertThat(columns[3].trim()).isEqualTo(List.of("B", "B", "C", "C", "C", "C", "B", "B").get(i));
+        }
+        List<String> counts = amendment.lines().filter(line -> line.matches(
+                "\\| (Launchers|Measured workers|Explicit toolchain preflights|Internal blackhole probes, inferred) \\|.*")).toList();
+        assertThat(counts).hasSize(4);
+        int combined = 0;
+        for (String row : counts) {
+            String[] columns = row.split("\\|", -1);
+            int total = Integer.parseInt(columns[4].trim());
+            assertThat(Integer.parseInt(columns[2].trim()) + Integer.parseInt(columns[3].trim())).isEqualTo(total);
+            combined += total;
+        }
+        assertThat(combined).isEqualTo(194);
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0];
+        assertThat(priority.replaceAll("\\s+", " "))
+                .contains("(INTERVENTION-ACCOUNTING.md)", "approve v36-p5-1", "cumulative budget is not reset");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(INTERVENTION-ACCOUNTING.md)");
+    }
+
+    @Test
+    void v36InterventionResultsExhaustBudgetWithoutReplacingOrdinaryEvidence() throws IOException {
+        Path directory = projectRoot().resolve("roadmaps/v36");
+        String results = Files.readString(directory.resolve("INTERVENTION-RESULTS.md"));
+        assertThat(results.replaceAll("\\s+", " ")).contains(
+                "Priority 5 complete; allocation findings unresolved/blocking",
+                "fe13031f171dd33fc86e6ee5392c2b83a14407e4", "approve v36-p5-1", "V36-P5-1",
+                "101.688487 seconds", "603.828999 seconds", "48/48 slots are exhausted",
+                "96 inferred probes", "194 JVM invocations", "not an observed process census",
+                "763 relevant compilation tasks", "28 resolver call-site refusals", "disallowed by CompileCommand",
+                "256.0054", "256.0033", "256.0029", "measurementInterval=null", "executingCodeIdentity=unverified",
+                "not exact timed-loop boundaries", "not exact per-operation allocation attribution",
+                "A001 / AUTO_REGISTRY", "A002 / HOOK", "E001 / evidence reliability",
+                "not finding acceptance", "or limited sampling", "No explanation from AUTO_NO_REGISTRY",
+                "83 Python tooling tests", "113 documentation cases", "No full reactor", "not permission to rerun",
+                "target/release-evidence/v36/priority5/", "verification-evidence/v36-priority5/",
+                "597", "931", "Never run root", "No production code");
+        List<String> rows = results.lines().filter(line -> line.matches("\\| (AUTO_REGISTRY|HOOK) \\| [BC] \\|.*")).toList();
+        assertThat(rows).hasSize(4);
+        int traced = 0;
+        int intervention = 0;
+        for (String row : rows) {
+            String[] columns = row.split("\\|", -1);
+            assertThat(columns[3].trim()).isEqualTo("4");
+            assertThat(columns[5].trim()).isEqualTo("2");
+            traced += Integer.parseInt(columns[3].trim());
+            intervention += Integer.parseInt(columns[5].trim());
+        }
+        assertThat(traced).isEqualTo(16);
+        assertThat(intervention).isEqualTo(8);
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 5 - ", 2)[1].split("## Priority 6 - ", 2)[0];
+        assertThat(priority).contains("### [x] 5.1", "### [x] 5.2", "### [x] 5.3", "(INTERVENTION-RESULTS.md)")
+                .doesNotContain("[ ]");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(INTERVENTION-RESULTS.md)");
+        assertThat(Files.readString(projectRoot().resolve("roadmaps/README.md"))).contains("(v36/INTERVENTION-RESULTS.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(results);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();

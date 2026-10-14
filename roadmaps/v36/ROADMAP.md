@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
-> **Experiment authorization:** V36-P3-1; 40/48 worker slots consumed, Priority 5 gated on revised probe accounting
+> **Experiment authorization:** V36-P3-1 plus V36-P5-1; 48/48 worker slots consumed, no further execution authorized
 > **Implementation and release scope:** unselected
 > **Draft date:** 2026-10-11
 > **Adopted:** 2026-10-12
@@ -203,6 +203,17 @@ accounting before execution. This is not retroactive authorization.
 
 Deliver causal conclusions with contrary evidence and limits. Non-reproduction
 alone does not resolve either original flag.
+
+[V36-P5-1](INTERVENTION-ACCOUNTING.md) approves accounting for the remaining eight
+workers and sixteen internal probes without changing the one-factor experiment.
+The maintainer approved its inferred-probe inventory limit on 2026-10-14,
+separately from Priority 4's accepted exception. No retry is authorized.
+
+[Priority 5 results](INTERVENTION-RESULTS.md) complete all eight intervention
+workers and exhaust the 48-worker budget. Both profiles reach the high band
+under verified forced non-inlining, but ordinary high-mode causal attribution
+remains missing: A001/A002 stay unresolved/blocking. New capture validation is
+verified within its recorded limits; no production fix or release is selected.
 
 ## 6. Select a Bounded Correction or No-Change Outcome
 
