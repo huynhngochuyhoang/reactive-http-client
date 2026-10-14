@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
-> **Experiment authorization:** V36-P3-1 approved; at most 48 worker forks, execution not started
+> **Experiment authorization:** V36-P3-1; 40/48 worker slots consumed, Priority 5 gated on revised probe accounting
 > **Implementation and release scope:** unselected
 > **Draft date:** 2026-10-11
 > **Adopted:** 2026-10-12
@@ -159,7 +159,8 @@ Deliver the frozen plan and approval before running a benchmark or diagnostic JV
 [V36-P3-1 investigation plan](INVESTIGATION-PLAN.md) fixes 48 worker forks across
 ordinary, marker-only, traced and single-factor lanes, with bounded resources and
 no automatic retries. The maintainer approved it in 3.3 on 2026-10-13 for later
-Priorities 4/5 only; no experiment has started or finding been accepted.
+Priorities 4/5 only. The Priority 4 result below records subsequent execution;
+approval itself accepts no finding.
 
 ## 4. Capture Ordinary Allocation Modes Per Profile
 
@@ -176,6 +177,14 @@ Priorities 4/5 only; no experiment has started or finding been accepted.
   evidence; do not manufacture an ordinary observation using an intervention.
 
 Deliver per-profile ordinary-mode evidence, or an explicit incomplete result.
+
+[Priority 4 ordinary capture](ORDINARY-CAPTURE.md) completes the 40 O/M/T slots
+with verified worker identities. HOOK high modes occurred only without tracing;
+AUTO_REGISTRY high mode was absent. Both allocation findings remain unresolved,
+and eight Priority 5 intervention slots remain unused. Final review identified
+unbudgeted JMH-internal probe JVMs. The maintainer explicitly accepted Priority 4
+closure with that exception on 2026-10-14; Priority 5 still requires revised probe
+accounting before execution. This is not retroactive authorization.
 
 ## 5. Test Causal Explanations Without Replacing Scores
 

@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
-> **Experiment authorization:** V36-P3-1 approved; at most 48 worker forks, execution not started
+> **Experiment authorization:** V36-P3-1; 40/48 worker slots consumed, Priority 5 gated on revised probe accounting
 > **Implementation and release scope:** unselected
 > **Adopted:** 2026-10-12
 
@@ -252,26 +252,66 @@ avoid self-reference and is the only excluded delta.
 
 ## Priority 4 - Capture Ordinary Allocation Modes Per Profile
 
-### [ ] 4.1 Validate inputs and execute the approved ordinary schedule
+### [x] 4.1 Validate inputs and execute the approved ordinary schedule
 
-- [ ] Verify artifact/plan/toolchain hashes and host limits before each stage;
+- [x] Verify artifact/plan/toolchain hashes and host limits before each stage;
       retain commands, exits and host/JVM observations without competing scored work.
-- [ ] Keep all forks/iterations and artifact orders; preserve partial/failed attempts
+- [x] Keep all forks/iterations and artifact orders; preserve partial/failed attempts
       and stop at the approved boundary rather than selecting favorable reruns.
 
-### [ ] 4.2 Associate observations independently for A001 and A002
+### [x] 4.2 Associate observations independently for A001 and A002
 
-- [ ] Couple traces to their actual measured forks on both matched artifacts and
+- [x] Couple traces to their actual measured forks on both matched artifacts and
       approved same-JAR controls. Reject ambiguous evidence rather than guessing.
-- [ ] Record per-profile high/low modes, uncertainty and absent modes; retain raw
+- [x] Record per-profile high/low modes, uncertainty and absent modes; retain raw
       outputs with reproducible summaries, not just means or best forks.
 
-### [ ] 4.3 Record ordinary evidence and observation limits
+### [x] 4.3 Record ordinary evidence and observation limits
 
-- [ ] State whether instrumentation affected observability and which ordinary
+- [x] State whether instrumentation affected observability and which ordinary
       high-mode compiler/class-load evidence is still missing.
-- [ ] Preserve incomplete attribution when the budget ends. An intervention cannot
+- [x] Preserve incomplete attribution when the budget ends. An intervention cannot
       manufacture an ordinary witness; completed execution is not finding acceptance.
+
+### Priority 4 Evidence
+
+[Ordinary capture](ORDINARY-CAPTURE.md) records source, implementation, all lanes,
+same-JAR observations, compiler history and limits. From clean
+`3d9253ca25aae8190d7a8b37116a04a7b8fa15b2` plus the sealed tooling/test patch,
+both preflights and **40 O/M/T workers** completed successfully in **502.141
+seconds**. All 200 measurement iterations are retained. No retry or intervention
+ran; IDs 41-48 remain for Priority 5 within the original cumulative time budget.
+Final inspection found unbudgeted JMH-internal blackhole-detection JVM probes,
+inferred from JMH bytecode and launcher logs but not individually recorded.
+On 2026-10-14 the maintainer answered **"Accept with documented exception
+(Recommended)"**, accepting the observations and Priority 4 closure without a
+rerun. This is not retroactive authorization or full process accounting. No new
+worker or retry is authorized; Priority 5 needs explicit probe-accounting
+revision before execution. The frozen plan and original records are unchanged.
+
+HOOK produced one untraced high fork per artifact (stages 10 and 15), alongside
+low forks of each same JAR. Every AUTO_REGISTRY, marker-only and traced fork was
+low. All 40 worker associations and 16 compiler/class-log pairs validated;
+24 workers have iteration envelopes, not exact executing-code identity. E001's
+new recording boundary is verified with those limits. **A001/A002 remain
+unresolved/blocking**; missing ordinary high traces are not supplied by approval,
+elapsed budget or a later forced intervention. V1-V35 evidence is unchanged.
+
+Verification passes **74 tooling tests**, **40 untimed workload cases**, the
+recorder callback contract and **111 documentation cases per Boot row**, with
+zero failures/errors/skips. `git diff --check` passes. Re-analysis reproduced all
+40 stage reports and rehashed 931 historical P10 files without new forks. No
+production, dependency, native, API, consumer or full acceptance change/run is
+claimed. Evidence is mirrored under `verification-evidence/v36-priority4/` and
+`target/release-evidence/v36/priority4/`; the external seal follows verification.
+
+The Priority 4 bundle seals **597 files**. Manifest SHA-256:
+`07a1785de010946808ebefb68eee512754b96383301d48a475a041b7b8cec44b`.
+Archive `verification-evidence/v36-priority4-20261014.tar.gz` SHA-256:
+`13b35a8f51bb899e9624c37c2344d691b3afba7f5fcc25d915448c8a0ed10b47`.
+Copied and archived contents were verified, including the unchanged frozen plan,
+original capture and accepted accounting exception. This integrity paragraph is
+added after sealing to avoid self-reference and is the only excluded delta.
 
 ## Priority 5 - Test Causal Explanations Without Replacing Scores
 

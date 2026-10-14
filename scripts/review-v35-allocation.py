@@ -152,6 +152,122 @@ def validate_jfr_summary(summary):
         raise ValueError('Scrub JFR to allocation samples before including it in evidence')
 
 
+def v36_stage(directory, expected):
+    """One owned worker per stage; never infer identity from timestamp ordering."""
+    command = json.loads((directory / 'command.json').read_text())
+    if command.get('exit') != 0 or command['argv'] != expected['argv'] or command['stageId'] != expected['stageId']:
+        raise ValueError('Failed or mismatched V36 command')
+    workers = json.loads((directory / 'workers.json').read_text())
+    if len(workers) != 1:
+        raise ValueError('Expected exactly one owned worker')
+    worker = workers[0]
+    cp = str(expected['jar']) + ':' + str(expected['recorder'])
+    argv = worker['argv']
+    if (worker['pid'] == command['launcherPid'] or worker['pgid'] != command['launcherPid']
+            or worker['ppid'] != command['launcherPid'] or worker['startTicks'] <= 0
+            or argv.count('org.openjdk.jmh.runner.ForkedMain') != 1 or argv.count('-cp') != 1
+            or argv[argv.index('-cp') + 1] != cp or argv[0] != str(RUNNER.JAVA)
+            or argv[1:1 + len(expected['jvmArgs'])] != expected['jvmArgs']):
+        raise ValueError('Worker identity/arguments mismatch')
+    rows = json.loads((directory / 'results.json').read_text())
+    if len(rows) != 1:
+        raise ValueError('Expected one result row')
+    row = rows[0]
+    if (row['benchmark'] != 'io.github.huynhngochuyhoang.httpstarter.benchmarks.V34DefaultPathBenchmark.defaultV34NoNetworkWarmPublisher'
+            or row['params'] != {'profile': expected['profile'], 'scenario': 'GET'}
+            or row['mode'] != 'avgt' or row['threads'] != 1 or row['forks'] != 1
+            or row['warmupIterations'] != 5 or row['measurementIterations'] != 5
+            or row['warmupTime'] != '1 s' or row['measurementTime'] != '1 s'
+            or row['jvmArgs'] != expected['jvmArgs'] or row['jdkVersion'] != '21.0.8'
+            or row['jmhVersion'] != '1.37'):
+        raise ValueError('V36 workload/result mismatch')
+    result = {'metrics': metrics(row, 1), 'worker': worker, 'forkAssociation': 'single-owned-worker',
+              'measurementInterval': None, 'executingCodeIdentity': 'unverified'}
+    samples = result['metrics']['allocation']['rawData'][0]
+    modes = ['low' if abs(x - 1744) <= 32 else 'high' if abs(x - 2000) <= 32 else 'other' for x in samples]
+    result['allocationMode'] = modes[0] if len(set(modes)) == 1 else 'mixed'
+    boundary = directory / 'boundaries.xml'
+    envelopes = []
+    if expected['lane'] == 'O':
+        if boundary.exists():
+            raise ValueError('Ordinary lane unexpectedly recorded boundaries')
+    else:
+        entries = ET.parse(boundary).getroot().findall('entry')
+        record = {e.get('key'): e.text for e in entries}
+        if len(record) != len(entries):
+            raise ValueError('Duplicate boundary fields')
+        for key, value in {'schema': 'v36-1', 'complete': 'true', 'stage': expected['stageId'],
+                           'seal': expected['seal'], 'pid': str(worker['pid']), 'classpath': cp,
+                           'benchmark': row['benchmark'], 'profile': expected['profile'], 'scenario': 'GET'}.items():
+            if record.get(key) != value:
+                raise ValueError('Boundary identity mismatch: ' + key)
+        for key, path in [('recorderOrigin', expected['recorder']), ('jmhOrigin', expected['jar'])]:
+            location = urlparse(record[key])
+            if (location.scheme != 'file' or location.netloc or location.query or location.fragment
+                    or Path(unquote(location.path)) != path):
+                raise ValueError('Boundary artifact origin mismatch')
+        actual_args = [record['argument.' + str(i)] for i in range(int(record['argumentCount']))]
+        if actual_args != argv[1:argv.index('-cp')]:
+            raise ValueError('Boundary VM arguments mismatch')
+        if {k for k in record if k.startswith('iteration.')} != {
+                f'iteration.{i}.{field}' for i in range(10)
+                for field in ('type', 'before.nano', 'after.nano', 'before.nanoAfter', 'after.nanoAfter',
+                              'before.uptimeMs', 'after.uptimeMs')}:
+            raise ValueError('Incomplete/extra iteration fields')
+        previous_nano, previous_uptime = None, 0
+        for i in range(10):
+            prefix = f'iteration.{i}.'
+            phase = 'WARMUP' if i < 5 else 'MEASUREMENT'
+            if record[prefix + 'type'] != phase:
+                raise ValueError('Iteration phase mismatch')
+            start, end = [int(record[prefix + when + '.nano']) for when in ('before', 'after')]
+            start_after, end_after = [int(record[prefix + when + '.nanoAfter']) for when in ('before', 'after')]
+            begin_ms, end_ms = [int(record[prefix + when + '.uptimeMs']) for when in ('before', 'after')]
+            if (not start <= start_after <= end <= end_after
+                    or (previous_nano is not None and start < previous_nano)
+                    or not previous_uptime <= begin_ms <= end_ms):
+                raise ValueError('Non-monotonic/overlapping boundary clocks')
+            envelopes.append({'index': i, 'type': phase, 'beforeUptimeMs': begin_ms, 'afterUptimeMs': end_ms,
+                              'beforeNano': start, 'afterNano': end,
+                              'precisionMarginMs': 2 + math.ceil(max(start_after - start, end_after - end) / 1e6)})
+            previous_nano, previous_uptime = end_after, end_ms
+        result['iterationEnvelopes'] = envelopes
+    traces = list(directory.glob('compilation-*.xml'))
+    logs = list(directory.glob('classes-*.log'))
+    if expected['lane'] not in ('T', 'I'):
+        if traces or logs:
+            raise ValueError('Unexpected tracing in non-trace lane')
+        return result
+    pid = worker['pid']
+    if {p.name for p in traces} != {f'compilation-pid{pid}.xml'} or {p.name for p in logs} != {f'classes-{pid}.log'}:
+        raise ValueError('V36 compiler/class-log inventory mismatch')
+    trace = compiler(traces[0])
+    if (trace['process'] != str(pid) or trace['classpaths'] != [cp]
+            or trace['vmArguments'] != argv[1:argv.index('-cp')]):
+        raise ValueError('V36 compiler worker mismatch')
+    trace['loadedClasses'] = loaded_classes(logs[0], expected['jar'])
+    result['trace'] = trace
+    # Envelopes bound the iteration, not the timed loop or the code actually executed.
+    result['compilerEnvelopeEvents'] = [
+        {'iteration': e['index'], 'events': [
+            {'kind': kind, **event, 'position': envelope_position(event.get('stamp'), e)}
+            for kind, events in [('installation', trace['nmethods']), ('invalidation', trace['deoptimizations'])]
+            for event in events]}
+        for e in envelopes if e['type'] == 'MEASUREMENT']
+    return result
+
+
+def envelope_position(stamp, envelope):
+    if stamp is None or not math.isfinite(float(stamp)):
+        return 'unknown'
+    millis = float(stamp) * 1000
+    start, end = envelope['beforeUptimeMs'], envelope['afterUptimeMs']
+    margin = envelope.get('precisionMarginMs', 2)
+    if abs(millis - start) <= margin or abs(millis - end) <= margin:
+        return 'boundary-ambiguous'
+    return 'before' if millis < start else 'after' if millis > end else 'inside-envelope'
+
+
 def summarize(root):
     report = {'scored': {}, 'diagnostic': {}, 'reviews': {},
               'limit': 'Diagnostic timings are not scored benefit; summaries alone do not assert a cause.'}

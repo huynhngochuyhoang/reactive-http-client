@@ -268,7 +268,7 @@ class DocumentationReleaseArtifactTest {
                 "Central-only", "strict root and independent starter source/binary", "both even if the first fails",
                 "explicit GC disabled", "clean reachable source", "N/A, not passed",
                 "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 4 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 5 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=v36", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
@@ -389,6 +389,57 @@ class DocumentationReleaseArtifactTest {
                 .contains("(v36/INVESTIGATION-PLAN.md)");
         assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(INVESTIGATION-PLAN.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(plan);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v36OrdinaryCaptureRecordsBudgetExceptionWithoutAcceptingMissingHighTraces() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v36");
+        String capture = Files.readString(directory.resolve("ORDINARY-CAPTURE.md"));
+        assertThat(capture.lines().filter(line -> line.startsWith("> **Status:**")).toList())
+                .containsExactly("> **Status:** Priority 4 complete with accepted probe-accounting exception; findings unresolved");
+        assertThat(capture.replaceAll("\\s+", " ")).contains(
+                "3d9253ca25aae8190d7a8b37116a04a7b8fa15b2", "V36-P3-1", "40 of 48",
+                "502.141 seconds", "7,200-second", "IDs 41-48", "no ordinary retry", "931",
+                "same-JAR", "1744", "2000", "stage **10**", "stage **15**",
+                "iteration envelopes", "1,542 relevant tasks", "40 compilation tasks",
+                "measurementInterval=null", "executingCodeIdentity=unverified", "superseded",
+                "limited sampling", "A001", "A002", "E001", "unresolved/blocking",
+                "non-reproduction is not resolution", "not permission to repeat it",
+                "74 Python tooling tests", "40 untimed workload cases", "111 documentation cases",
+                "verification-evidence/v36-priority4/", "target/release-evidence/v36/priority4/",
+                "No production", "source patch", "before any cleanup", "80 internal probe invocations",
+                "not an observed PID/exit", "process-accounting exception", "No rerun is proposed",
+                "Accept with documented exception (Recommended)", "not retroactive authorization",
+                "Priority 5 must first revise probe accounting");
+        List<String> rows = capture.lines().filter(line -> line.matches("\\| [OMT] \\| (AUTO_REGISTRY|HOOK) \\|.*")).toList();
+        assertThat(rows).hasSize(12);
+        int forks = 0;
+        int highForks = 0;
+        for (String row : rows) {
+            String[] columns = row.split("\\|", -1);
+            String[] modes = columns[4].trim().split(" / ");
+            int low = Integer.parseInt(modes[0]);
+            int high = Integer.parseInt(modes[1]);
+            assertThat(Integer.parseInt(modes[2])).isZero();
+            assertThat(high).isEqualTo(columns[1].trim().equals("O") && columns[2].trim().equals("HOOK") ? 1 : 0);
+            assertThat(low + high).isEqualTo(columns[1].trim().equals("M") ? 2 : 4);
+            forks += low + high;
+            highForks += high;
+        }
+        assertThat(forks).isEqualTo(40);
+        assertThat(highForks).isEqualTo(2);
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.split("## Priority 4 - ", 2)[1].split("## Priority 5 - ", 2)[0];
+        assertThat(priority).contains("### [x] 4.1", "### [x] 4.2", "### [x] 4.3", "(ORDINARY-CAPTURE.md)")
+                .doesNotContain("[ ]");
+        assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v36/ORDINARY-CAPTURE.md)");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(ORDINARY-CAPTURE.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(capture);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();

@@ -24,8 +24,14 @@ corrects unsupported trace-to-score pairing; the old recordings still lack
 durable fork identity and measurement boundaries.
 The [Priority 3 plan](v36/INVESTIGATION-PLAN.md) freezes a 48-fork investigation,
 separate instrumentation controls and stop rules. The maintainer approved that
-bounded plan in 3.3; execution has not started. Experiments outside it need a new
-decision, production edits need 6.2 approval,
+bounded plan in 3.3. [Priority 4 capture](v36/ORDINARY-CAPTURE.md) completed 40
+ordinary/control/trace workers; eight intervention slots remain. HOOK reproduced
+untraced high modes, but both allocation findings still lack ordinary high-mode
+compiler attribution. The maintainer accepted capture closure with the documented
+JMH-internal probe-accounting exception; Priority 5 requires revised accounting
+before further execution.
+Experiments outside the plan need a new decision,
+production edits need 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`
 and `plannedFinalVersion=null`; no next release is selected.
 
