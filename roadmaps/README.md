@@ -19,7 +19,23 @@ for baseline review, deterministic tooling tests and experiment planning around
 AUTO_REGISTRY/HOOK allocation and measurement reliability. The
 [Priority 1 baseline and ledger](v36/BASELINE-SCOPE.md) reconcile reachable source
 and available V35 evidence without resolving either allocation flag.
-New experiments require 3.3 approval, production edits 6.2 approval,
+The [Priority 2 audit](v36/EVIDENCE-AUDIT.md) verifies workload semantics and
+corrects unsupported trace-to-score pairing; the old recordings still lack
+durable fork identity and measurement boundaries.
+The [Priority 3 plan](v36/INVESTIGATION-PLAN.md) freezes a 48-fork investigation,
+separate instrumentation controls and stop rules. The maintainer approved that
+bounded plan in 3.3. [Priority 4 capture](v36/ORDINARY-CAPTURE.md) completed 40
+ordinary/control/trace workers. HOOK reproduced
+untraced high modes, but both allocation findings still lack ordinary high-mode
+compiler attribution. The maintainer accepted capture closure with the documented
+JMH-internal probe-accounting exception, then explicitly approved
+[V36-P5-1](v36/INTERVENTION-ACCOUNTING.md).
+[Priority 5](v36/INTERVENTION-RESULTS.md) completed the eight remaining workers:
+forced non-inlining produces high allocation on both profiles/artifacts, but
+does not resolve either original flag. All 48 worker slots are exhausted; no
+further experiment is authorized.
+Experiments outside the plan need a new decision,
+production edits need 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`
 and `plannedFinalVersion=null`; no next release is selected.
 

@@ -92,7 +92,8 @@ class AllocationInvestigationTest(unittest.TestCase):
                 method="CacheWorkPolicy validator" stamp="1"><klass id="1" name="test.EffectiveCachePolicy$Selection"/>
                 <method id="2" holder="1" name="disabled"/><parse method="2"><call method="2"/>
                 <inline_success reason="inline (hot)"/></parse><eliminate_allocation type="1">
-                <jvms method="2" bci="0"/></eliminate_allocation></task></compilation_log></hotspot_log>''')
+                <jvms method="2" bci="0"/></eliminate_allocation></task></compilation_log>
+                <hotspot_log_done stamp="2"/></hotspot_log>''')
             result = REVIEW.compiler(path)
             self.assertEqual(result['tasks'][0]['policyInlining'][0]['decision'], 'inline_success')
             self.assertEqual(result['tasks'][0]['eliminations'][0]['class'], 'test.EffectiveCachePolicy$Selection')

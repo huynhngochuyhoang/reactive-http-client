@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
-> **Experiment authorization:** unselected; V35's approved schedule is exhausted
+> **Experiment authorization:** V36-P3-1 plus V36-P5-1; 48/48 worker slots consumed, no further execution authorized
 > **Implementation and release scope:** unselected
 > **Adopted:** 2026-10-12
 
@@ -130,101 +130,258 @@ added after sealing to avoid self-reference; it is the only excluded delta.
 
 ## Priority 2 - Audit Workloads, Fork Identity and Compiler Evidence
 
-### [ ] 2.1 Verify effective workload boundaries
+### [x] 2.1 Verify effective workload boundaries
 
-- [ ] Inspect existing workload/runner/reviewer code and available saved records;
+- [x] Inspect existing workload/runner/reviewer code and available saved records;
       verify AUTO_REGISTRY/HOOK beans, features, GET scenario and publisher use.
-- [ ] Verify untimed semantic witnesses distinguish warm assembly, subscription,
+- [x] Verify untimed semantic witnesses distinguish warm assembly, subscription,
       transport, construction and first use; keep instrumentation outside scored work.
 
-### [ ] 2.2 Audit fork association and relevant compiler history
+### [x] 2.2 Audit fork association and relevant compiler history
 
-- [ ] Require unambiguous artifact/profile/process/trace association; review the
+- [x] Require unambiguous artifact/profile/process/trace association; review the
       existing timestamp ordering without assuming sorting proves identity.
-- [ ] Identify relevant tasks, installed code, recompilation and deoptimization
+- [x] Identify relevant tasks, installed code, recompilation and deoptimization
       relative to measurement; document unavailable timing/code-version facts.
-- [ ] Add deterministic synthetic fixtures for duplicate, missing, truncated,
+- [x] Add deterministic synthetic fixtures for duplicate, missing, truncated,
       reordered and mismatched records, including unrelated/superseded tasks.
 
-### [ ] 2.3 Record audit conclusions and bounded tooling corrections
+### [x] 2.3 Record audit conclusions and bounded tooling corrections
 
-- [ ] Distinguish verified behavior, reproduced parser/harness defects and unknowns.
+- [x] Distinguish verified behavior, reproduced parser/harness defects and unknowns.
       Preserve a failing fixture and affected conclusions for each actual defect.
-- [ ] Record any local tooling correction and its tests separately; require new
+- [x] Record any local tooling correction and its tests separately; require new
       affected evidence before relying on corrected conclusions. No runtime patch
       or new measured fork is authorized by an audit concern.
 
+**Priority 2 record (2026-10-13):** [Workload and compiler-evidence audit](EVIDENCE-AUDIT.md).
+Reachable base `18c64f7b6147189fc2c1229816e97c46bc6a9d39` plus the retained
+tooling/test/documentation patch. All 931 P10 files rehash. Corrected re-analysis
+reads 58 existing compiler processes across 22 diagnostic stages; it does not
+create new scores or forks. Unsupported timestamp-to-score joins are removed,
+command/trace validation is shared, and process-local compilation histories are
+retained without claiming measurement-time code identity.
+
+Workload semantics pass 40 untimed JUnit cases. E001 has reproduced local tooling
+defects and bounded corrections, but durable per-fork association and measurement
+boundaries remain unavailable in the old recordings. A001/A002 remain unresolved;
+Priority 3.3 must approve new capture. V1-V35 history and raw evidence are unchanged.
+
+Fresh verification passes **63 Python tooling tests**, **40 untimed workload
+cases**, and **109 documentation cases per Boot row** (4.0.0 and 4.1.0), zero
+failures/errors/skips in accepted runs. The original-reader failing reproduction
+is retained, not counted as passing. `git diff --check` passes. No production,
+timed harness, API, native or scored-performance change/run is claimed.
+
+The Priority 2 bundle seals **131 files** at
+`verification-evidence/v36-priority2/`, mirrored at
+`target/release-evidence/v36/priority2/`. Manifest SHA-256:
+`402a0f0c837eab3e6f0fe35dfd46a4cd17c866f53b4559c74b2b8e882ffb2967`.
+Archive `verification-evidence/v36-priority2-20261013.tar.gz` SHA-256:
+`b6d06ef27e939a1adcb478aeed948b3b6ca8675bfa5fbd775ee711c4f506512c`.
+Copied and archived contents were verified; all 22 derived stage metrics match
+their historical summaries. This external integrity paragraph is added after
+sealing to avoid self-reference and is the only excluded delta.
+
 ## Priority 3 - Freeze and Approve a New Bounded Investigation
 
-### [ ] 3.1 Specify hypotheses and distinguishing observations
+### [x] 3.1 Specify hypotheses and distinguishing observations
 
-- [ ] Cover ordinary compiler modes, instrumentation perturbation, workload/phase
+- [x] Cover ordinary compiler modes, instrumentation perturbation, workload/phase
       mismatch and artifact/dependency differences with evidence that could refute each.
-- [ ] Separate lowest-perturbation ordinary, traced and intervention lanes; specify
+- [x] Separate lowest-perturbation ordinary, traced and intervention lanes; specify
       how missing modes and perturbation will limit attribution per profile.
 
-### [ ] 3.2 Freeze exact inputs, schedule and resource bounds
+### [x] 3.2 Freeze exact inputs, schedule and resource bounds
 
-- [ ] Freeze profiles/controls, artifacts, JDK/JMH/Boot/dependencies, VM flags,
+- [x] Freeze profiles/controls, artifacts, JDK/JMH/Boot/dependencies, VM flags,
       heap, threads, warmup/measurement, units, order and same-JAR controls.
-- [ ] Start from recorded Java 21.0.8/Boot 4.0.0 where available; changed stacks
+- [x] Start from recorded Java 21.0.8/Boot 4.0.0 where available; changed stacks
       are separate experiments, not silent replacements of historical comparisons.
-- [ ] Set a numerical fork ceiling, per-stage timeout, total resource/time bound,
+- [x] Set a numerical fork ceiling, per-stage timeout, total resource/time bound,
       host preconditions and abort policy covering every control/trace/intervention.
 
-### [ ] 3.3 Obtain explicit experiment approval
+### [x] 3.3 Obtain explicit experiment approval
 
-- [ ] Record the maintainer's approval of the frozen plan and stop rules before
+- [x] Record the maintainer's approval of the frozen plan and stop rules before
       launching any benchmark or diagnostic JVM, including pilots.
-- [ ] Confirm V35's 338-fork history and exhausted 36-fork extension grant no new
+- [x] Confirm V35's 338-fork history and exhausted 36-fork extension grant no new
       budget. Failures or absent modes do not authorize retries; extensions require
       a new recorded decision before additional execution.
 
+### Priority 3 Planning Record
+
+[V36-P3-1](INVESTIGATION-PLAN.md) freezes competing hypotheses, saved artifact/JDK
+hashes, exact measurement settings and the ordered **48-fork** O/M/T/I schedule.
+The numerical ceiling includes same-JAR and instrumentation controls; each stage
+has a 120-second deadline and the cumulative active investigation is capped at
+120 minutes. Failure aborts the schedule; neither failure nor missing modes grants
+retries. V35's 338 forks and exhausted extension confer no authorization.
+
+The new identity contract uses one worker per stage and a separately controlled
+iteration recorder. Its intervals are envelopes, not exact timed-loop boundaries
+or proof of executing code. Recorder/runner implementation and actual E001 capture
+verification remain Priority 4 work. A001/A002 remain unresolved.
+
+Started from clean `56bb5753cd1c247654360c86a5257a1c2aaf201c`; the planning delta
+contains only documentation and its regression guard. Eight pinned input hashes
+were rechecked without rebuilding saved artifacts. On 2026-10-13 the maintainer
+replied **"Approve V36-P3-1 (Recommended)"**, selecting this 48-fork / 120-minute
+investigation with fixed lanes and no retries after failure without a new decision.
+This authorizes later Priorities 4/5 only, not production edits or a release.
+**No benchmark or diagnostic fork was launched; all 48 slots remain unused.**
+
+Verification passes **63 Python tooling tests** and **110 documentation cases per
+Boot row** (4.0.0 and 4.1.0), with zero failures/errors/skips. The documentation
+guard checks exact lane order, contiguous stage IDs, 48-fork arithmetic, limits,
+links and the recorded approval. `git diff --check` passes. The initial Boot 4.0.0
+run passed, but its report-copy step used an incorrect filename; that failed
+collection attempt is retained separately from corrected complete runs.
+No fresh workload, full-reactor, API, consumer, native or performance run is claimed.
+Commands, input hashes, reports, readiness and base-plus-patch provenance are
+preserved at `verification-evidence/v36-priority3/`, mirrored at
+`target/release-evidence/v36/priority3/`; the external seal follows verification.
+
+The Priority 3 bundle seals **59 files**. Manifest SHA-256:
+`2ce190c822d2f64936038b3c051ea14b65a1701dd9111570100930a2d19edd1c`.
+Archive `verification-evidence/v36-priority3-20261013.tar.gz` SHA-256:
+`461b1920e9351050b009342e5093b53ed3509ac013821e37e279cb7e41257d69`.
+Copied and archived contents were verified, including the exact plan approved
+before its status update. This integrity paragraph is added after sealing to
+avoid self-reference and is the only excluded delta.
+
 ## Priority 4 - Capture Ordinary Allocation Modes Per Profile
 
-### [ ] 4.1 Validate inputs and execute the approved ordinary schedule
+### [x] 4.1 Validate inputs and execute the approved ordinary schedule
 
-- [ ] Verify artifact/plan/toolchain hashes and host limits before each stage;
+- [x] Verify artifact/plan/toolchain hashes and host limits before each stage;
       retain commands, exits and host/JVM observations without competing scored work.
-- [ ] Keep all forks/iterations and artifact orders; preserve partial/failed attempts
+- [x] Keep all forks/iterations and artifact orders; preserve partial/failed attempts
       and stop at the approved boundary rather than selecting favorable reruns.
 
-### [ ] 4.2 Associate observations independently for A001 and A002
+### [x] 4.2 Associate observations independently for A001 and A002
 
-- [ ] Couple traces to their actual measured forks on both matched artifacts and
+- [x] Couple traces to their actual measured forks on both matched artifacts and
       approved same-JAR controls. Reject ambiguous evidence rather than guessing.
-- [ ] Record per-profile high/low modes, uncertainty and absent modes; retain raw
+- [x] Record per-profile high/low modes, uncertainty and absent modes; retain raw
       outputs with reproducible summaries, not just means or best forks.
 
-### [ ] 4.3 Record ordinary evidence and observation limits
+### [x] 4.3 Record ordinary evidence and observation limits
 
-- [ ] State whether instrumentation affected observability and which ordinary
+- [x] State whether instrumentation affected observability and which ordinary
       high-mode compiler/class-load evidence is still missing.
-- [ ] Preserve incomplete attribution when the budget ends. An intervention cannot
+- [x] Preserve incomplete attribution when the budget ends. An intervention cannot
       manufacture an ordinary witness; completed execution is not finding acceptance.
+
+### Priority 4 Evidence
+
+[Ordinary capture](ORDINARY-CAPTURE.md) records source, implementation, all lanes,
+same-JAR observations, compiler history and limits. From clean
+`3d9253ca25aae8190d7a8b37116a04a7b8fa15b2` plus the sealed tooling/test patch,
+both preflights and **40 O/M/T workers** completed successfully in **502.141
+seconds**. All 200 measurement iterations are retained. No retry or intervention
+ran; IDs 41-48 remain for Priority 5 within the original cumulative time budget.
+Final inspection found unbudgeted JMH-internal blackhole-detection JVM probes,
+inferred from JMH bytecode and launcher logs but not individually recorded.
+On 2026-10-14 the maintainer answered **"Accept with documented exception
+(Recommended)"**, accepting the observations and Priority 4 closure without a
+rerun. This is not retroactive authorization or full process accounting. No new
+worker or retry is authorized; Priority 5 needs explicit probe-accounting
+revision before execution. The frozen plan and original records are unchanged.
+
+HOOK produced one untraced high fork per artifact (stages 10 and 15), alongside
+low forks of each same JAR. Every AUTO_REGISTRY, marker-only and traced fork was
+low. All 40 worker associations and 16 compiler/class-log pairs validated;
+24 workers have iteration envelopes, not exact executing-code identity. E001's
+new recording boundary is verified with those limits. **A001/A002 remain
+unresolved/blocking**; missing ordinary high traces are not supplied by approval,
+elapsed budget or a later forced intervention. V1-V35 evidence is unchanged.
+
+Verification passes **74 tooling tests**, **40 untimed workload cases**, the
+recorder callback contract and **111 documentation cases per Boot row**, with
+zero failures/errors/skips. `git diff --check` passes. Re-analysis reproduced all
+40 stage reports and rehashed 931 historical P10 files without new forks. No
+production, dependency, native, API, consumer or full acceptance change/run is
+claimed. Evidence is mirrored under `verification-evidence/v36-priority4/` and
+`target/release-evidence/v36/priority4/`; the external seal follows verification.
+
+The Priority 4 bundle seals **597 files**. Manifest SHA-256:
+`07a1785de010946808ebefb68eee512754b96383301d48a475a041b7b8cec44b`.
+Archive `verification-evidence/v36-priority4-20261014.tar.gz` SHA-256:
+`13b35a8f51bb899e9624c37c2344d691b3afba7f5fcc25d915448c8a0ed10b47`.
+Copied and archived contents were verified, including the unchanged frozen plan,
+original capture and accepted accounting exception. This integrity paragraph is
+added after sealing to avoid self-reference and is the only excluded delta.
 
 ## Priority 5 - Test Causal Explanations Without Replacing Scores
 
-### [ ] 5.1 Execute only approved one-factor controls
+**Execution gate:** [V36-P5-1 accounting amendment](INTERVENTION-ACCOUNTING.md)
+approves eight remaining workers and sixteen inferred internal probes, with no
+new preflights or retries. The maintainer answered **"approve v36-p5-1"** on
+2026-10-14. That approval authorized only the run below; the original cumulative
+budget is not reset. All eight remaining slots have now been consumed.
 
-- [ ] Challenge the leading explanation with the approved interventions and preserve
+### [x] 5.1 Execute only approved one-factor controls
+
+- [x] Challenge the leading explanation with the approved interventions and preserve
       workload semantics, all results and budget accounting.
-- [ ] Label forced non-inlining, disabled escape analysis or controlled class loading
+- [x] Label forced non-inlining, disabled escape analysis or controlled class loading
       as diagnostics, not production advice, ordinary evidence or release scores.
 
-### [ ] 5.2 Build per-profile causal evidence chains
+### [x] 5.2 Build per-profile causal evidence chains
 
-- [ ] Link inputs, measured modes, relevant compiler history and interventions;
+- [x] Link inputs, measured modes, relevant compiler history and interventions;
       retain contrary evidence and distinguish sampling from exact object accounting.
-- [ ] Do not extend AUTO_NO_REGISTRY's explanation to A001/A002 without their own
+- [x] Do not extend AUTO_NO_REGISTRY's explanation to A001/A002 without their own
       evidence. State what an untraced historical fork cannot establish.
 
-### [ ] 5.3 Classify findings and remaining limits
+### [x] 5.3 Classify findings and remaining limits
 
-- [ ] Disposition A001 and A002 independently as explained without production change,
+- [x] Disposition A001 and A002 independently as explained without production change,
       reproduced defect requiring selection, or unresolved/blocking.
-- [ ] Disposition E001 with tests and affected-result applicability. Evidence-processing
+- [x] Disposition E001 with tests and affected-result applicability. Evidence-processing
       corrections must not erase raw observations; non-reproduction is not resolution.
+
+### Priority 5 Evidence
+
+[Intervention results](INTERVENTION-RESULTS.md) record all eight I workers,
+per-profile causal chains, contrary evidence and independent dispositions. The
+maintainer approved V36-P5-1 before execution. Reachable base
+`fe13031f171dd33fc86e6ee5392c2b83a14407e4` plus the sealed tooling/test/docs patch
+reused the exact saved JARs and recorder, without production or harness changes.
+
+Stages **41-48** exited zero and validated; all **40 measurement iterations**
+remain. No retries, preflights or extra profiles ran. New execution consumed
+**101.688487 seconds**, cumulative **603.828999 seconds**. All **48/48 worker
+slots are exhausted**. Sixteen new probes are inferred under the accepted
+accounting limit, not individually observed: combined accounting is 96 inferred
+probes plus 48 launchers, 48 workers and two historical preflights.
+
+Each profile/artifact produced two I-high forks near 2000 B/op versus four T-low
+forks near 1744 B/op. All eight I histories contain the requested compiler
+refusals; 28 call-site refusals and 763 relevant tasks/installations are retained.
+This supports a controlled inlining-boundary effect, not the cause of an
+untraced ordinary high mode. **A001 and A002 remain unresolved/blocking**. E001's
+new association/validation is verified with explicit limitations; no legacy
+pairing, exact executing-code identity or individual probe census is asserted.
+No additional experiment, production change or release is selected.
+
+Verification passes **83 tooling tests** and **113 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips. Re-analysis reproduced all 48 stage
+reports and rehashed 597 P4 and 931 P10 files. Prior workload/callback checks are
+reused, not fresh runs. `git diff --check` passes. No full reactor/API/consumer/
+native or release scoring rerun is claimed. Evidence is preserved under
+`target/release-evidence/v36/priority5/` and `verification-evidence/v36-priority5/`;
+the external seal follows verification.
+
+The Priority 5 bundle seals **201 files**. Manifest SHA-256:
+`b1b6a7ec0e180f959feb3fd4901ef9cc4ec65c7abc499e5ec43ecb6e92c4dc54`.
+Archive `verification-evidence/v36-priority5-20261014.tar.gz` SHA-256:
+`d963c7f7e8eddcc04c63bc72f61fc530310685b099feec826d0d6bef0952e905`.
+Copied and archived contents were verified, including the approved amendment,
+capture-time source patch, all eight raw stages and final result/test evidence.
+This integrity paragraph is added after sealing to avoid self-reference and is
+the only excluded delta.
 
 ## Priority 6 - Select a Bounded Correction or No-Change Outcome
 

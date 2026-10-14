@@ -5,7 +5,7 @@
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
-> **Experiment authorization:** unselected; V35's approved schedule is exhausted
+> **Experiment authorization:** V36-P3-1 plus V36-P5-1; 48/48 worker slots consumed, no further execution authorized
 > **Implementation and release scope:** unselected
 > **Draft date:** 2026-10-11
 > **Adopted:** 2026-10-12
@@ -131,6 +131,10 @@ source/evidence audit and verification; it authorizes no experiment or correctio
 Deliver an audit and deterministic synthetic parser fixtures. No new performance
 claim or production defect is inferred merely from an audit concern.
 
+[Priority 2 audit](EVIDENCE-AUDIT.md) verifies the workload and records bounded
+reader corrections. Historical per-fork association and measurement-time code
+identity remain unverified; no new experiment or allocation acceptance follows.
+
 ## 3. Freeze and Approve a New Bounded Investigation
 
 - Before launching measurement, specify competing hypotheses and a distinguishing
@@ -152,6 +156,12 @@ claim or production defect is inferred merely from an audit concern.
 
 Deliver the frozen plan and approval before running a benchmark or diagnostic JVM.
 
+[V36-P3-1 investigation plan](INVESTIGATION-PLAN.md) fixes 48 worker forks across
+ordinary, marker-only, traced and single-factor lanes, with bounded resources and
+no automatic retries. The maintainer approved it in 3.3 on 2026-10-13 for later
+Priorities 4/5 only. The Priority 4 result below records subsequent execution;
+approval itself accepts no finding.
+
 ## 4. Capture Ordinary Allocation Modes Per Profile
 
 - Execute only the approved schedule, retaining every fork/iteration, artifact
@@ -167,6 +177,14 @@ Deliver the frozen plan and approval before running a benchmark or diagnostic JV
   evidence; do not manufacture an ordinary observation using an intervention.
 
 Deliver per-profile ordinary-mode evidence, or an explicit incomplete result.
+
+[Priority 4 ordinary capture](ORDINARY-CAPTURE.md) completes the 40 O/M/T slots
+with verified worker identities. HOOK high modes occurred only without tracing;
+AUTO_REGISTRY high mode was absent. Both allocation findings remain unresolved,
+and eight Priority 5 intervention slots remain unused. Final review identified
+unbudgeted JMH-internal probe JVMs. The maintainer explicitly accepted Priority 4
+closure with that exception on 2026-10-14; Priority 5 still requires revised probe
+accounting before execution. This is not retroactive authorization.
 
 ## 5. Test Causal Explanations Without Replacing Scores
 
@@ -185,6 +203,17 @@ Deliver per-profile ordinary-mode evidence, or an explicit incomplete result.
 
 Deliver causal conclusions with contrary evidence and limits. Non-reproduction
 alone does not resolve either original flag.
+
+[V36-P5-1](INTERVENTION-ACCOUNTING.md) approves accounting for the remaining eight
+workers and sixteen internal probes without changing the one-factor experiment.
+The maintainer approved its inferred-probe inventory limit on 2026-10-14,
+separately from Priority 4's accepted exception. No retry is authorized.
+
+[Priority 5 results](INTERVENTION-RESULTS.md) complete all eight intervention
+workers and exhaust the 48-worker budget. Both profiles reach the high band
+under verified forced non-inlining, but ordinary high-mode causal attribution
+remains missing: A001/A002 stay unresolved/blocking. New capture validation is
+verified within its recorded limits; no production fix or release is selected.
 
 ## 6. Select a Bounded Correction or No-Change Outcome
 
