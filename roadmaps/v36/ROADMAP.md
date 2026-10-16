@@ -302,6 +302,11 @@ scope. A001/A002 remain blocking; correctness evidence does not accept their cos
 
 Deliver a reproducible, bounded investigation record and current maintainer guidance.
 
+[Priority 9 guidance](MAINTAINER-GUIDANCE.md) records the three dispositions,
+owners, supported alternatives, reopening gates and local evidence seals. A001
+and A002 remain unresolved/blocking; preservation does not authorize new runs,
+scope exclusion or closure. Priority 10 remains pending.
+
 ## 10. Conditional Release and Closure
 
 - Reconcile A001, A002 and E001. Full-scope completion requires their evidence-backed

@@ -93,6 +93,20 @@ Maven output and use the [tracked reproduction rules](../roadmaps/v35/MAINTAINER
 Attribution is not a JVM tuning recommendation or a pod-memory diagnosis;
 `4.5.0-SNAPSHOT` is not a selected release or upgrade remedy.
 
+## V36 Allocation Evidence and Limits
+
+The [V36 maintainer record](../roadmaps/v36/MAINTAINER-GUIDANCE.md) preserves the
+original scores and new per-worker diagnostics with verified local archive seals.
+AUTO_REGISTRY and HOOK remain unresolved/blocking; corrected evidence tooling
+does not establish ordinary high-mode causality or promote a public score.
+The 48-worker investigation is exhausted. No production change, further run,
+scope exclusion or release is selected by its completion. Published `4.4.2`
+remains the baseline; `4.5.0-SNAPSHOT` is not an upgrade remedy.
+
+The commands below describe general benchmark workflows, not permission to
+extend V36's exhausted schedule. Reuse the read-only verification commands in
+the record; any new V36 experiment requires a separately approved bounded plan.
+
 ## Commands
 
 Compile the benchmark module without running benchmarks:

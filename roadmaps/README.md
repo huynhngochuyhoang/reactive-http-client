@@ -44,6 +44,9 @@ independent and combined cost acceptance is still blocked, with no public claim.
 [Priority 8 verification](v36/VERIFICATION.md) runs the applicable tooling and
 workload guards and revalidates unchanged runtime/API/consumer/native evidence.
 Historical executions remain labeled as reuse, not fresh V36 runs.
+[Priority 9 guidance](v36/MAINTAINER-GUIDANCE.md) preserves the evidence seals,
+availability limits and three finding dispositions. A001/A002 remain blocking;
+no new experiments, scope exclusions or release are selected.
 Experiments outside the plan need a new decision,
 production edits need 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`

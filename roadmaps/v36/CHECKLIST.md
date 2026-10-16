@@ -584,26 +584,74 @@ acceptance, scope exclusion, closure or release. Priorities 9-10 remain pending.
 
 ## Priority 9 - Evidence Preservation and Maintainer Guidance
 
-### [ ] 9.1 Preserve reproducible evidence outside build output
+### [x] 9.1 Preserve reproducible evidence outside build output
 
-- [ ] Seal source or base-plus-patch, commands/exits, toolchains/dependencies, raw
+- [x] Seal source or base-plus-patch, commands/exits, toolchains/dependencies, raw
       samples/reports and file/archive hashes; verify copied and archived contents.
-- [ ] Test missing/corrupt/incomplete evidence rejection; preserve failed/interrupted
+- [x] Test missing/corrupt/incomplete evidence rejection; preserve failed/interrupted
       attempts and original V35 artifacts. State local-bundle availability limits.
 
-### [ ] 9.2 Reconcile findings, guidance and operating limits
+### [x] 9.2 Reconcile findings, guidance and operating limits
 
-- [ ] Document all three dispositions, owners, supported alternatives and reopening
+- [x] Document all three dispositions, owners, supported alternatives and reopening
       triggers; retain unresolved scope rather than silently deferring it.
-- [ ] Separate diagnostics from public scores, allocation from retention/RSS and
+- [x] Separate diagnostics from public scores, allocation from retention/RSS and
       starter from application work. No snapshot-upgrade remedy or mesh diagnosis.
 
-### [ ] 9.3 Verify current guidance and release-state boundaries
+### [x] 9.3 Verify current guidance and release-state boundaries
 
-- [ ] Verify examples, local links, metadata/configuration, versions and readiness
+- [x] Verify examples, local links, metadata/configuration, versions and readiness
       against actual evidence; distinguish candidate from published `4.4.2` behavior.
-- [ ] Keep synthetic capture bounded/sanitized and V1-V35 history unchanged. Record
+- [x] Keep synthetic capture bounded/sanitized and V1-V35 history unchanged. Record
       missing evidence and any proposed reduction before requesting closure.
+
+**Priority 9 record (2026-10-16):** [Evidence and maintainer guidance](MAINTAINER-GUIDANCE.md).
+Starting from clean `e0a041bc1b52bdd2a4ca631a08a7f2ae6e5e81b2`, this bounded
+tooling/test/documentation patch retains no production change. The read-only
+verifier rehashes **4,758 files in 13 bundles**, verifies every file inside all
+13 archives against the original tracked seals, and confirms **392 unchanged
+runtime/build/fixture inputs**. Historical V35 evidence and V1-V35 records stay
+unchanged; lost recordings remain unavailable, not regenerated under old identities.
+
+The guidance records all three dispositions, owners, supported alternatives and
+reopening triggers. A001/A002 remain **unresolved/blocking**; E001 is verified for
+new capture within its stated limits. No public scores, new telemetry, snapshot
+upgrade, pod/mesh diagnosis, scope reduction or release is selected. The 48/48
+worker budget stays exhausted; Priority 10 remains pending.
+
+Fresh tooling verification passes **92 Python tests**, including nine synthetic
+bundle-integrity cases for missing/corrupt/incomplete content, changed seals,
+duplicates, unsafe paths, links and truncated archives. No original evidence is
+mutated or extracted. The first Java documentation guard rejects the unfinished
+Priority 9 checklist; its failed command, log and XML are preserved. The previous
+temporary Maven repository is absent
+after restart; fresh checks use a writable copy at `/tmp/v36-p9-maven-repository`,
+with current toolchain/dependency inventories rather than claiming old paths exist.
+The first completed-record rerun caught one remaining Priority 8 guard that still
+required Priority 9 unchecked; that stale boundary is advanced to Priority 10,
+with the failure preserved rather than counted as a pass.
+
+Final verification passes **170 Java cases per Boot row** (4.0.0/4.1.0):
+117 documentation/readiness/link, 18 metadata/example and 35 property cases,
+zero failures/errors/skips. Ordinary forks disable explicit GC, using Java
+21.0.8/Maven 3.9.9. Readiness remains `activeRoadmap=v36`,
+`plannedFinalVersion=null`, `releaseLane=unselected`. `git diff --check` passes.
+No fresh benchmark, runtime full-suite, API, consumer, AOT/native, signing or
+publication result is claimed; exact prior runtime evidence reuse stays under
+Priority 8. Fresh commands/exits, source patch, dependency inventories, reports,
+failures and the read-only historical audit are preserved at
+`target/release-evidence/v36/priority9/`, copied outside Maven output to
+`verification-evidence/v36-priority9/`; the verified external seal follows.
+
+The Priority 9 bundle seals **229 files**. Manifest SHA-256:
+`938d27c50f957853c3ec2fd6ea62edebaa79d098fc8a931d047207323d738d28`.
+Archive `verification-evidence/v36-priority9-20261016.tar.gz` SHA-256:
+`7dd057b61e9b942f2557f325aceaf5534765d080edda1d18b0a4883d32d4f32d`.
+Copied and archived contents are verified. The complete source patch, including
+new files, applies to the reachable base and reproduces every changed-file hash.
+This paragraph is added after sealing to avoid self-reference and is the only
+excluded delta. The 13 original bundles remain required for their raw data;
+this audit archive does not replace them or constitute an off-machine backup.
 
 ## Priority 10 - Conditional Release and Closure
 
