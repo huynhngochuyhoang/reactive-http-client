@@ -164,6 +164,9 @@ verified process association within documented limits, not exact executing-code
 identity or a complete internal-probe census. Diagnostic modes cannot replace
 ordinary scores; no more investigation workers are authorized. This is not a
 snapshot-upgrade remedy, Kubernetes/Istio/Envoy diagnosis or pod-memory all-clear.
+[V36's approved closure](../roadmaps/v36/RELEASE-DECISION.md) is reduced-scope,
+review-only/no release. It excludes A001/A002 from closure, not from the findings
+or future attribution requirements.
 
 B/op measures allocation per operation, not retained heap. Compare time-aligned
 post-GC heap, direct/native memory, protocol-aware pool gauges, threads and RSS

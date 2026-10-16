@@ -5,6 +5,11 @@
 > **Runtime:** published `4.4.2` unchanged; development `4.5.0-SNAPSHOT`
 > **Release and closure:** unselected; Priority 10 remains pending
 
+This is the dated Priority 9 checkpoint. [V36-P10-1](RELEASE-DECISION.md) later
+approved reduced-scope review-only/no-release closure, excluding A001/A002 from
+closure obligations without resolving them. That decision supersedes pending
+lifecycle statements here; the evidence, scope limits and findings are unchanged.
+
 This record reconciles the [audit](EVIDENCE-AUDIT.md),
 [ordinary capture](ORDINARY-CAPTURE.md), [intervention](INTERVENTION-RESULTS.md),
 [no-production-change decision](CORRECTION-DECISION.md),

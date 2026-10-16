@@ -103,6 +103,10 @@ The 48-worker investigation is exhausted. No production change, further run,
 scope exclusion or release is selected by its completion. Published `4.4.2`
 remains the baseline; `4.5.0-SNAPSHOT` is not an upgrade remedy.
 
+[V36 closure](../roadmaps/v36/RELEASE-DECISION.md) is review-only/no release with
+explicit maintainer exclusion of A001/A002 from closure obligations. Both findings
+remain unresolved; this decision does not accept their cost or promote scores.
+
 The commands below describe general benchmark workflows, not permission to
 extend V36's exhausted schedule. Reuse the read-only verification commands in
 the record; any new V36 experiment requires a separately approved bounded plan.

@@ -11,12 +11,17 @@ V2 predates the separate execution-checklist convention and intentionally has no
 `CHECKLIST.md`. V1-V33 are completed release records. V33 was released as `4.4.2`.
 V34 is completed as a review-only/no-release roadmap; C004 was evaluated and rolled back.
 V35 is completed as a reduced-scope review-only/no-release roadmap; no next release is selected.
+V36 is completed as a reduced-scope review-only/no-release roadmap; A001/A002 remain unresolved.
 The reactor is `4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are
 verified `4.4.2`.
 
-[V36](v36/ROADMAP.md) and its [execution checklist](v36/CHECKLIST.md) are active
-for baseline review, deterministic tooling tests and experiment planning around
-AUTO_REGISTRY/HOOK allocation and measurement reliability. The
+[V36](v36/ROADMAP.md) and its [execution checklist](v36/CHECKLIST.md) are closed
+under [V36-P10-1](v36/RELEASE-DECISION.md). The maintainer approved review-only/no
+release and explicitly excluded A001/AUTO_REGISTRY and A002/HOOK from closure
+obligations, not resolved them or passed their cost. No production change remains.
+Readiness reports `activeRoadmap=null`, `plannedFinalVersion=null` and
+`releaseLane=unselected`; future scope is unselected. The dated records below
+retain their original measurements, approvals, pending gates and limits. The
 [Priority 1 baseline and ledger](v36/BASELINE-SCOPE.md) reconcile reachable source
 and available V35 evidence without resolving either allocation flag.
 The [Priority 2 audit](v36/EVIDENCE-AUDIT.md) verifies workload semantics and
@@ -49,8 +54,8 @@ availability limits and three finding dispositions. A001/A002 remain blocking;
 no new experiments, scope exclusions or release are selected.
 Experiments outside the plan need a new decision,
 production edits need 6.2 approval,
-and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`
-and `plannedFinalVersion=null`; no next release is selected.
+and release/closure a Priority 10 decision. That decision now closes review only;
+no next release, further experiment or performance all-clear is selected.
 
 [V35 closure](v35/RELEASE-DECISION.md) records explicit maintainer approval to
 exclude the unresolved AUTO_REGISTRY and HOOK allocation flags from closure,
@@ -193,4 +198,4 @@ automatically create another execution roadmap or reopen V32.
 | V33 | [Roadmap](v33/ROADMAP.md) | [Checklist](v33/CHECKLIST.md) | Completed and released as `4.4.2` |
 | V34 | [Roadmap](v34/ROADMAP.md) | [Checklist](v34/CHECKLIST.md) | Completed; review-only, no release |
 | V35 | [Roadmap](v35/ROADMAP.md) | [Checklist](v35/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |
-| V36 | [Roadmap](v36/ROADMAP.md) | [Checklist](v36/CHECKLIST.md) | Active |
+| V36 | [Roadmap](v36/ROADMAP.md) | [Checklist](v36/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |

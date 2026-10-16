@@ -1,12 +1,12 @@
 # Reactive HTTP Client - Roadmap V36
 
-> **Status:** active
+> **Status:** completed; review-only, no release; explicitly reduced scope
 > **Theme:** remaining allocation attribution and measurement reliability
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
 > **Experiment authorization:** V36-P3-1 plus V36-P5-1; 48/48 worker slots consumed, no further execution authorized
-> **Implementation and release scope:** approved no production change (V36-P6-1); release unselected
+> **Implementation and release scope:** no production change; no release; V36 closed (V36-P10-1)
 > **Draft date:** 2026-10-11
 > **Adopted:** 2026-10-12
 
@@ -15,8 +15,15 @@ The [execution checklist](CHECKLIST.md) adopts baseline review, deterministic
 tooling tests and experiment planning. Creating it completes no execution item
 and authorizes no diagnostic fork, benchmark rerun, production edit, version
 change or release. Experiment approval is required in **3.3**, implementation
-selection in **6.2**, and scope/release approval in **Priority 10**. Readiness is
-`activeRoadmap=v36`, `plannedFinalVersion=null`; V1-V35 stay closed.
+selection in **6.2**, and scope/release approval in **Priority 10**. At adoption,
+readiness was `activeRoadmap=v36`, `plannedFinalVersion=null`; V1-V35 stay closed.
+
+[V36-P10-1 closure](RELEASE-DECISION.md) records the 2026-10-16 approval for
+reduced-scope review-only/no release. A001/A002 are excluded from closure
+obligations, not resolved or passed; E001 remains verified only within its stated
+limits. Readiness now reports `activeRoadmap=null`, `plannedFinalVersion=null`.
+Future scope is unselected. Dated priority records below retain their original
+pending gates and results; this decision supersedes lifecycle status only.
 
 ## Objective
 
@@ -337,5 +344,7 @@ scope exclusion or closure. Priority 10 remains pending.
 - [ ] Guidance and release/no-release claims match delivered behavior. Unresolved
       scope requires explicit exclusion, not a blanket performance all-clear.
 
-These are acceptance criteria, not completed work. Checklist adoption, experiment
+These proposal criteria are not a blanket performance pass. The checklist and
+[explicit closure decision](RELEASE-DECISION.md) record actual execution and
+exclusions. A001/A002 remain unresolved after reduced-scope closure; experiment
 approval, implementation selection and release decision remain separate steps.

@@ -1,12 +1,12 @@
 # Reactive HTTP Client - Roadmap V36 Execution Checklist
 
-> **Status:** active
+> **Status:** completed; review-only, no release; explicitly reduced scope
 > **Theme:** remaining allocation attribution and measurement reliability
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** V35 AUTO_REGISTRY and HOOK allocation flags; evidence reliability needed to classify them
 > **Experiment authorization:** V36-P3-1 plus V36-P5-1; 48/48 worker slots consumed, no further execution authorized
-> **Implementation and release scope:** approved no production change (V36-P6-1); release unselected
+> **Implementation and release scope:** no production change; no release; V36 closed (V36-P10-1)
 > **Adopted:** 2026-10-12
 
 Execution companion to [ROADMAP.md](ROADMAP.md). Adoption authorizes baseline,
@@ -20,6 +20,11 @@ work. Preserve failed attempts and missing evidence. Mark a box only after its
 actual result, source and verification are recorded. Completing an approved run
 is not resolving a finding. Conditional work may be N/A only with a dated reason
 and applicability evidence, not because execution failed or a mode was absent.
+
+[V36-P10-1](RELEASE-DECISION.md) closes this review on 2026-10-16 with explicit
+exclusion of unresolved A001/A002 from closure obligations, not cost acceptance.
+P1-P9 statements that later priorities remain pending are dated checkpoints,
+superseded for lifecycle only. No production change or release is delivered.
 
 ## Finding and Approval Gates
 
@@ -655,52 +660,105 @@ this audit archive does not replace them or constitute an off-machine backup.
 
 ## Priority 10 - Conditional Release and Closure
 
-### [ ] 10.1 Reconcile scope and obtain release intent
+### [x] 10.1 Reconcile scope and obtain release intent
 
-- [ ] Reconcile A001/A002/E001; obtain explicit reduced-scope approval or keep the
+- [x] Reconcile A001/A002/E001; obtain explicit reduced-scope approval or keep the
       roadmap open if required evidence remains unresolved. No-release alone clears nothing.
-- [ ] Obtain release preparation or review-only/no-release approval. Evaluate a
+- [x] Obtain release preparation or review-only/no-release approval. Evaluate a
       compatible patch first if a justified change remains; no implicit `4.5.0` selection.
 
-### [ ] 10.2 Select exact candidate or no-release branch
+### [x] 10.2 Select exact candidate or no-release branch
 
-- [ ] For release, approve exact version and update reactor/modules/fixtures,
+- [x] For release, approve exact version and update reactor/modules/fixtures,
       guards/current docs/readiness together, keeping historical evidence coordinates.
-- [ ] Keep baseline `4.4.2` until verified publication and V36 active through any
+      N/A on 2026-10-16: approved no-release branch; no coordinate transition.
+- [x] Keep baseline `4.4.2` until verified publication and V36 active through any
       final-version cut. Preparation is neither publication nor final release GO.
-- [ ] For no release, record delivered/rolled-back/unresolved scope and explicit
+      Baseline unchanged; final-version cut N/A under the no-release decision.
+- [x] For no release, record delivered/rolled-back/unresolved scope and explicit
       exclusions; label release-only gates N/A, not passed.
 
-### [ ] 10.3 Assemble immutable final evidence
+### [x] 10.3 Assemble immutable final evidence
 
-- [ ] Inventory reachable final source, decisions, findings, tests, cost, API,
+- [x] Inventory reachable final source, decisions, findings, tests, cost, API,
       ownership, Boot/consumer/AOT/native and guidance with applicability/reuse limits.
-- [ ] Seal exact commands/statuses/counts, dependencies, reports/artifact hashes and
+- [x] Seal exact commands/statuses/counts, dependencies, reports/artifact hashes and
       failures; revalidate after final input edits without claiming a dirty patch is a commit.
-- [ ] For release, verify final-coordinate packaging and applicable unsigned/staged
+- [x] For release, verify final-coordinate packaging and applicable unsigned/staged
       checks separately from signing, tag/workflow, publication and Central consumption.
+      N/A on 2026-10-16: no release artifact/candidate selected; not run, not passed.
 
-### [ ] 10.4 Verify publication or explicit no-release closure
+### [x] 10.4 Verify publication or explicit no-release closure
 
-- [ ] For release, verify signing/signatures, version-matched tag/source/workflow,
+- [x] For release, verify signing/signatures, version-matched tag/source/workflow,
       publication and isolated Central assembled consumption before advancing baselines.
-- [ ] For no release, record approved final disposition/reduced scope; unrun release
+      N/A on 2026-10-16: approved no release; none run or claimed passed.
+- [x] For no release, record approved final disposition/reduced scope; unrun release
       gates are N/A, not passes, and unresolved findings remain named.
-- [ ] Close roadmap/checklist/index/readiness together with source/evidence links;
+- [x] Close roadmap/checklist/index/readiness together with source/evidence links;
       leave future scope unselected and V35 closed unchanged.
+
+**Priority 10 decision (2026-10-16):** [V36-P10-1](RELEASE-DECISION.md).
+The maintainer answered **"Approve reduced-scope, no-release closure (Recommended)"**,
+explicitly excluding unresolved A001/AUTO_REGISTRY and A002/HOOK from closure
+obligations, not marking them passed. E001 stays verified for new capture within
+limits; legacy pairing, exact executing-code identity and individual probe census
+remain unverified. No production change remains. A compatible `4.4.3` patch was
+evaluated but not selected; `4.5.0-SNAPSHOT` is not a selected minor release.
+Release-only gates above are dated N/A, not passes. No additional workers or
+probes are authorized by closure; all 48 worker slots remain consumed.
+
+Starting source is clean `5f160cccdff9b6116fdf74d64f8d85a47ed75150` plus the
+preserved closure documentation/test patch. Final evidence verifies all **4,987
+files in 14 bundles/archives** and **392 unchanged runtime/build/test/fixture
+inputs**. Prior API, consumer, ownership, JVM/AOT/native and cost results retain
+their original source/artifacts and applicability limits; none is relabeled as
+fresh execution. V1-V35 history, all original flags/failures and missing-evidence
+limits remain unchanged.
+
+Fresh closure checks pass **171 Java cases per Boot row** (4.0.0/4.1.0):
+118 documentation/readiness/link, 18 metadata/example and 35 property cases,
+plus **92 Python tooling tests**. Zero failures/errors/skips; overlapping final
+reruns are not additional distinct cases. Ordinary JVM tests disable explicit
+GC with Java 21.0.8/Maven 3.9.9. Final-input dependency inventories, source patch,
+approval, exact commands/exits, reports/readiness and historical audit are sealed
+under `target/release-evidence/v36/priority10/`, with the verified durable copy
+at `verification-evidence/v36-priority10/` and dated archive. Historical failed
+attempts remain in the unchanged referenced bundles. `git diff --check` passes.
+
+Readiness now reports `activeRoadmap=null`, `plannedFinalVersion=null` and
+`releaseLane=unselected`. Roadmap/checklist/index agree on completed, review-only,
+no release, explicitly reduced scope. Versions remain `4.5.0-SNAPSHOT` / `4.4.2`;
+future scope is unselected. No full-runtime, benchmark, API, consumer, native,
+signing, tag, publication or new-version Central run is claimed. The external
+integrity paragraph follows sealing; no original evidence is overwritten.
+
+The Priority 10 closure bundle seals **145 files**. Manifest SHA-256:
+`65ff8f3b9ecd37febd6096f7f08aa925d5ac0ebe14c2d8ff9757143ee6283b0b`.
+Archive `verification-evidence/v36-priority10-20261016.tar.gz` SHA-256:
+`fe2aabfcae053661c49a25c81ff558f8ff0fa77d264f92c0143a9a5f135eccdf`.
+Copied and archived contents are verified; the complete patch applies to the
+reachable base and reproduces all changed-file hashes. This external paragraph
+is added after sealing to avoid self-reference and is the only excluded delta.
+All 14 referenced original bundles remain required for raw reports and binaries;
+this closure archive does not replace them or provide an off-machine backup.
 
 ## Completion Criteria
 
-- [ ] A001, A002 and E001 have evidence-backed dispositions; unresolved scope is
+- [x] A001, A002 and E001 have evidence-backed dispositions; unresolved scope is
       explicitly excluded or still blocking, not silently cleared.
-- [ ] Fork/trace association and relevant compiler-history limits are verified.
-- [ ] All measurement has prior approval, frozen budgets and preserved stop rules;
+      A001/A002 excluded from closure only; full-scope cost acceptance still blocked.
+- [x] Fork/trace association and relevant compiler-history limits are verified.
+      New-capture association only; unverified legacy/code/probe facts remain named.
+- [x] All measurement has prior approval, frozen budgets and preserved stop rules;
       no diagnostic-score substitution, favorable-rerun selection or unapproved extension.
-- [ ] Any retained correction has approval, semantic/ownership/compatibility controls
+      Includes the explicitly accepted P4 internal-probe accounting exception.
+- [x] Any retained correction has approval, semantic/ownership/compatibility controls
       and matched benefit or accepted correctness cost; failed candidates remain rejected.
-- [ ] Final evidence identifies actual inputs, results, failures and reuse limits;
+      Tooling correction verified; runtime benefit/acceptance N/A, no runtime patch.
+- [x] Final evidence identifies actual inputs, results, failures and reuse limits;
       lost recordings and V1-V35 history are not rewritten.
-- [ ] Guidance, release/no-release decision and lifecycle closure match actual delivered
+- [x] Guidance, release/no-release decision and lifecycle closure match actual delivered
       behavior without a blanket performance or deployment-memory claim.
 
 All boxes are execution gates, not adoption accomplishments. No experiment,
