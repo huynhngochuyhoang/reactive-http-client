@@ -515,28 +515,72 @@ for raw samples and binaries; this smaller audit archive does not replace them.
 
 ## Priority 8 - Compatibility, Cross-Path and Lifecycle Verification
 
-### [ ] 8.1 Select and run delta-appropriate contract checks
+### [x] 8.1 Select and run delta-appropriate contract checks
 
-- [ ] For tooling/docs-only work, verify parser/workload/archive/readiness/guidance
+- [x] For tooling/docs-only work, verify parser/workload/archive/readiness/guidance
       guards and exact applicability of reused runtime evidence; do not claim fresh native.
-- [ ] For runtime/fixture changes, run affected public/factory/mock/assembled contracts,
+- [x] For runtime/fixture changes, run affected public/factory/mock/assembled contracts,
       genuine Boot 4.0.0/4.1.0 rows and physically absent optional integrations.
+      Fresh executions N/A on 2026-10-14: no runtime/fixture change; exact prior inputs reverified.
 
-### [ ] 8.2 Verify ownership and runtime/AOT boundaries
+### [x] 8.2 Verify ownership and runtime/AOT boundaries
 
-- [ ] Preserve metadata/properties selection, cancellation/discard, failed creation,
+- [x] Preserve metadata/properties selection, cancellation/discard, failed creation,
       shutdown and application-versus-starter resource ownership.
-- [ ] Use explicit GC disabled for ordinary tests, controlled reachability for
+- [x] Use explicit GC disabled for ordinary tests, controlled reachability for
       collection claims, and deterministic concurrency/cleanup gates rather than sleeps.
 
-### [ ] 8.3 Verify applicable API, packaging and native evidence
+### [x] 8.3 Verify applicable API, packaging and native evidence
 
-- [ ] For retained runtime changes, run strict root and independent starter source/binary
+- [x] For retained runtime changes, run strict root and independent starter source/binary
       API checks against isolated Central `4.4.2`; run both even if the first fails.
-- [ ] Verify applicable packaging/JVM/AOT/native paths. Native compile and executable
+      New comparisons N/A on 2026-10-14: no retained runtime change; both strict results reused.
+- [x] Verify applicable packaging/JVM/AOT/native paths. Native compile and executable
       must use clean reachable source containing final implementation and fixture.
-- [ ] Record actual totals/failures and exact reuse or dated N/A rationale for unchanged
+- [x] Record actual totals/failures and exact reuse or dated N/A rationale for unchanged
       paths; JVM/AOT success is not a native pass, nor local install Central provenance.
+
+**Priority 8 verification (2026-10-14):** [Compatibility and lifecycle record](VERIFICATION.md).
+V36-P6-1 retains no production change. The audit rehashes **2,892 files** and
+four archives, compares **392 unchanged runtime/build/test/fixture inputs** to
+reachable P9 source, and reconciles historical XML, Boot parents, installed
+artifact identities, API failure switches/reports and native binary/source/exits.
+P9's 2,446 cases per Boot row, 29 selected-consumer/one absence/six smoke cases
+per row, controlled 16/5/2 reachability cases and native result are **reused**,
+not fresh executions. P10 strict root/independent starter and packaging evidence
+is likewise reused; fresh execution is N/A for this tooling/docs-only delta.
+
+Fresh checks pass **83 Python tooling tests**, **40 untimed workload cases per
+Boot row** (4.0.0/4.1.0), the standalone recorder callback contract and synthetic
+provenance fixtures. Explicit GC is disabled for ordinary Java checks. No JMH
+runner, measured worker, internal probe or new experiment budget is used.
+The first provenance-fixture run failed on a read-only default Maven cache;
+the isolated rerun uses the recorded writable repository and passes. The first
+offline audit's starter-report layout assumption is corrected without changing
+or rerunning historical evidence. Both failures and the missing-record guard
+failure are preserved. Current documentation/readiness guards are recorded below.
+
+Final documentation/readiness/link guards pass **116 cases per Boot row**,
+zero failures/errors/skips, giving **156 Java cases per row** with the workload
+checks, plus the standalone callback contract. A heading-case assertion mismatch
+in the first full documentation run is corrected and retained with its failed XML;
+the final rerun passes. `git diff --check` passes. Exact commands/exits, current
+source patch, failed attempts, actual totals and reused-evidence inventories are
+preserved in `target/release-evidence/v36/priority8/` and copied to
+`verification-evidence/v36-priority8/` before cleanup; the external seal follows.
+
+The Priority 8 bundle seals **203 files**. Manifest SHA-256:
+`8d69e9d56fffe322df1313b929743c6b272d584f4214922b9d97005ebf035e85`.
+Archive `verification-evidence/v36-priority8-20261014.tar.gz` SHA-256:
+`13f223432e297407b34a144d6fabfa8f4ff6e95dd5a36044fb510b117f7132f6`.
+Copied and archived contents were verified, including fresh guards, failed
+attempts, corrected reuse audit, original input-manifest references and source
+patch. This paragraph is added after sealing to avoid self-reference and is the
+only excluded delta. Referenced historical bundles remain required for raw
+runtime/API/native evidence; the audit archive does not replace those binaries.
+
+A001/A002 remain **unresolved/blocking**; correctness verification is not cost
+acceptance, scope exclusion, closure or release. Priorities 9-10 remain pending.
 
 ## Priority 9 - Evidence Preservation and Maintainer Guidance
 

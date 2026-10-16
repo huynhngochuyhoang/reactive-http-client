@@ -281,6 +281,11 @@ review does not approve scope exclusion, further experiments, closure or release
 
 Deliver actual counts, compatibility/ownership outcomes and precise reuse limits.
 
+[Priority 8 verification](VERIFICATION.md) records fresh tooling/workload/docs
+guards and exact reuse of unchanged runtime, consumer, API, packaging and native
+inputs/results. No fresh native or full-suite run is claimed for this tooling-only
+scope. A001/A002 remain blocking; correctness evidence does not accept their cost.
+
 ## 9. Evidence Preservation and Maintainer Guidance
 
 - Preserve immutable bundles outside Maven output before any cleanup. Keep

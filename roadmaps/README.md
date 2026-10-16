@@ -41,6 +41,9 @@ does not approve scope exclusion, closure or release.
 [Priority 7 review](v36/COST-ACCEPTANCE.md) revalidates the unchanged scored pair
 and reverse confirmations without new workers. Original allocation flags remain;
 independent and combined cost acceptance is still blocked, with no public claim.
+[Priority 8 verification](v36/VERIFICATION.md) runs the applicable tooling and
+workload guards and revalidates unchanged runtime/API/consumer/native evidence.
+Historical executions remain labeled as reuse, not fresh V36 runs.
 Experiments outside the plan need a new decision,
 production edits need 6.2 approval,
 and release/closure a Priority 10 decision. Readiness reports `activeRoadmap=v36`
