@@ -158,6 +158,16 @@ migration, release, new meter or snapshot-upgrade remedy is selected.
 [V35's approved no-release closure](../roadmaps/v35/RELEASE-DECISION.md) excludes
 the two unresolved flags from closure scope, without accepting their cost.
 
+[V36's evidence and guidance](../roadmaps/v36/MAINTAINER-GUIDANCE.md) retain both
+flags as unresolved/blocking and approve no production change. New capture has
+verified process association within documented limits, not exact executing-code
+identity or a complete internal-probe census. Diagnostic modes cannot replace
+ordinary scores; no more investigation workers are authorized. This is not a
+snapshot-upgrade remedy, Kubernetes/Istio/Envoy diagnosis or pod-memory all-clear.
+[V36's approved closure](../roadmaps/v36/RELEASE-DECISION.md) is reduced-scope,
+review-only/no release. It excludes A001/A002 from closure, not from the findings
+or future attribution requirements.
+
 B/op measures allocation per operation, not retained heap. Compare time-aligned
 post-GC heap, direct/native memory, protocol-aware pool gauges, threads and RSS
 under the existing [memory-triage procedure](30-operations-troubleshooting.md#cache-memory-triage-420).

@@ -105,6 +105,10 @@ memory before attributing growth. Its two blocking cost flags are a benchmark
 evidence gap, not a proved application leak; passing cleanup tests is not a
 deployment leak all-clear either. No new capture fields or snapshot upgrade are
 required to investigate published `4.4.2` incidents.
+The [V36 follow-up](../roadmaps/v36/MAINTAINER-GUIDANCE.md) likewise retains
+AUTO_REGISTRY/HOOK as unresolved/blocking, with no production change. Its bounded
+synthetic diagnostics do not assign a pod/mesh incident to the starter or change
+the published capture procedure.
 The [V34 guide](../roadmaps/v34/MAINTAINER-GUIDANCE.md) remains historical
 review-only evidence, not a retrospectively passed cost gate.
 
