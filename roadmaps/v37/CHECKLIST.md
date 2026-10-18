@@ -83,27 +83,61 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ## Priority 1 - Post-V36 Baseline and Narrow Scope Integrity
 
-### [ ] 1.1 Verify adoption and version state
+### [x] 1.1 Verify adoption and version state
 
-- [ ] Verify roadmap/checklist/index/readiness agree on active V37, closed V1-V36,
+- [x] Verify roadmap/checklist/index/readiness agree on active V37, closed V1-V36,
       `4.5.0-SNAPSHOT`, baseline `4.4.2`, `plannedFinalVersion=null` and unselected
       release lane; run archive/version/documentation guards.
-- [ ] Preserve V36's reduced-scope no-release decision and unresolved A001/A002;
+- [x] Preserve V36's reduced-scope no-release decision and unresolved A001/A002;
       adoption does not retrospectively pass them or complete Priority 1.
 
-### [ ] 1.2 Inventory source and reusable evidence
+### [x] 1.2 Inventory source and reusable evidence
 
-- [ ] Record reachable source/tree, worktree changes, toolchains, JDK/JMH/Boot and
+- [x] Record reachable source/tree, worktree changes, toolchains, JDK/JMH/Boot and
       dependencies; inventory raw samples, saved JARs, patches, manifests/archives.
-- [ ] Rehash inputs before reuse and record missing data, inferred process counts
+- [x] Rehash inputs before reuse and record missing data, inferred process counts
       and unavailable historical revisions without manufacturing provenance.
 
-### [ ] 1.3 Initialize the narrow finding ledger
+### [x] 1.3 Initialize the narrow finding ledger
 
-- [ ] Record A001, A002 and E001 with owners, evidence, proof obligations, controls,
+- [x] Record A001, A002 and E001 with owners, evidence, proof obligations, controls,
       uncertainty and stop conditions; retain independent profile dispositions.
-- [ ] Confirm exhausted V35/V36 approvals grant no worker, pilot, probe or time
+- [x] Confirm exhausted V35/V36 approvals grant no worker, pilot, probe or time
       budget, and C001-C005 are not reopened by this follow-up.
+
+**Priority 1 record (2026-10-18):** [Baseline and narrow ledger](BASELINE-SCOPE.md).
+Started from clean `7e67a7ccec5ef8b0100d4b559d91e34ad8b8c2fc`; fresh checks use
+that reachable base plus the retained documentation/test patch. The read-only
+audit verifies 5,132 files across 15 bundles and their complete archives, 392
+unchanged runtime/build/test/fixture inputs and both saved benchmark JARs.
+All 121 historical classpath paths per artifact are now absent; input hashes
+and shaded artifacts are preserved, not a claim of a runnable old environment.
+Lost V35 recordings remain unavailable, and non-ancestor execution objects keep
+their original provenance rather than being relabeled as reachable revisions.
+
+Verification passes **121 documentation cases per Boot row** (4.0.0/4.1.0), zero
+failures/errors/skips, **nine archive-verifier tests**, reactor validation,
+baseline-provenance fixtures, matrix-script syntax and `git diff --check`.
+Fresh effective POMs/dependency trees and test classpath hashes are retained;
+Java 21.0.8/Maven 3.9.9 use explicit GC disabled for ordinary tests. Repeated
+verification is not counted as additional unique cases. No benchmark, runtime
+full-suite, API, consumer, AOT/native or new Central verification is claimed.
+
+A001/A002 remain unresolved/blocking; E001 is feasibility pending, not a new
+confirmed defect. V1-V36 history and all versions are unchanged. Priority 2.3
+must decide proceed-to-plan or stop; 4.3, 7.2 and Priority 10 retain their separate
+approval gates. Priority 1 launches zero workers and selects no numerical budget,
+production correction or release. Evidence is retained under
+`target/release-evidence/v37/priority1/`; the external seal follows verification.
+
+The Priority 1 bundle seals **146 files** at
+`verification-evidence/v37-priority1/`, mirrored under Maven output. Manifest
+SHA-256: `a21c2f68403d8f20460dd8efe02e4cd4cd35a823af2da9deb26c8d3af68249eb`.
+Archive `verification-evidence/v37-priority1-20261018.tar.gz` SHA-256:
+`7a15f706e7b00c32ab7c6e7d9cc6b55e8fd97b910f4084123cd5002c1a60bdeb`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is added after sealing to avoid self-reference;
+it is the only excluded delta. Ignored local copies are not an off-machine backup.
 
 ## Priority 2 - Attribution Feasibility and Stop Decision
 

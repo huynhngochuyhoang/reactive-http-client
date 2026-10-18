@@ -249,7 +249,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v37ChecklistMatchesRoadmapWithoutApprovingExperimentsOrCompletingWork() throws IOException {
+    void v37ChecklistMatchesRoadmapAndKeepsExperimentAndReleaseApprovalsSeparate() throws IOException {
         Path root = projectRoot();
         Path directory = root.resolve("roadmaps/v37");
         String roadmap = Files.readString(directory.resolve("ROADMAP.md"));
@@ -261,7 +261,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(priorities).hasSize(10);
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
-        assertThat(checklist.lines().filter(line -> line.matches("### \\[ \\] \\d+\\.\\d+ .+")).toList())
+        assertThat(checklist.lines().filter(line -> line.matches("### \\[[ x]\\] \\d+\\.\\d+ .+")).toList())
                 .hasSize(31);
         for (String prefix : List.of("> **Status:**", "> **Theme:**", "> **Published baseline:**",
                 "> **Development coordinate:**", "> **Proposed scope:**", "> **Experiment authorization:**",
@@ -285,11 +285,51 @@ class DocumentationReleaseArtifactTest {
                 "Lost V35 P2-P8", "base-plus-patch", "target/release-evidence/v37/priority<N>/",
                 "before any cleanup", "both artifact orders", "60-row matrix", "Central-only",
                 ">20% latency", ">max(32 B/op, 5%)", "explicit GC disabled", "clean-source native",
-                "strict root and independent starter", "even if the first fails", "N/A, not passed")
-                .doesNotContain("[x]");
+                "strict root and independent starter", "even if the first fails", "N/A, not passed");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 2 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v37/CHECKLIST.md)", "activeRoadmap=v37", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v37BaselinePreservesUnresolvedFindingsAndDistinguishesAvailableFromRunnableEvidence() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v37");
+        String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
+        assertThat(baseline.replaceAll("\\s+", " ")).contains(
+                "2026-10-18", "4.4.2", "4.5.0-SNAPSHOT", "activeRoadmap=v37",
+                "plannedFinalVersion=null", "releaseLane=unselected", "V1-V36 stay closed",
+                "7e67a7ccec5ef8b0100d4b559d91e34ad8b8c2fc", "27293e32b6b7919060d35901c87b8004f1c9d93a",
+                "base-plus-patch", "not an ancestor", "5,132 files across 15 bundles",
+                "392 runtime/build/test/fixture inputs", "39 harness/build inputs", "121 JAR paths",
+                "all now absent", "not verified", "not fresh Central", "Lost V35 P2-P8",
+                "V37-A001 / AUTO_REGISTRY", "V37-A002 / HOOK", "V37-E001 / Attribution Feasibility",
+                "Unresolved/blocking", "Feasibility pending", "not a newly reproduced defect",
+                "**Owner:**", "**Evidence:**", "**Controls:**", "**Question:**", "**Proof obligation:**",
+                "**Stop conditions:**", "338 workers", "48/48 workers", "96 inferred internal probes",
+                "194 accounted JVM invocations", "zero new workers", "no numerical budget",
+                "C001-C005 and both C004 subrows", "2.3", "4.3", "7.2", "Priority 10",
+                "explicit GC disabled", "JMH 1.37", "Boot 4.0.0", "Boot 4.1.0",
+                "target/release-evidence/v37/priority1/", "no off-machine backup",
+                "No fresh full-module, API", "B/op is not retention or RSS");
+        assertThat(baseline.lines().filter(line -> line.startsWith("### V37-")).toList()).hasSize(3);
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(checklist.substring(checklist.indexOf("## Priority 1 - "),
+                checklist.indexOf("## Priority 2 - ")))
+                .contains("### [x] 1.1", "### [x] 1.2", "### [x] 1.3", "(BASELINE-SCOPE.md)",
+                        "121 documentation cases per Boot row", "nine archive-verifier tests")
+                .doesNotContain("[ ]");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(BASELINE-SCOPE.md)");
+        assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v37/BASELINE-SCOPE.md)");
+        assertThat(Files.readString(root.resolve("roadmaps/v36/CHECKLIST.md")))
+                .contains("> **Status:** completed; review-only, no release; explicitly reduced scope",
+                        "A001/A002 excluded from closure only");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();

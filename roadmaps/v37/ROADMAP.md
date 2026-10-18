@@ -19,6 +19,10 @@ or release. Readiness reports `activeRoadmap=v37`, `plannedFinalVersion=null`,
 `releaseLane=unselected`.
 V1-V36 stay closed; the two unresolved flags are not retrospectively passed.
 
+[Priority 1's baseline and ledger](BASELINE-SCOPE.md) inventory preserved evidence
+and missing historical classpaths. They verify baseline integrity, not a causal
+explanation or permission for new measurements; feasibility remains Priority 2.
+
 ## Objective and Difference from V36
 
 Decide whether a materially different, bounded method can connect an ordinary
@@ -36,9 +40,9 @@ it does not resolve the findings or authorize closure by itself.
 
 ## Starting Evidence and Required Findings
 
-Inspected closure revision: `0574d892603b30fec903deee79211464a1fe86c8`.
-This planning record claims source review only, not fresh artifact, Central, compiler or
-native verification. On execution, reconcile reachable source and preserved
+Draft-stage inspected closure revision: `0574d892603b30fec903deee79211464a1fe86c8`.
+Drafting claimed source review only, not fresh artifact, Central, compiler or
+native verification. Execution records reconcile reachable source and preserved
 base-plus-patch evidence; squash-local hashes must not be presented as reachable
 execution revisions without verification.
 

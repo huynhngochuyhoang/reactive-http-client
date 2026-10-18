@@ -22,6 +22,10 @@ feasibility stop decision precedes more measurement if no materially different
 attribution method is credible. No execution item is completed by adoption; no
 experiment budget, production change or release is selected. Readiness reports
 `activeRoadmap=v37`, `plannedFinalVersion=null`, `releaseLane=unselected`.
+The [Priority 1 baseline and ledger](v37/BASELINE-SCOPE.md) record the available
+bundles, missing historical classpaths and independent unresolved A001/A002 rows.
+E001 remains a feasibility review, not a newly presumed defect; no experiment
+budget or implementation is selected by the baseline.
 
 [V36](v36/ROADMAP.md) and its [execution checklist](v36/CHECKLIST.md) are closed
 under [V36-P10-1](v36/RELEASE-DECISION.md). The maintainer approved review-only/no
