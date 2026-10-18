@@ -26,6 +26,11 @@ The [Priority 1 baseline and ledger](v37/BASELINE-SCOPE.md) record the available
 bundles, missing historical classpaths and independent unresolved A001/A002 rows.
 E001 remains a feasibility review, not a newly presumed defect; no experiment
 budget or implementation is selected by the baseline.
+The [Priority 2 decision](v37/FEASIBILITY-DECISION.md) approves stopping before
+more measurements: alternative observations have not yet been connected into a
+bounded causal capture design. Both findings remain unresolved; new capture and
+correction work is N/A, not passed. Applicable verification, preservation and a
+separate closure decision remain required; V37 is not closed.
 
 [V36](v36/ROADMAP.md) and its [execution checklist](v36/CHECKLIST.md) are closed
 under [V36-P10-1](v36/RELEASE-DECISION.md). The maintainer approved review-only/no

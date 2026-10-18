@@ -21,7 +21,10 @@ V1-V36 stay closed; the two unresolved flags are not retrospectively passed.
 
 [Priority 1's baseline and ledger](BASELINE-SCOPE.md) inventory preserved evidence
 and missing historical classpaths. They verify baseline integrity, not a causal
-explanation or permission for new measurements; feasibility remains Priority 2.
+explanation or permission for new measurements. The [Priority 2 decision](FEASIBILITY-DECISION.md)
+approves a stop before new measurements, not closure or scope exclusion.
+Applicable verification, evidence preservation and the Priority 10 decision remain
+required; both allocation findings stay unresolved.
 
 ## Objective and Difference from V36
 

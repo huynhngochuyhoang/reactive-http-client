@@ -141,28 +141,62 @@ it is the only excluded delta. Ignored local copies are not an off-machine backu
 
 ## Priority 2 - Attribution Feasibility and Stop Decision
 
-### [ ] 2.1 Identify the missing causal observation
+### [x] 2.1 Identify the missing causal observation
 
-- [ ] Audit available ordinary, marker, traced and intervention evidence offline;
+- [x] Audit available ordinary, marker, traced and intervention evidence offline;
       state what each supports and the missing high-mode causal bridge per profile.
-- [ ] Distinguish installed/inlined/eliminated code and iteration envelopes from
+- [x] Distinguish installed/inlined/eliminated code and iteration envelopes from
       exact executing-code identity; preserve old acceptance and uncertainty.
 
-### [ ] 2.2 Evaluate a materially different method
+### [x] 2.2 Evaluate a materially different method
 
-- [ ] Compare methods using existing tooling/source evidence, with expected
+- [x] Compare methods using existing tooling/source evidence, with expected
       perturbation, permissions/resources and outcomes that would refute usefulness.
-- [ ] Specify minimum sufficient evidence for each proposed explanation. Another
+- [x] Specify minimum sufficient evidence for each proposed explanation. Another
       profiler name, more forks or repetition of V36's low-only tracing is not proof
       of feasibility and authorizes no pilot.
 
-### [ ] 2.3 Obtain proceed-to-plan or stop approval
+### [x] 2.3 Obtain proceed-to-plan or stop approval
 
-- [ ] Record the maintainer's explicit decision and rationale before advancing;
+- [x] Record the maintainer's explicit decision and rationale before advancing;
       proceeding permits planning only, not execution before 4.3.
-- [ ] If no credible method exists, stop before launching workers, retain findings
-      unresolved and record dated applicability for later priorities. Complete
-      applicable verification/preservation and seek a separate closure decision.
+- [x] If no credible method exists, stop before launching workers, retain findings
+      unresolved and record dated applicability for later priorities. Keep
+      applicable verification/preservation and a separate closure decision required
+      in Priorities 8-10; recording the route does not complete those priorities.
+
+**Priority 2 record (2026-10-18):** [Feasibility and approved stop](FEASIBILITY-DECISION.md).
+The offline audit revalidates 1,938 files across five bundles/archives, reproduces
+all 48 V36 stage reviews and the original 60-row primary/four-row reverse reviews.
+AUTO_REGISTRY has no ordinary high witness in V36; HOOK's ordinary high stages
+10 and 15 have no compiler trace. Forced high modes and installed code do not
+identify the ordinary executing allocation path. A001/A002 remain unresolved.
+
+Five method families are evaluated with prerequisites, perturbation, falsifiers
+and minimum evidence. Execution-PC/allocation correlation is materially different
+in principle, but no bounded complete capture path is established in the reviewed
+tooling/source. The maintainer answered **"Approve stop (Recommended)"**, approving
+**V37-P2-1** before new measurement. Dated N/A for new capture/correction work in
+Priorities 3-7 means not run, not passed; applicable verification in Priority 8,
+preservation/guidance in Priority 9 and the separate Priority 10 decision remain
+required. No worker or pilot ran; no budget, implementation, release or scope
+exclusion is selected. A001/A002 still block full-scope acceptance; V37 stays active.
+
+Verification passes **122 documentation cases per Boot row** (4.0.0/4.1.0),
+**36 deterministic tooling tests** and `git diff --check`, zero failures/errors/skips.
+Ordinary Java checks use explicit GC disabled. Overlapping reruns are not additional
+unique cases. No runtime full-suite, API, consumer, AOT/native, performance or
+publication execution is claimed. Evidence and the complete source patch are
+retained under `target/release-evidence/v37/priority2/`; the external seal follows.
+
+The Priority 2 bundle seals **76 files** at
+`verification-evidence/v37-priority2/`, mirrored under Maven output. Manifest
+SHA-256: `63e9e0b90ffc84604f4f990baec2d34c61bcb3153df6562e242faed2d4e775c5`.
+Archive `verification-evidence/v37-priority2-20261018.tar.gz` SHA-256:
+`966ad7e40ce6cfa76d612e6c944a7e1fc53dc617b942a555caae29990e4fe9d6`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is added after sealing to avoid self-reference;
+it is the only excluded delta. Ignored local copies are not an off-machine backup.
 
 ## Priority 3 - Minimal Capture and Process-Accounting Contract
 
