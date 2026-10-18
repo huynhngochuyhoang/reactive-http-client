@@ -15,12 +15,20 @@ V36 is completed as a reduced-scope review-only/no-release roadmap; A001/A002 re
 The reactor is `4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are
 verified `4.4.2`.
 
+[V37](v37/ROADMAP.md) and its [execution checklist](v37/CHECKLIST.md) are active.
+Adoption permits baseline/evidence review, bounded deterministic synthetic tests
+and planning for the unresolved AUTO_REGISTRY/HOOK allocation findings. A
+feasibility stop decision precedes more measurement if no materially different
+attribution method is credible. No execution item is completed by adoption; no
+experiment budget, production change or release is selected. Readiness reports
+`activeRoadmap=v37`, `plannedFinalVersion=null`, `releaseLane=unselected`.
+
 [V36](v36/ROADMAP.md) and its [execution checklist](v36/CHECKLIST.md) are closed
 under [V36-P10-1](v36/RELEASE-DECISION.md). The maintainer approved review-only/no
 release and explicitly excluded A001/AUTO_REGISTRY and A002/HOOK from closure
 obligations, not resolved them or passed their cost. No production change remains.
-Readiness reports `activeRoadmap=null`, `plannedFinalVersion=null` and
-`releaseLane=unselected`; future scope is unselected. The dated records below
+At V36 closure, readiness reported `activeRoadmap=null`, `plannedFinalVersion=null`
+and `releaseLane=unselected`, with future scope unselected. The dated records below
 retain their original measurements, approvals, pending gates and limits. The
 [Priority 1 baseline and ledger](v36/BASELINE-SCOPE.md) reconcile reachable source
 and available V35 evidence without resolving either allocation flag.
@@ -199,3 +207,4 @@ automatically create another execution roadmap or reopen V32.
 | V34 | [Roadmap](v34/ROADMAP.md) | [Checklist](v34/CHECKLIST.md) | Completed; review-only, no release |
 | V35 | [Roadmap](v35/ROADMAP.md) | [Checklist](v35/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |
 | V36 | [Roadmap](v36/ROADMAP.md) | [Checklist](v36/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |
+| V37 | [Roadmap](v37/ROADMAP.md) | [Checklist](v37/CHECKLIST.md) | Active |
