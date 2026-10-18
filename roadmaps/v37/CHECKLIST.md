@@ -202,6 +202,10 @@ it is the only excluded delta. Ignored local copies are not an off-machine backu
 
 ### [ ] 3.1 Specify the smallest missing observation
 
+**N/A (2026-10-18, V37-P2-1):** No capture approach was selected. The maintainer
+confirmed **"Record N/A under approved stop (Recommended)"** rather than reopening
+offline planning. No new capture contract or observation is specified.
+
 - [ ] Reuse [capture](../../scripts/capture-v36-allocation.py),
       [review](../../scripts/review-v35-allocation.py) and
       [archive verification](../../scripts/verify-v36-evidence.py) where applicable;
@@ -212,6 +216,10 @@ it is the only excluded delta. Ignored local copies are not an off-machine backu
 
 ### [ ] 3.2 Define complete process accounting
 
+**N/A (2026-10-18, V37-P2-1):** No investigation schedule or process budget is
+selected. No launcher, worker, internal probe, preflight or profiler/helper is
+authorized; historical inferred counts are not a new process census or allowance.
+
 - [ ] Specify how every launcher, measured worker, internal JMH probe, preflight
       and profiler/helper process is identified and charged before execution.
 - [ ] Record observation limits and abort behavior for unexpected launches or
@@ -219,10 +227,44 @@ it is the only excluded delta. Ignored local copies are not an off-machine backu
 
 ### [ ] 3.3 Verify tooling with bounded synthetic fixtures
 
+**N/A (2026-10-18, V37-P2-1):** No new capture/parser behavior or tooling fix is
+selected, so no new synthetic capture fixtures are required. Priority 2's tooling
+tests remain historical evidence, not fresh Priority 3 execution or a new causal
+claim. Diagnostic JVM and recorder smoke remain unrun and gated on 4.3.
+
 - [ ] Test missing, duplicate, truncated, mismatched, reordered and superseded
       records; preserve a failing synthetic reproduction for each tooling fix.
 - [ ] Review what corrected conclusions need fresh evidence. Keep diagnostic JVM
       and recorder smoke behind 4.3, not disguised as deterministic tooling tests.
+
+**Priority 3 disposition (2026-10-18):** N/A under the
+[approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates),
+not run, not passed. All nine execution boxes remain unchecked; recording this
+applicability does not implement a capture contract or reopen planning. A001/A002
+remain unresolved/blocking, V37 remains active and no scope exclusion or release
+is approved. Priorities 8-10 retain applicable verification, preservation/guidance
+and the separate closure decision. Reopening requires a new explicit decision;
+execution would still require 4.3 approval.
+
+Source: clean `4586f6aa6a0d8f7c495f477c8b8b00ac0ea24768`, tree
+`7beaf83021371256e9ea7a3ca7101570b5f9e82a`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 2 bundle/archive is reverified (76 files);
+this checks integrity, not fresh allocation attribution. No tooling suite,
+runtime/API/consumer/AOT/native, benchmark or publication execution is claimed.
+Commands, exits, test reports and classpath hashes are preserved under
+`target/release-evidence/v37/priority3/`; the external seal follows.
+
+The Priority 3 disposition bundle seals **28 files** at
+`verification-evidence/v37-priority3/`, mirrored under Maven output. Manifest
+SHA-256: `615659f2ecb70865121117c8a4ae329715091a554e4a719ecef33acaa5bd1125`.
+Archive `verification-evidence/v37-priority3-20261018.tar.gz` SHA-256:
+`99e65d1375a50443577d8050c27141cee6ddbeffeb65f4369c9794684f4dc6e5`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
 
 ## Priority 4 - Freeze and Approve One Bounded Investigation
 
