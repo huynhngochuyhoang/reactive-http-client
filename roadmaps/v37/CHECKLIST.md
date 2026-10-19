@@ -270,6 +270,10 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 4.1 Freeze inputs and distinguishing lanes
 
+**N/A (2026-10-18, V37-P2-1):** No investigation or capture method is selected
+under the approved stop. Historical artifacts and lanes are evidence only, not
+newly frozen execution inputs; no investigation plan is created.
+
 - [ ] Pin artifact/harness/JDK/JMH/Boot/dependency identities, workload phase,
       payload, VM flags, heap/threads, iterations, units, order and host conditions.
 - [ ] Select minimal ordinary/observed/intervention and same-JAR controls, with
@@ -278,6 +282,10 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 4.2 Set numerical execution and stop bounds
 
+**N/A (2026-10-18, V37-P2-1):** No numerical execution budget is selected, not even
+a zero-worker approved schedule. No process/time/memory/storage allowance carries
+over from V35/V36, and no pilot, probe, preflight, helper or smoke run is authorized.
+
 - [ ] Freeze per-category and total process ceilings, worker count, stage deadlines,
       cumulative time and memory/storage limits, including every pilot/probe/control.
 - [ ] Specify stop rules for failure, absent modes, unexpected processes, incomplete
@@ -285,10 +293,43 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 4.3 Obtain explicit investigation approval
 
+**N/A (2026-10-18, V37-P2-1):** Investigation approval is neither requested nor
+granted on this stop route. The approved stop is not execution approval; gate 4.3
+remains unapproved. Reopening needs a new explicit decision followed by approval
+of an exact bounded plan before any measurement, including diagnostic smoke.
+
 - [ ] Record approval of the exact plan, numerical schedule and stop policy before
       any benchmark or diagnostic execution, including smoke or preflight processes.
 - [ ] Verify no inherited budget and require a new recorded decision before any
       extension, with cumulative rather than reset process/resource accounting.
+
+**Priority 4 disposition (2026-10-18):** N/A under the
+[approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates),
+not run, not passed. All nine execution boxes remain unchecked. This records
+applicability only; it neither reopens planning nor authorizes measurement.
+A001/A002 remain unresolved/blocking, V37 remains active, and Priorities 8-10
+retain applicable verification, preservation/guidance and the separate closure
+decision. No production change, scope exclusion or release is selected.
+
+Source: clean `d697ede1461c59a98881da95f82f721396476623`, tree
+`6fbd1d148180b3e22b7021747a47c337c3a214d9`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 3 bundle/archive is reverified (28 files);
+this checks integrity, not fresh allocation attribution. No tooling suite,
+runtime/API/consumer/AOT/native, benchmark or publication execution is claimed.
+Commands, exits, test reports and classpath hashes are preserved under
+`target/release-evidence/v37/priority4/`; the external seal follows.
+
+The Priority 4 disposition bundle seals **28 files** at
+`verification-evidence/v37-priority4/`, mirrored under Maven output. Manifest
+SHA-256: `39cffa7e32a0f08cfe475004e505e20c4e9f694af415611bbb2d9217d34e7463`.
+Archive `verification-evidence/v37-priority4-20261018.tar.gz` SHA-256:
+`0d045abb63dfb2a32f22bd79ba6464f124c5a35fe4f522a46e274d0f1da2d5e0`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
 
 ## Priority 5 - Ordinary-Mode Capture and Perturbation Checks
 
