@@ -428,6 +428,20 @@ class DocumentationReleaseArtifactTest {
                 .singleElement().asString().contains("Feasibility decision complete: approved stop V37-P2-1",
                         "attribution limits remain unresolved", "Benchmark tooling maintainer",
                         "failing reproduction and affected evidence");
+        String correction = checklist.substring(checklist.indexOf("## Priority 7 - "),
+                checklist.indexOf("## Priority 8 - "));
+        assertThat(correction.replaceAll("\\s+", " ")).contains(
+                "### [ ] 7.1", "### [ ] 7.2", "### [ ] 7.3",
+                "No reproduced defect supports a new correction", "Runtime and tooling remain unchanged",
+                "genuine registry/hook behavior is not disabled", "gate 7.2 remains unapproved",
+                "not a new implementation decision or performance pass", "numerical approval at 4.3",
+                "No runtime or tooling candidate was implemented, tested or rolled back in V37",
+                "not run, not passed", "A001/A002 remain unresolved/blocking", "V37 remains active",
+                "implementation and release scope unselected", "Priorities 8-10",
+                "(FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates)").doesNotContain("[x]");
+        assertThat(correction.lines().filter(line -> line.startsWith("**N/A (2026-10-24, V37-P2-1):**")))
+                .hasSize(3);
+        assertThat(correction.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
         assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v37/FEASIBILITY-DECISION.md)");
         assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(FEASIBILITY-DECISION.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);

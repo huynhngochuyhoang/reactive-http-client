@@ -484,12 +484,23 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 7.1 Specify a bounded response to the evidence
 
+**N/A (2026-10-24, V37-P2-1):** No reproduced defect supports a new correction
+candidate on the approved stop route. Runtime and tooling remain unchanged; no
+optimization, benefit claim or rollback plan is selected. V34/V35's rejected
+candidates remain rejected; genuine registry/hook behavior is not disabled.
+
 - [ ] Prefer no production change for required behavior or inconclusive evidence;
       distinguish a scoped tooling correction from any proposed runtime optimization.
 - [ ] For a reproduced runtime defect, specify the smallest correction, contracts,
       benefit/correctness-cost criterion, regression controls and rollback.
 
 ### [ ] 7.2 Obtain implementation or no-change approval
+
+**N/A (2026-10-24, V37-P2-1):** No new implementation or no-change approval is
+requested or granted; gate 7.2 remains unapproved. Leaving production unchanged
+under the approved stop is not a new implementation decision or performance pass.
+Reopening requires a separate explicit decision and scoped correction approval
+before production edits; measurements still require numerical approval at 4.3.
 
 - [ ] Record explicit approval before any production edit; do not reinstate rejected
       V34/V35 candidates or disable genuine registry/hook behavior by default.
@@ -498,11 +509,45 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 7.3 Verify retained changes and rejected candidates
 
+**N/A (2026-10-24, V37-P2-1):** No runtime or tooling candidate was implemented,
+tested or rolled back in V37. No correction regression or rollback result is
+claimed. The documentation verification below checks only this disposition;
+Priority 8's applicable verification and evidence-reuse review remain required.
+
 - [ ] Verify focused positive/negative regressions for each retained change, including
       late/prototype discovery, ordering/supports, fresh metadata, mutation validation
       and subscription-local body/context/terminal ownership where affected.
 - [ ] Roll back a failed candidate and preserve its evidence; record justified N/A
       for unselected runtime implementation, not an unexecuted pass.
+
+**Priority 7 disposition (2026-10-24):** N/A under the
+[approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates),
+not run, not passed. All nine execution boxes remain unchecked. A001/A002 remain
+unresolved/blocking; E001's feasibility stop does not resolve the attribution
+limits. V37 remains active, with implementation and release scope unselected.
+No extra experiment, scope exclusion or closure is authorized. Priorities 8-10
+retain applicable verification, preservation/guidance and the separate closure
+decision; the stop does not complete those gates.
+
+Source: clean `d2211be101d9fcd439152c1020920de9df247086`, tree
+`8b8a1252dfe376c35a817050f4f6296a401359fb`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 6 bundle/archive is reverified (32 files);
+this checks integrity, not correction acceptance or fresh causal attribution.
+No tooling suite, runtime/API/consumer/AOT/native, benchmark or publication
+execution is claimed. Commands, exits, test reports and classpath hashes are
+preserved under `target/release-evidence/v37/priority7/`; the external seal follows.
+
+The Priority 7 disposition bundle seals **28 files** at
+`verification-evidence/v37-priority7/`, mirrored under Maven output. Manifest
+SHA-256: `7bb656effb5b3141498b201d50ba375b3e01270cfff28e14511da28a2d3bc1c8`.
+Archive `verification-evidence/v37-priority7-20261024.tar.gz` SHA-256:
+`d32d4fcc665c841e8138391e1c7e25b85e5c2d1b2dddcbeeec92ea0ff19131b9`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
 
 ## Priority 8 - Matched Cost, Compatibility and Ownership Acceptance
 
