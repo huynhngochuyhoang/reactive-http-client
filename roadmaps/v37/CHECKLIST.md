@@ -335,12 +335,22 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 5.1 Execute only the approved schedule
 
+**N/A (2026-10-24, V37-P2-1):** No schedule is approved and gate 4.3 remains
+unapproved. No benchmark or diagnostic launcher, worker, probe, pilot, preflight,
+profiler/helper or recorder smoke is launched. This is an approved stop, not a
+failed or completed investigation; historical captures are not new execution.
+
 - [ ] Verify inputs and host preconditions before launch; use fresh directories
       with no competing scored work, preserving every exit, interruption and failure.
 - [ ] Capture every scheduled artifact/profile/worker and interval, not only
       favorable modes; stop at the frozen limits without unapproved replacement runs.
 
 ### [ ] 5.2 Evaluate observation perturbation
+
+**N/A (2026-10-24, V37-P2-1):** No new ordinary or observed samples exist to
+compare. Perturbation remains unresolved; no execution is not evidence of absent
+high modes or unchanged allocation. Priority 2's historical observations retain
+their limits, with no pooling, score substitution or performance pass.
 
 - [ ] Compare ordinary and observed mode availability separately without pooling
       scores; record suppressed/changed modes as observation limits, not fixes.
@@ -349,10 +359,44 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 5.3 Reconcile execution and evidence integrity
 
+**N/A (2026-10-24, V37-P2-1):** No new capture process census, per-worker association
+or resource-use reconciliation is claimed. Zero new measurement launches is not
+a verified zero-worker experiment or an inherited budget. Documentation tests
+and archive checks below are verification only, not diagnostic capture; they do
+not upgrade V36's inferred probe accounting or supply executing-code identity.
+
 - [ ] Verify actual process counts, category totals, resource use and per-worker
       association against approval; retain incomplete or unexpected work as failures.
 - [ ] Record what capture establishes and what it cannot. Request a new decision
       if bounds or stop rules prevent completion; do not launch more work to improve it.
+
+**Priority 5 disposition (2026-10-24):** N/A under the
+[approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates),
+not run, not passed. All nine execution boxes remain unchecked. A001/A002 remain
+unresolved/blocking; V37 remains active. No planning, execution, production change,
+scope exclusion or release is newly authorized. Reopening requires a new explicit
+decision and exact numerical approval before measurement. Priorities 8-10 retain
+applicable verification, preservation/guidance and the separate closure decision.
+
+Source: clean `1f4cf9e07f183e9a8e21a5698f478d7386df4ca4`, tree
+`2c0e85611be4360c632e305edc7a3a5bf2ff0985`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 4 bundle/archive is reverified (28 files);
+this checks integrity, not fresh allocation attribution. No tooling suite,
+runtime/API/consumer/AOT/native, benchmark or publication execution is claimed.
+Commands, exits, test reports and classpath hashes are preserved under
+`target/release-evidence/v37/priority5/`; the external seal follows.
+
+The Priority 5 disposition bundle seals **28 files** at
+`verification-evidence/v37-priority5/`, mirrored under Maven output. Manifest
+SHA-256: `cd28a29aa68f36ec531b0458c4ea6a25782e372fc4a897db00579e1c9548369d`.
+Archive `verification-evidence/v37-priority5-20261024.tar.gz` SHA-256:
+`ee0736fd89c7d797b33c40ffeb7eed38eebfbb7e48dc8af212116cce7b05aa92`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
 
 ## Priority 6 - Causal Review and Independent Finding Dispositions
 

@@ -390,6 +390,20 @@ class DocumentationReleaseArtifactTest {
         assertThat(investigation.lines().filter(line -> line.startsWith("**N/A (2026-10-18, V37-P2-1):**")))
                 .hasSize(3);
         assertThat(investigation.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
+        String measurement = checklist.substring(checklist.indexOf("## Priority 5 - "),
+                checklist.indexOf("## Priority 6 - "));
+        assertThat(measurement.replaceAll("\\s+", " ")).contains(
+                "### [ ] 5.1", "### [ ] 5.2", "### [ ] 5.3",
+                "No schedule is approved and gate 4.3 remains unapproved",
+                "historical captures are not new execution", "No new ordinary or observed samples exist",
+                "Perturbation remains unresolved", "no pooling, score substitution or performance pass",
+                "No new capture process census", "not a verified zero-worker experiment",
+                "verification only, not diagnostic capture", "not run, not passed",
+                "A001/A002 remain unresolved/blocking", "V37 remains active", "Priorities 8-10",
+                "(FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates)").doesNotContain("[x]");
+        assertThat(measurement.lines().filter(line -> line.startsWith("**N/A (2026-10-24, V37-P2-1):**")))
+                .hasSize(3);
+        assertThat(measurement.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
         assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v37/FEASIBILITY-DECISION.md)");
         assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(FEASIBILITY-DECISION.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
