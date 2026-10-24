@@ -402,12 +402,24 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 6.1 Review each ordinary-mode explanation
 
+**N/A (2026-10-24, V37-P2-1):** No new capture exists for a post-investigation
+causal review. Priority 2's historical review remains the evidence basis, not a
+new explanation. Installed compiler tasks, elimination events and iteration
+envelopes do not identify the ordinary executing path; forced high modes do not
+supply that missing link for either profile.
+
 - [ ] Relate high/low observations to relevant compilation, installation,
       invalidation and class-load history under the frozen proof obligations.
 - [ ] Preserve uncertainty when sampling/envelopes cannot identify executed code;
       a forced high-mode intervention tests mechanism, not necessarily ordinary cause.
 
 ### [ ] 6.2 Separate tooling, runtime and measurement conclusions
+
+**N/A (2026-10-24, V37-P2-1):** No new tooling or runtime defect is reproduced,
+and no variability is newly explained. Existing process-association corrections
+retain their documented limits. Perturbation versus limited sampling remains
+unresolved; neither absent traced high modes nor clear reverse aggregates erase
+the primary flags. Original scores and contrary evidence remain unchanged.
 
 - [ ] Classify reproduced tooling defects, runtime defects, explained variability
       and unresolved limits; require affected evidence for stronger corrected claims.
@@ -416,10 +428,57 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ### [ ] 6.3 Record independent and combined dispositions
 
+**N/A (2026-10-24, V37-P2-1):** New post-investigation dispositions are not
+applicable. The stop-route ledger below carries forward the independent outcomes
+and obligations; it does not claim a new causal result or acceptance. Owners are
+unchanged from the [baseline ledger](BASELINE-SCOPE.md#narrow-finding-ledger).
+
 - [ ] Record A001/A002 and E001 outcomes, evidence, owners and reopening triggers;
       do not transfer AUTO_NO_REGISTRY or control acceptance to either profile.
 - [ ] Mark unexplained flags unresolved/blocking and identify closure implications;
       completing approved execution alone resolves no finding.
+
+| Finding | Carried-forward disposition and evidence | Owner | Reopening condition |
+|---|---|---|---|
+| **V37-A001 / AUTO_REGISTRY** | Unresolved/blocking. V36 has no ordinary high witness for this profile; forced non-inlining is not its ordinary cause. [Priority 2 review](FEASIBILITY-DECISION.md#21-missing-causal-observation). | Performance maintainer with metrics-integration review | A materially different bounded method for registry-selected ordinary high/low attribution, followed by explicit reopening and numerical execution approval. |
+| **V37-A002 / HOOK** | Unresolved/blocking independently of A001. Ordinary high stages 10 and 15 lack compiler/allocation attribution; low-only traced lanes do not explain them. [Priority 2 review](FEASIBILITY-DECISION.md#21-missing-causal-observation). | Performance maintainer with observer/hook review | A HOOK-specific bounded method linking ordinary high/low work to its cause without substituting another profile; the same reopening and execution gates apply. |
+| **V37-E001 / Attribution Feasibility and Evidence Limits** | Feasibility decision complete: approved stop V37-P2-1; attribution limits remain unresolved, not a newly reproduced tooling defect or repaired observation gap. [Approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates). | Benchmark tooling maintainer | A concrete exporter/format and worker/phase/code/allocation correlation design with uncertainty, rejection rules and resource accounting; any claimed tooling defect also needs a failing reproduction and affected evidence. |
+
+**Combined disposition:** A001/A002 remain unresolved/blocking. Neither profile
+inherits AUTO_NO_REGISTRY/control acceptance or the other's explanation. E001's
+stop decision completes feasibility governance only; it does not clear either
+allocation flag. Original >20% latency and >max(32 B/op, 5%) allocation review
+triggers remain unchanged. Full-scope closure remains blocked; only Priority 10
+can approve named exclusions, which would not be performance passes.
+
+**Priority 6 disposition (2026-10-24):** N/A under V37-P2-1, not run, not passed.
+All nine execution boxes remain unchecked. The ledger is preservation of the
+existing review, not new capture or a new no-change implementation approval.
+V37 remains active; gates 4.3 and 7.2 remain unapproved. Priorities 8-10 retain
+applicable verification, preservation/guidance and the separate closure decision.
+No production change, scope exclusion or release is selected.
+
+Source: clean `bef54721a19be6de7c6b23a4f98f87cc15441e66`, tree
+`0db17c445a1d0a945f6e8f95c92dcbfb5fc121ab`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 2 and 5 bundles/archives are reverified
+(104 files). Saved review consistency checks confirm the 48 stage records, HOOK
+high-stage identities, primary flags and unchanged executing-code uncertainty;
+these are not raw-stage reanalysis or fresh causal attribution. No tooling suite,
+runtime/API/consumer/AOT/native, benchmark or publication execution is claimed.
+Commands, exits, test reports and classpath hashes are preserved under
+`target/release-evidence/v37/priority6/`; the external seal follows.
+
+The Priority 6 disposition bundle seals **32 files** at
+`verification-evidence/v37-priority6/`, mirrored under Maven output. Manifest
+SHA-256: `5a62aff5a1fbf538531f715f06e48caf399a75ebd2e6034cb4146e6ba1b16fde`.
+Archive `verification-evidence/v37-priority6-20261024.tar.gz` SHA-256:
+`04579bbc7ea56fa20d43ec8a9c26804106d83dc0d2726e1bd3e2622486e5389f`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
 
 ## Priority 7 - Explicit Correction or No-Change Selection
 

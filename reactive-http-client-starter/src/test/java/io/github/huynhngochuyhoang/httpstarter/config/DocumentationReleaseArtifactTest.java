@@ -404,6 +404,30 @@ class DocumentationReleaseArtifactTest {
         assertThat(measurement.lines().filter(line -> line.startsWith("**N/A (2026-10-24, V37-P2-1):**")))
                 .hasSize(3);
         assertThat(measurement.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
+        String review = checklist.substring(checklist.indexOf("## Priority 6 - "),
+                checklist.indexOf("## Priority 7 - "));
+        assertThat(review.replaceAll("\\s+", " ")).contains(
+                "### [ ] 6.1", "### [ ] 6.2", "### [ ] 6.3",
+                "No new capture exists", "No new tooling or runtime defect is reproduced",
+                "Original scores and contrary evidence remain unchanged", "does not claim a new causal result or acceptance",
+                "A001/A002 remain unresolved/blocking", "AUTO_NO_REGISTRY/control acceptance",
+                "Full-scope closure remains blocked", "not run, not passed", "V37 remains active",
+                "gates 4.3 and 7.2 remain unapproved", "Priorities 8-10",
+                ">20% latency", ">max(32 B/op, 5%)", "(BASELINE-SCOPE.md#narrow-finding-ledger)")
+                .doesNotContain("[x]");
+        assertThat(review.lines().filter(line -> line.startsWith("**N/A (2026-10-24, V37-P2-1):**")))
+                .hasSize(3);
+        assertThat(review.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
+        assertThat(review.lines().filter(line -> line.startsWith("| **V37-A001 / AUTO_REGISTRY**")))
+                .singleElement().asString().contains("Unresolved/blocking", "no ordinary high witness",
+                        "metrics-integration review", "explicit reopening and numerical execution approval");
+        assertThat(review.lines().filter(line -> line.startsWith("| **V37-A002 / HOOK**")))
+                .singleElement().asString().contains("Unresolved/blocking independently", "10 and 15",
+                        "observer/hook review", "HOOK-specific bounded method");
+        assertThat(review.lines().filter(line -> line.startsWith("| **V37-E001 /")))
+                .singleElement().asString().contains("Feasibility decision complete: approved stop V37-P2-1",
+                        "attribution limits remain unresolved", "Benchmark tooling maintainer",
+                        "failing reproduction and affected evidence");
         assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v37/FEASIBILITY-DECISION.md)");
         assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(FEASIBILITY-DECISION.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
