@@ -551,23 +551,35 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ## Priority 8 - Matched Cost, Compatibility and Ownership Acceptance
 
-### [ ] 8.1 Decide applicability and approve any new scoring
+### [x] 8.1 Decide applicability and approve any new scoring
 
-- [ ] Freeze applicability and exact unchanged-input reuse limits before scoring;
+Applicability review complete. **New scoring N/A (2026-10-24, V37-P2-1):**
+no numerical budget is requested or approved; the unchecked execution item below
+is not an unrun pass. See [verification and reuse limits](VERIFICATION.md).
+
+- [x] Freeze applicability and exact unchanged-input reuse limits before scoring;
       changed shared default paths require the existing 60-row matrix.
 - [ ] Obtain a separate numerical budget for new scores, covering all processes
       and controls; unused diagnostic time does not authorize scored execution.
 
 ### [ ] 8.2 Establish independent and combined cost acceptance
 
-- [ ] Keep Central-only `4.4.2`, matched non-starter dependencies/harness, semantic
+**Review complete; acceptance blocked (2026-10-24):** A001/A002 remain
+unresolved/blocking independently and combined. The checked review tasks preserve
+evidence, not a performance pass; the acceptance heading stays unchecked.
+
+- [x] Keep Central-only `4.4.2`, matched non-starter dependencies/harness, semantic
       witnesses, both artifact orders and all raw samples/intervals.
-- [ ] Apply original review triggers, >20% latency and >max(32 B/op, 5%) allocation;
+- [x] Apply original review triggers, >20% latency and >max(32 B/op, 5%) allocation;
       retain primary flags through confirmation and distinguish scores from diagnostics.
 
-### [ ] 8.3 Verify compatibility, cross-path and ownership applicability
+### [x] 8.3 Verify compatibility, cross-path and ownership applicability
 
-- [ ] For tooling/docs-only work, run affected parser/workload/archive/readiness/
+**Fresh full/assembled/API/packaging/native execution N/A (2026-10-24):**
+unchanged inputs support exact historical reuse, not fresh execution. Applicable
+documentation, workload, tooling and integrity guards still require fresh results.
+
+- [x] For tooling/docs-only work, run affected parser/workload/archive/readiness/
       guidance guards and justify runtime-evidence reuse. On a feasibility stop,
       still verify the decision, links, lifecycle and applicable preserved evidence.
 - [ ] For runtime/fixture changes, verify affected public/factory/mock/assembled,
@@ -576,6 +588,40 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
       source/binary comparisons against isolated Central even if the first fails;
       run applicable packaging and clean-source native compile/run. Record actual
       totals, failures and dated reuse/N/A, with controlled reachability where needed.
+
+**Priority 8 record (2026-10-24):** [Matched cost and verification](VERIFICATION.md).
+Source is clean `fd87028a863e1bbe53d62c6628d92f82f2715844`, tree
+`435497f99bd33e2c3319535eb84250cfb7b1b0f8`, plus the preserved documentation/test
+patch. The audit verifies 4,143 files across ten bundles/archives, 392 unchanged
+runtime/build/test/fixture inputs, 202 production/build/benchmark inputs and 39
+matched harness/build inputs. Historical classpaths remain unavailable at their
+121 original paths per artifact; shaded JARs and saved evidence remain intact.
+
+Both saved reviews reproduce exactly: 60 primary and four reverse rows per
+artifact, three primary allocation flags, zero primary latency flags and zero
+reverse flags. A001/A002 and their combination remain unaccepted; no scope
+exclusion, new worker, implementation approval, public claim or release follows.
+V37 remains active; Priorities 9-10 remain required. Applicable verification is
+complete; 8.2's full-scope cost acceptance remains blocked, not N/A or passed.
+
+Fresh verification passes **123 documentation and 40 untimed workload cases per
+Boot row** (163 cases per row, zero failures/errors/skips), **92 Python tooling
+tests**, baseline-provenance fixtures and `git diff --check`. Ordinary Java tests
+disable explicit GC. The first local driver stopped after the 92 successful
+tooling tests because it expected an obsolete total of 83; that failure and its
+passing log are preserved, with only remaining guards executed on continuation.
+Repeated documentation checks are not added to unique totals. No fresh full
+runtime, API, consumer, JVM/AOT/native, scoring or publication run is claimed.
+Evidence is under `target/release-evidence/v37/priority8/`; the external seal follows.
+
+The Priority 8 verification bundle seals **167 files** at
+`verification-evidence/v37-priority8/`, mirrored under Maven output. Manifest
+SHA-256: `a20c4b5859703f99bafac60347c2f3894a380f113d1de9685ad702f3d3020908`.
+Archive `verification-evidence/v37-priority8-20261024.tar.gz` SHA-256:
+`e4b2f6bdaf941149619f56c4c60c416cb98a04849543974443f5fdba720c12d0`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
 
 ## Priority 9 - Durable Evidence and Maintainer Guidance
 

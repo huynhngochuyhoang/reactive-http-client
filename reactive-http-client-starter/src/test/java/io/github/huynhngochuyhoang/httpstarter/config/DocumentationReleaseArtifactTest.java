@@ -286,7 +286,9 @@ class DocumentationReleaseArtifactTest {
                 "before any cleanup", "both artifact orders", "60-row matrix", "Central-only",
                 ">20% latency", ">max(32 B/op, 5%)", "explicit GC disabled", "clean-source native",
                 "strict root and independent starter", "even if the first fails", "N/A, not passed");
-        assertThat(checklist.substring(checklist.indexOf("## Priority 3 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 3 - "),
+                checklist.indexOf("## Priority 8 - "))).doesNotContain("[x]");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 9 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
                 .contains("(../roadmaps/v37/CHECKLIST.md)", "activeRoadmap=v37", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
@@ -445,6 +447,43 @@ class DocumentationReleaseArtifactTest {
         assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v37/FEASIBILITY-DECISION.md)");
         assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(FEASIBILITY-DECISION.md)");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v37VerificationSeparatesHistoricalReuseAndFreshGuardsFromCostAcceptance() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v37");
+        String verification = Files.readString(directory.resolve("VERIFICATION.md"));
+        assertThat(verification.replaceAll("\\s+", " ")).contains(
+                "fd87028a863e1bbe53d62c6628d92f82f2715844", "435497f99bd33e2c3319535eb84250cfb7b1b0f8",
+                "V37-P2-1", "Applicability Frozen Before Verification", "No numerical budget",
+                "4,143 files in ten bundles", "392 runtime/build/test/fixture inputs",
+                "202 production/build/benchmark inputs", "39 harness/build inputs", "24,224 class entries",
+                "121 historical classpath files per artifact remain missing", "not freshly reverified",
+                "60 primary rows per artifact", "four reverse-confirmation rows per artifact",
+                "256 historical scored workers", "three primary allocation flags", "zero reverse flags",
+                ">20% latency", ">max(32 B/op, 5%)", "A001 / AUTO_REGISTRY", "A002 / HOOK",
+                "Combined A001 + A002", "**not accepted**", "E001", "acceptance heading remains unchecked",
+                "2,446 cases per row", "29 selected-consumer and one absence case per row",
+                "Six fixture cases per row", "16 / 5 / 2", "No changes.", "isolated Central",
+                "Both binary/source failure switches remain true", "caller-owned", "may outlive manager close", "Removed meters",
+                "92 Python tests successfully", "obsolete expectation of 83", "explicit GC disabled",
+                "123 documentation/readiness/link cases per Boot row", "40 V34WorkloadContractTest cases per Boot row",
+                "163 cases per row", "applicable verification complete; full-scope cost acceptance blocked",
+                "No public performance claim", "not clean-clone artifacts or off-machine backups",
+                "active", "plannedFinalVersion=null", "releaseLane=unselected", "Priorities 9-10 remain required");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.substring(checklist.indexOf("## Priority 8 - "),
+                checklist.indexOf("## Priority 9 - "));
+        assertThat(priority).contains("### [x] 8.1", "### [ ] 8.2", "### [x] 8.3", "Review complete; acceptance blocked",
+                "New scoring N/A (2026-10-24, V37-P2-1)", "no numerical budget is requested or approved",
+                "(VERIFICATION.md)", "three primary allocation flags", "A001/A002");
+        assertThat(priority).doesNotContain("### [x] 8.2", "[x] Obtain a separate numerical budget");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(verification);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
