@@ -1,21 +1,29 @@
 # Reactive HTTP Client - Roadmap V37
 
-> **Status:** active
+> **Status:** completed; review-only, no release; explicitly reduced scope
 > **Theme:** ordinary allocation-mode attribution with a feasibility-first boundary
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** unresolved AUTO_REGISTRY/HOOK attribution and the minimum evidence needed to decide it
 > **Experiment authorization:** none; no inherited budget
-> **Implementation and release scope:** unselected
+> **Implementation and release scope:** no production change; no release; V37 closed (V37-P10-1)
 > **Draft date:** 2026-10-18
 > **Adopted:** 2026-10-18
+
+**Closed 2026-10-25:** [V37-P10-1](RELEASE-DECISION.md) approves reduced-scope
+review-only/no-release closure. A001/AUTO_REGISTRY and A002/HOOK are excluded
+from closure obligations, not resolved or passed. E001's feasibility stop is
+complete; no new measurement or production change was selected. Readiness now
+reports `activeRoadmap=null`, `plannedFinalVersion=null`, `releaseLane=unselected`.
+This decision supersedes pending lifecycle statements in dated execution records;
+their evidence, failed acceptance and limits remain unchanged.
 
 Follow-up to [V36's reduced-scope no-release closure](../v36/RELEASE-DECISION.md).
 The [execution checklist](CHECKLIST.md) adopts this roadmap for baseline,
 source/evidence review, bounded deterministic synthetic tests and planning only.
 Creating the checklist completes no execution item. Adoption authorizes no
 benchmark, diagnostic worker, pilot, preflight, production edit, version change
-or release. Readiness reports `activeRoadmap=v37`, `plannedFinalVersion=null`,
+or release. At adoption, readiness reported `activeRoadmap=v37`, `plannedFinalVersion=null`,
 `releaseLane=unselected`.
 V1-V36 stay closed; the two unresolved flags are not retrospectively passed.
 
@@ -23,8 +31,9 @@ V1-V36 stay closed; the two unresolved flags are not retrospectively passed.
 and missing historical classpaths. They verify baseline integrity, not a causal
 explanation or permission for new measurements. The [Priority 2 decision](FEASIBILITY-DECISION.md)
 approves a stop before new measurements, not closure or scope exclusion.
-Applicable verification, evidence preservation and the Priority 10 decision remain
-required; both allocation findings stay unresolved.
+The later [verification](VERIFICATION.md), [preservation](MAINTAINER-GUIDANCE.md)
+and separate [closure decision](RELEASE-DECISION.md) complete the applicable review
+gates; both allocation findings stay unresolved.
 
 ## Objective and Difference from V36
 

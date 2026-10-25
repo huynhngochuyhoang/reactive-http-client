@@ -12,25 +12,32 @@ V2 predates the separate execution-checklist convention and intentionally has no
 V34 is completed as a review-only/no-release roadmap; C004 was evaluated and rolled back.
 V35 is completed as a reduced-scope review-only/no-release roadmap; no next release is selected.
 V36 is completed as a reduced-scope review-only/no-release roadmap; A001/A002 remain unresolved.
+V37 is completed as a reduced-scope review-only/no-release roadmap; no new measurement was selected.
 The reactor is `4.5.0-SNAPSHOT`; public/API/consumer/benchmark baselines are
 verified `4.4.2`.
 
-[V37](v37/ROADMAP.md) and its [execution checklist](v37/CHECKLIST.md) are active.
-Adoption permits baseline/evidence review, bounded deterministic synthetic tests
-and planning for the unresolved AUTO_REGISTRY/HOOK allocation findings. A
-feasibility stop decision precedes more measurement if no materially different
-attribution method is credible. No execution item is completed by adoption; no
-experiment budget, production change or release is selected. Readiness reports
-`activeRoadmap=v37`, `plannedFinalVersion=null`, `releaseLane=unselected`.
+[V37](v37/ROADMAP.md) and its [execution checklist](v37/CHECKLIST.md) are closed
+under [V37-P10-1](v37/RELEASE-DECISION.md). The maintainer approved review scope,
+no release, explicitly excluding A001/AUTO_REGISTRY and A002/HOOK from closure
+obligations without resolving them or accepting their cost. No production change
+or new measurement was selected. Readiness reports `activeRoadmap=null`,
+`plannedFinalVersion=null`, `releaseLane=unselected`; future scope is unselected.
 The [Priority 1 baseline and ledger](v37/BASELINE-SCOPE.md) record the available
 bundles, missing historical classpaths and independent unresolved A001/A002 rows.
-E001 remains a feasibility review, not a newly presumed defect; no experiment
-budget or implementation is selected by the baseline.
+E001 completed feasibility review, not a newly presumed defect; no experiment
+budget or implementation was selected by the baseline.
 The [Priority 2 decision](v37/FEASIBILITY-DECISION.md) approves stopping before
 more measurements: alternative observations have not yet been connected into a
 bounded causal capture design. Both findings remain unresolved; new capture and
-correction work is N/A, not passed. Applicable verification, preservation and a
-separate closure decision remain required; V37 is not closed.
+correction work is N/A, not passed. Dated pending lifecycle statements are
+superseded by the final decision; the evidence and attribution limits stay intact.
+
+[Priority 8 verification](v37/VERIFICATION.md) completes applicable checks but
+leaves independent and combined cost acceptance blocked. [Priority 9 guidance](v37/MAINTAINER-GUIDANCE.md)
+preserves the evidence, rejection guards, supported behavior and reopening rules.
+Priority 10 records the separate named exclusions and no-release decision;
+preservation alone does not accept either allocation finding. Historical N/A
+boxes and blocked 8.2 remain unchecked, not unfinished approved review work.
 
 [V36](v36/ROADMAP.md) and its [execution checklist](v36/CHECKLIST.md) are closed
 under [V36-P10-1](v36/RELEASE-DECISION.md). The maintainer approved review-only/no
@@ -216,4 +223,4 @@ automatically create another execution roadmap or reopen V32.
 | V34 | [Roadmap](v34/ROADMAP.md) | [Checklist](v34/CHECKLIST.md) | Completed; review-only, no release |
 | V35 | [Roadmap](v35/ROADMAP.md) | [Checklist](v35/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |
 | V36 | [Roadmap](v36/ROADMAP.md) | [Checklist](v36/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |
-| V37 | [Roadmap](v37/ROADMAP.md) | [Checklist](v37/CHECKLIST.md) | Active |
+| V37 | [Roadmap](v37/ROADMAP.md) | [Checklist](v37/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |

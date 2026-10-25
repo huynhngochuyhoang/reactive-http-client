@@ -111,6 +111,18 @@ The commands below describe general benchmark workflows, not permission to
 extend V36's exhausted schedule. Reuse the read-only verification commands in
 the record; any new V36 experiment requires a separately approved bounded plan.
 
+## V37 Feasibility Stop
+
+[V37's guidance](../roadmaps/v37/MAINTAINER-GUIDANCE.md) preserves the same scores
+and records zero new measurement workers under the approved feasibility stop.
+AUTO_REGISTRY and HOOK remain unresolved; neither archive integrity nor passing
+correctness tests supplies ordinary high-mode attribution. No public score or
+snapshot-upgrade remedy follows. The commands below do not reopen that stop or
+authorize a new investigation budget.
+
+[V37 closure](../roadmaps/v37/RELEASE-DECISION.md) is review-only/no release,
+with A001/A002 explicitly excluded from closure obligations, not cost acceptance.
+
 ## Commands
 
 Compile the benchmark module without running benchmarks:

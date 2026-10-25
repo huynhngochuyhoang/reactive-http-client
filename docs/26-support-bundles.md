@@ -1249,6 +1249,10 @@ its internal matched scores are not promoted report evidence. Use existing bound
 capture/sanitization recipes, preserve unknowns, and sample cache/work counters
 before their last owner closes. Do not attach raw profiler recordings, heap dumps,
 targets, headers/bodies, identities, cache key material or arbitrary exception text.
+[V37's preservation rules](../roadmaps/v37/MAINTAINER-GUIDANCE.md#reproduction-and-privacy)
+retain the same boundary: local synthetic compiler evidence is not a production
+attachment, and neither an archive seal nor allocation B/op diagnoses retained
+memory or a Kubernetes/mesh incident. No additional capture is authorized.
 
 ## Related Docs
 

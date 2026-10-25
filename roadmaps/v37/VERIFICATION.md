@@ -6,6 +6,11 @@
 > **Published / development:** `4.4.2` / `4.5.0-SNAPSHOT`
 > **Release scope:** unselected
 
+This is the dated P8 checkpoint. [V37-P10-1](RELEASE-DECISION.md) later approved
+reduced-scope review-only/no-release closure with A001/A002 excluded from closure
+obligations, not passed. It supersedes pending lifecycle statements below, not
+the blocked acceptance result, original evidence or reuse limits.
+
 This records [Priority 8](CHECKLIST.md) after the
 [approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates).
 A001/AUTO_REGISTRY and A002/HOOK remain independently unresolved/blocking.

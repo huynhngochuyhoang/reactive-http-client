@@ -1,13 +1,20 @@
 # Reactive HTTP Client - Roadmap V37 Execution Checklist
 
-> **Status:** active
+> **Status:** completed; review-only, no release; explicitly reduced scope
 > **Theme:** ordinary allocation-mode attribution with a feasibility-first boundary
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** unresolved AUTO_REGISTRY/HOOK attribution and the minimum evidence needed to decide it
 > **Experiment authorization:** none; no inherited budget
-> **Implementation and release scope:** unselected
+> **Implementation and release scope:** no production change; no release; V37 closed (V37-P10-1)
 > **Adopted:** 2026-10-18
+
+**Closed 2026-10-25:** [V37-P10-1](RELEASE-DECISION.md) approves review-only/no
+release with A001/AUTO_REGISTRY and A002/HOOK excluded from closure obligations,
+not resolved or passed. Dated P1-P9 pending lifecycle statements are superseded
+only by this decision. Priorities 3-7 remain N/A and 8.2 remains blocked/excluded
+from closure only; their unchecked boxes are not unexecuted passes or reopened
+review work. No further experiments, production change or release are authorized.
 
 Execution companion to [ROADMAP.md](ROADMAP.md). Adoption authorizes baseline,
 source/evidence review, bounded deterministic synthetic tests and planning only.
@@ -625,64 +632,143 @@ patch to avoid self-reference. Ignored local copies are not an off-machine backu
 
 ## Priority 9 - Durable Evidence and Maintainer Guidance
 
-### [ ] 9.1 Seal and verify durable evidence
+### [x] 9.1 Seal and verify durable evidence
 
-- [ ] Seal reachable source or base-plus-patch, approvals, commands/exits,
+- [x] Seal reachable source or base-plus-patch, approvals, commands/exits,
       toolchains/dependencies, raw results, failures and file/archive hashes.
-- [ ] Verify copied and archived contents outside Maven output before cleanup;
+- [x] Verify copied and archived contents outside Maven output before cleanup;
       record location/access/backup limits without calling a local copy off-machine.
 
-### [ ] 9.2 Preserve historical truth and rejection guards
+### [x] 9.2 Preserve historical truth and rejection guards
 
-- [ ] Keep V35/V36 originals unchanged; test missing/corrupt/incomplete evidence
+- [x] Keep V35/V36 originals unchanged; test missing/corrupt/incomplete evidence
       rejection and distinguish regeneration from recovery of lost recordings.
-- [ ] Preserve actual process-accounting and executing-code limits; no missing
+- [x] Preserve actual process-accounting and executing-code limits; no missing
       mode, exhausted budget or inferred census becomes a passed gate.
 
-### [ ] 9.3 Reconcile maintainer and operations guidance
+### [x] 9.3 Reconcile maintainer and operations guidance
 
-- [ ] Align findings, intentional costs, supported alternatives and reopening
+- [x] Align findings, intentional costs, supported alternatives and reopening
       triggers with current docs/examples/metadata/readiness and baseline versions.
-- [ ] Check sanitized evidence boundaries; make no snapshot-upgrade remedy,
+- [x] Check sanitized evidence boundaries; make no snapshot-upgrade remedy,
       application-memory/mesh diagnosis, new telemetry or unsupported performance claim.
+
+**Priority 9 record (2026-10-25):** [Evidence and maintainer guidance](MAINTAINER-GUIDANCE.md).
+Clean starting source `2ee37be5f1d976c85b233ed1dc489a7dfb8895b8`, tree
+`1d7485b43c6f82d2d2fcc707a81946777bfd24f3`, plus the preserved documentation/test
+patch. Read-only verification checks **4,426 files across 15 bundles and archives**,
+including all V37 P1-P8 records and their original V35/V36 evidence, and **392
+unchanged runtime/build/test/fixture inputs**. Missing historical classpaths and
+lost recordings remain unavailable; the P8 obsolete-count driver failure remains
+preserved. Nothing is regenerated under an old run identity.
+
+Fresh checks pass **177 Java cases per Boot row** (4.0.0/4.1.0): 124 documentation,
+18 metadata/example and 35 properties cases, with zero failures/errors/skips.
+**92 Python tooling tests**, including missing/corrupt/incomplete archive negatives,
+baseline-provenance fixtures and `git diff --check` pass. Ordinary tests use
+explicit GC disabled, Java 21.0.8 and Maven 3.9.9; commands/exits, actual classpath
+hashes, reports and readiness are preserved. Final reruns are not extra unique
+cases. No new runtime full-suite, API, consumer, JVM/AOT/native, measured worker,
+signing or publication execution is claimed; Priority 8's reuse limits remain.
+
+A001/A002 stay independently and jointly unresolved/blocking. E001's approved
+feasibility stop does not resolve attribution. Guidance adds no feature, migration,
+telemetry or snapshot-upgrade remedy. V37 is active pending Priority 10's explicit
+named exclusion and separate no-release decision; the closure request alone is
+not recorded as approval of those exclusions. Evidence is retained under
+`target/release-evidence/v37/closure/`; the external Priority 9 seal follows.
+
+The Priority 9 preservation bundle seals **172 files** at
+`verification-evidence/v37-priority9/`, mirrored under Maven output. Manifest
+SHA-256: `3c0ad9ca8685ed77816143a643fa696fb625f1cd31b3c8d7dc136459b448ec8c`.
+Archive `verification-evidence/v37-priority9-20261025.tar.gz` SHA-256:
+`308e304445e21078799b70180b7f4f2cf8d2b93d6fa543982c98ab0cb390e00b`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
 
 ## Priority 10 - Scope Decision and Conditional Release or Closure
 
-### [ ] 10.1 Reconcile findings and closure scope
+### [x] 10.1 Reconcile findings and closure scope
 
-- [ ] Reconcile all three rows, including any feasibility stop, with evidence-backed
+- [x] Reconcile all three rows, including any feasibility stop, with evidence-backed
       dispositions. Full-scope closure requires acceptance, not merely completed runs.
-- [ ] If unresolved findings remain, obtain explicit named exclusion from closure
+- [x] If unresolved findings remain, obtain explicit named exclusion from closure
       obligations or keep V37 open; exclusion and no-release are not performance passes.
 
-### [ ] 10.2 Select release or no-release intent
+### [x] 10.2 Select release or no-release intent
 
-- [ ] Obtain a separate maintainer decision; consider a compatible patch first only
+- [x] Obtain a separate maintainer decision; consider a compatible patch first only
       for a justified retained change. `4.5.0-SNAPSHOT` selects no minor release.
-- [ ] For release, approve exact coordinates and update current inputs together.
+- [x] For release, approve exact coordinates and update current inputs together.
       Otherwise record no-release scope; future implementation/release stays unselected.
 
-### [ ] 10.3 Assemble immutable release or review evidence
+### [x] 10.3 Assemble immutable release or review evidence
 
-- [ ] Seal final decisions, delivered/rolled-back/unresolved scope, verification,
+- [x] Seal final decisions, delivered/rolled-back/unresolved scope, verification,
       approvals and hashes with reproducible provenance and verified durable copies.
-- [ ] For release, verify final packaging, signing/signatures and tag/source/workflow
+- [x] For release, verify final packaging, signing/signatures and tag/source/workflow
       separately. For no release, record unrun release gates as N/A, not passed.
 
-### [ ] 10.4 Verify publication or explicit no-release closure
+### [x] 10.4 Verify publication or explicit no-release closure
+
+**Release branch N/A on 2026-10-25 (V37-P10-1):** final-coordinate packaging,
+signing/signatures, tag/source/workflow, publication and isolated new-version
+Central consumption were not run, not passed. The unchecked release-only item
+below does not block approved no-release review closure.
 
 - [ ] For release, verify publication and isolated Central consumption separately;
       preparation is not final GO. Keep baseline `4.4.2` and V37 active until verified
       closure, then update current version references from the verified release.
-- [ ] For either branch, close checklist/roadmap/index/readiness together only after
+- [x] For either branch, close checklist/roadmap/index/readiness together only after
       the decision and applicable gates. Retain exclusions and unresolved flags;
       leave future scope unselected and preserve V1-V36 history.
 
+**Priority 10 decision (2026-10-25):** [V37-P10-1](RELEASE-DECISION.md).
+In response to the named-exclusion closure request, the maintainer instructed:
+"Complete the Priority 10 with review scope, no release". This approves reduced
+review scope: A001/AUTO_REGISTRY and A002/HOOK are excluded from closure obligations,
+not resolved or passed. E001 completes feasibility via the approved stop; its
+attribution limits remain. **GO for review closure, NO-GO for release or a
+performance all-clear.** No runtime correction, experiment budget or next release
+is selected. Historical N/A items and 8.2's blocked acceptance remain unchecked.
+
+Source is reachable `2ee37be5f1d976c85b233ed1dc489a7dfb8895b8`, tree
+`1d7485b43c6f82d2d2fcc707a81946777bfd24f3`, plus the complete verified
+base-plus-patch, including uncommitted P9 changes. The final read-only audit
+verifies **4,598 files across 16 bundles and complete archives** and **392 unchanged
+runtime/build/test/fixture inputs**. All earlier seals, failures, missing recordings
+and classpath limitations remain intact; no historical provenance is rewritten.
+
+Fresh checks pass **178 Java cases per Boot row** (4.0.0/4.1.0): 125 documentation,
+18 metadata/example and 35 properties cases, with zero failures/errors/skips.
+**92 Python tooling tests**, baseline-provenance fixtures and `git diff --check`
+pass. Ordinary tests disable explicit GC; Java 21.0.8/Maven 3.9.9, actual dependency
+hashes, commands/exits, reports and readiness are preserved. Final reruns do not
+increase unique totals. Runtime/API/consumer/JVM/AOT/native evidence remains exact
+Priority 8 historical reuse, not new execution. No new measurement worker,
+collection claim, signing or publication run is claimed.
+
+Roadmap/checklist/index/readiness now agree on completed review-only/no release,
+with `activeRoadmap=null`, `plannedFinalVersion=null`, `releaseLane=unselected`.
+Published baseline stays `4.4.2`, development stays `4.5.0-SNAPSHOT`; V1-V36 and
+future scope remain unchanged. Final source, decisions, approvals and verification
+are under `target/release-evidence/v37/priority10/`; the external seal follows.
+
+The Priority 10 closure bundle seals **179 files** at
+`verification-evidence/v37-priority10/`, mirrored under Maven output. Manifest
+SHA-256: `612a746752026379e168c8106f3e545e32ff289c5efd77a439a600858f8c3c47`.
+Archive `verification-evidence/v37-priority10-20261025.tar.gz` SHA-256:
+`2af61e02a062b577a92c210069a95ae0ac451f1fba32e25d350fc3575ded02ef`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
+
 ## Completion Rule
 
-- [ ] Every required row has an evidence-backed disposition or an explicit named
+- [x] Every required row has an evidence-backed disposition or an explicit named
       closure exclusion; no stop/no-change/no-release decision silently clears it.
-- [ ] Applicable execution, approval, integrity and verification gates have actual
+- [x] Applicable execution, approval, integrity and verification gates have actual
       results or dated justified N/A; no inherited budget or diagnostic-score substitution.
-- [ ] Lifecycle, guidance and final evidence agree; no release is claimed without
+- [x] Lifecycle, guidance and final evidence agree; no release is claimed without
       independent signing/publication/consumer verification.
