@@ -1,13 +1,20 @@
 # Reactive HTTP Client - Roadmap V37 Execution Checklist
 
-> **Status:** active
+> **Status:** completed; review-only, no release; explicitly reduced scope
 > **Theme:** ordinary allocation-mode attribution with a feasibility-first boundary
 > **Published baseline:** `4.4.2`
 > **Development coordinate:** `4.5.0-SNAPSHOT`
 > **Proposed scope:** unresolved AUTO_REGISTRY/HOOK attribution and the minimum evidence needed to decide it
 > **Experiment authorization:** none; no inherited budget
-> **Implementation and release scope:** unselected
+> **Implementation and release scope:** no production change; no release; V37 closed (V37-P10-1)
 > **Adopted:** 2026-10-18
+
+**Closed 2026-10-25:** [V37-P10-1](RELEASE-DECISION.md) approves review-only/no
+release with A001/AUTO_REGISTRY and A002/HOOK excluded from closure obligations,
+not resolved or passed. Dated P1-P9 pending lifecycle statements are superseded
+only by this decision. Priorities 3-7 remain N/A and 8.2 remains blocked/excluded
+from closure only; their unchecked boxes are not unexecuted passes or reopened
+review work. No further experiments, production change or release are authorized.
 
 Execution companion to [ROADMAP.md](ROADMAP.md). Adoption authorizes baseline,
 source/evidence review, bounded deterministic synthetic tests and planning only.
@@ -83,56 +90,128 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ## Priority 1 - Post-V36 Baseline and Narrow Scope Integrity
 
-### [ ] 1.1 Verify adoption and version state
+### [x] 1.1 Verify adoption and version state
 
-- [ ] Verify roadmap/checklist/index/readiness agree on active V37, closed V1-V36,
+- [x] Verify roadmap/checklist/index/readiness agree on active V37, closed V1-V36,
       `4.5.0-SNAPSHOT`, baseline `4.4.2`, `plannedFinalVersion=null` and unselected
       release lane; run archive/version/documentation guards.
-- [ ] Preserve V36's reduced-scope no-release decision and unresolved A001/A002;
+- [x] Preserve V36's reduced-scope no-release decision and unresolved A001/A002;
       adoption does not retrospectively pass them or complete Priority 1.
 
-### [ ] 1.2 Inventory source and reusable evidence
+### [x] 1.2 Inventory source and reusable evidence
 
-- [ ] Record reachable source/tree, worktree changes, toolchains, JDK/JMH/Boot and
+- [x] Record reachable source/tree, worktree changes, toolchains, JDK/JMH/Boot and
       dependencies; inventory raw samples, saved JARs, patches, manifests/archives.
-- [ ] Rehash inputs before reuse and record missing data, inferred process counts
+- [x] Rehash inputs before reuse and record missing data, inferred process counts
       and unavailable historical revisions without manufacturing provenance.
 
-### [ ] 1.3 Initialize the narrow finding ledger
+### [x] 1.3 Initialize the narrow finding ledger
 
-- [ ] Record A001, A002 and E001 with owners, evidence, proof obligations, controls,
+- [x] Record A001, A002 and E001 with owners, evidence, proof obligations, controls,
       uncertainty and stop conditions; retain independent profile dispositions.
-- [ ] Confirm exhausted V35/V36 approvals grant no worker, pilot, probe or time
+- [x] Confirm exhausted V35/V36 approvals grant no worker, pilot, probe or time
       budget, and C001-C005 are not reopened by this follow-up.
+
+**Priority 1 record (2026-10-18):** [Baseline and narrow ledger](BASELINE-SCOPE.md).
+Started from clean `7e67a7ccec5ef8b0100d4b559d91e34ad8b8c2fc`; fresh checks use
+that reachable base plus the retained documentation/test patch. The read-only
+audit verifies 5,132 files across 15 bundles and their complete archives, 392
+unchanged runtime/build/test/fixture inputs and both saved benchmark JARs.
+All 121 historical classpath paths per artifact are now absent; input hashes
+and shaded artifacts are preserved, not a claim of a runnable old environment.
+Lost V35 recordings remain unavailable, and non-ancestor execution objects keep
+their original provenance rather than being relabeled as reachable revisions.
+
+Verification passes **121 documentation cases per Boot row** (4.0.0/4.1.0), zero
+failures/errors/skips, **nine archive-verifier tests**, reactor validation,
+baseline-provenance fixtures, matrix-script syntax and `git diff --check`.
+Fresh effective POMs/dependency trees and test classpath hashes are retained;
+Java 21.0.8/Maven 3.9.9 use explicit GC disabled for ordinary tests. Repeated
+verification is not counted as additional unique cases. No benchmark, runtime
+full-suite, API, consumer, AOT/native or new Central verification is claimed.
+
+A001/A002 remain unresolved/blocking; E001 is feasibility pending, not a new
+confirmed defect. V1-V36 history and all versions are unchanged. Priority 2.3
+must decide proceed-to-plan or stop; 4.3, 7.2 and Priority 10 retain their separate
+approval gates. Priority 1 launches zero workers and selects no numerical budget,
+production correction or release. Evidence is retained under
+`target/release-evidence/v37/priority1/`; the external seal follows verification.
+
+The Priority 1 bundle seals **146 files** at
+`verification-evidence/v37-priority1/`, mirrored under Maven output. Manifest
+SHA-256: `a21c2f68403d8f20460dd8efe02e4cd4cd35a823af2da9deb26c8d3af68249eb`.
+Archive `verification-evidence/v37-priority1-20261018.tar.gz` SHA-256:
+`7a15f706e7b00c32ab7c6e7d9cc6b55e8fd97b910f4084123cd5002c1a60bdeb`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is added after sealing to avoid self-reference;
+it is the only excluded delta. Ignored local copies are not an off-machine backup.
 
 ## Priority 2 - Attribution Feasibility and Stop Decision
 
-### [ ] 2.1 Identify the missing causal observation
+### [x] 2.1 Identify the missing causal observation
 
-- [ ] Audit available ordinary, marker, traced and intervention evidence offline;
+- [x] Audit available ordinary, marker, traced and intervention evidence offline;
       state what each supports and the missing high-mode causal bridge per profile.
-- [ ] Distinguish installed/inlined/eliminated code and iteration envelopes from
+- [x] Distinguish installed/inlined/eliminated code and iteration envelopes from
       exact executing-code identity; preserve old acceptance and uncertainty.
 
-### [ ] 2.2 Evaluate a materially different method
+### [x] 2.2 Evaluate a materially different method
 
-- [ ] Compare methods using existing tooling/source evidence, with expected
+- [x] Compare methods using existing tooling/source evidence, with expected
       perturbation, permissions/resources and outcomes that would refute usefulness.
-- [ ] Specify minimum sufficient evidence for each proposed explanation. Another
+- [x] Specify minimum sufficient evidence for each proposed explanation. Another
       profiler name, more forks or repetition of V36's low-only tracing is not proof
       of feasibility and authorizes no pilot.
 
-### [ ] 2.3 Obtain proceed-to-plan or stop approval
+### [x] 2.3 Obtain proceed-to-plan or stop approval
 
-- [ ] Record the maintainer's explicit decision and rationale before advancing;
+- [x] Record the maintainer's explicit decision and rationale before advancing;
       proceeding permits planning only, not execution before 4.3.
-- [ ] If no credible method exists, stop before launching workers, retain findings
-      unresolved and record dated applicability for later priorities. Complete
-      applicable verification/preservation and seek a separate closure decision.
+- [x] If no credible method exists, stop before launching workers, retain findings
+      unresolved and record dated applicability for later priorities. Keep
+      applicable verification/preservation and a separate closure decision required
+      in Priorities 8-10; recording the route does not complete those priorities.
+
+**Priority 2 record (2026-10-18):** [Feasibility and approved stop](FEASIBILITY-DECISION.md).
+The offline audit revalidates 1,938 files across five bundles/archives, reproduces
+all 48 V36 stage reviews and the original 60-row primary/four-row reverse reviews.
+AUTO_REGISTRY has no ordinary high witness in V36; HOOK's ordinary high stages
+10 and 15 have no compiler trace. Forced high modes and installed code do not
+identify the ordinary executing allocation path. A001/A002 remain unresolved.
+
+Five method families are evaluated with prerequisites, perturbation, falsifiers
+and minimum evidence. Execution-PC/allocation correlation is materially different
+in principle, but no bounded complete capture path is established in the reviewed
+tooling/source. The maintainer answered **"Approve stop (Recommended)"**, approving
+**V37-P2-1** before new measurement. Dated N/A for new capture/correction work in
+Priorities 3-7 means not run, not passed; applicable verification in Priority 8,
+preservation/guidance in Priority 9 and the separate Priority 10 decision remain
+required. No worker or pilot ran; no budget, implementation, release or scope
+exclusion is selected. A001/A002 still block full-scope acceptance; V37 stays active.
+
+Verification passes **122 documentation cases per Boot row** (4.0.0/4.1.0),
+**36 deterministic tooling tests** and `git diff --check`, zero failures/errors/skips.
+Ordinary Java checks use explicit GC disabled. Overlapping reruns are not additional
+unique cases. No runtime full-suite, API, consumer, AOT/native, performance or
+publication execution is claimed. Evidence and the complete source patch are
+retained under `target/release-evidence/v37/priority2/`; the external seal follows.
+
+The Priority 2 bundle seals **76 files** at
+`verification-evidence/v37-priority2/`, mirrored under Maven output. Manifest
+SHA-256: `63e9e0b90ffc84604f4f990baec2d34c61bcb3153df6562e242faed2d4e775c5`.
+Archive `verification-evidence/v37-priority2-20261018.tar.gz` SHA-256:
+`966ad7e40ce6cfa76d612e6c944a7e1fc53dc617b942a555caae29990e4fe9d6`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is added after sealing to avoid self-reference;
+it is the only excluded delta. Ignored local copies are not an off-machine backup.
 
 ## Priority 3 - Minimal Capture and Process-Accounting Contract
 
 ### [ ] 3.1 Specify the smallest missing observation
+
+**N/A (2026-10-18, V37-P2-1):** No capture approach was selected. The maintainer
+confirmed **"Record N/A under approved stop (Recommended)"** rather than reopening
+offline planning. No new capture contract or observation is specified.
 
 - [ ] Reuse [capture](../../scripts/capture-v36-allocation.py),
       [review](../../scripts/review-v35-allocation.py) and
@@ -144,6 +223,10 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 3.2 Define complete process accounting
 
+**N/A (2026-10-18, V37-P2-1):** No investigation schedule or process budget is
+selected. No launcher, worker, internal probe, preflight or profiler/helper is
+authorized; historical inferred counts are not a new process census or allowance.
+
 - [ ] Specify how every launcher, measured worker, internal JMH probe, preflight
       and profiler/helper process is identified and charged before execution.
 - [ ] Record observation limits and abort behavior for unexpected launches or
@@ -151,14 +234,52 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 3.3 Verify tooling with bounded synthetic fixtures
 
+**N/A (2026-10-18, V37-P2-1):** No new capture/parser behavior or tooling fix is
+selected, so no new synthetic capture fixtures are required. Priority 2's tooling
+tests remain historical evidence, not fresh Priority 3 execution or a new causal
+claim. Diagnostic JVM and recorder smoke remain unrun and gated on 4.3.
+
 - [ ] Test missing, duplicate, truncated, mismatched, reordered and superseded
       records; preserve a failing synthetic reproduction for each tooling fix.
 - [ ] Review what corrected conclusions need fresh evidence. Keep diagnostic JVM
       and recorder smoke behind 4.3, not disguised as deterministic tooling tests.
 
+**Priority 3 disposition (2026-10-18):** N/A under the
+[approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates),
+not run, not passed. All nine execution boxes remain unchecked; recording this
+applicability does not implement a capture contract or reopen planning. A001/A002
+remain unresolved/blocking, V37 remains active and no scope exclusion or release
+is approved. Priorities 8-10 retain applicable verification, preservation/guidance
+and the separate closure decision. Reopening requires a new explicit decision;
+execution would still require 4.3 approval.
+
+Source: clean `4586f6aa6a0d8f7c495f477c8b8b00ac0ea24768`, tree
+`7beaf83021371256e9ea7a3ca7101570b5f9e82a`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 2 bundle/archive is reverified (76 files);
+this checks integrity, not fresh allocation attribution. No tooling suite,
+runtime/API/consumer/AOT/native, benchmark or publication execution is claimed.
+Commands, exits, test reports and classpath hashes are preserved under
+`target/release-evidence/v37/priority3/`; the external seal follows.
+
+The Priority 3 disposition bundle seals **28 files** at
+`verification-evidence/v37-priority3/`, mirrored under Maven output. Manifest
+SHA-256: `615659f2ecb70865121117c8a4ae329715091a554e4a719ecef33acaa5bd1125`.
+Archive `verification-evidence/v37-priority3-20261018.tar.gz` SHA-256:
+`99e65d1375a50443577d8050c27141cee6ddbeffeb65f4369c9794684f4dc6e5`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
+
 ## Priority 4 - Freeze and Approve One Bounded Investigation
 
 ### [ ] 4.1 Freeze inputs and distinguishing lanes
+
+**N/A (2026-10-18, V37-P2-1):** No investigation or capture method is selected
+under the approved stop. Historical artifacts and lanes are evidence only, not
+newly frozen execution inputs; no investigation plan is created.
 
 - [ ] Pin artifact/harness/JDK/JMH/Boot/dependency identities, workload phase,
       payload, VM flags, heap/threads, iterations, units, order and host conditions.
@@ -168,6 +289,10 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 4.2 Set numerical execution and stop bounds
 
+**N/A (2026-10-18, V37-P2-1):** No numerical execution budget is selected, not even
+a zero-worker approved schedule. No process/time/memory/storage allowance carries
+over from V35/V36, and no pilot, probe, preflight, helper or smoke run is authorized.
+
 - [ ] Freeze per-category and total process ceilings, worker count, stage deadlines,
       cumulative time and memory/storage limits, including every pilot/probe/control.
 - [ ] Specify stop rules for failure, absent modes, unexpected processes, incomplete
@@ -175,14 +300,52 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 4.3 Obtain explicit investigation approval
 
+**N/A (2026-10-18, V37-P2-1):** Investigation approval is neither requested nor
+granted on this stop route. The approved stop is not execution approval; gate 4.3
+remains unapproved. Reopening needs a new explicit decision followed by approval
+of an exact bounded plan before any measurement, including diagnostic smoke.
+
 - [ ] Record approval of the exact plan, numerical schedule and stop policy before
       any benchmark or diagnostic execution, including smoke or preflight processes.
 - [ ] Verify no inherited budget and require a new recorded decision before any
       extension, with cumulative rather than reset process/resource accounting.
 
+**Priority 4 disposition (2026-10-18):** N/A under the
+[approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates),
+not run, not passed. All nine execution boxes remain unchecked. This records
+applicability only; it neither reopens planning nor authorizes measurement.
+A001/A002 remain unresolved/blocking, V37 remains active, and Priorities 8-10
+retain applicable verification, preservation/guidance and the separate closure
+decision. No production change, scope exclusion or release is selected.
+
+Source: clean `d697ede1461c59a98881da95f82f721396476623`, tree
+`6fbd1d148180b3e22b7021747a47c337c3a214d9`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 3 bundle/archive is reverified (28 files);
+this checks integrity, not fresh allocation attribution. No tooling suite,
+runtime/API/consumer/AOT/native, benchmark or publication execution is claimed.
+Commands, exits, test reports and classpath hashes are preserved under
+`target/release-evidence/v37/priority4/`; the external seal follows.
+
+The Priority 4 disposition bundle seals **28 files** at
+`verification-evidence/v37-priority4/`, mirrored under Maven output. Manifest
+SHA-256: `39cffa7e32a0f08cfe475004e505e20c4e9f694af415611bbb2d9217d34e7463`.
+Archive `verification-evidence/v37-priority4-20261018.tar.gz` SHA-256:
+`0d045abb63dfb2a32f22bd79ba6464f124c5a35fe4f522a46e274d0f1da2d5e0`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
+
 ## Priority 5 - Ordinary-Mode Capture and Perturbation Checks
 
 ### [ ] 5.1 Execute only the approved schedule
+
+**N/A (2026-10-24, V37-P2-1):** No schedule is approved and gate 4.3 remains
+unapproved. No benchmark or diagnostic launcher, worker, probe, pilot, preflight,
+profiler/helper or recorder smoke is launched. This is an approved stop, not a
+failed or completed investigation; historical captures are not new execution.
 
 - [ ] Verify inputs and host preconditions before launch; use fresh directories
       with no competing scored work, preserving every exit, interruption and failure.
@@ -191,6 +354,11 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 5.2 Evaluate observation perturbation
 
+**N/A (2026-10-24, V37-P2-1):** No new ordinary or observed samples exist to
+compare. Perturbation remains unresolved; no execution is not evidence of absent
+high modes or unchanged allocation. Priority 2's historical observations retain
+their limits, with no pooling, score substitution or performance pass.
+
 - [ ] Compare ordinary and observed mode availability separately without pooling
       scores; record suppressed/changed modes as observation limits, not fixes.
 - [ ] Preserve absent high modes as missing evidence; do not infer resolution from
@@ -198,14 +366,54 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 5.3 Reconcile execution and evidence integrity
 
+**N/A (2026-10-24, V37-P2-1):** No new capture process census, per-worker association
+or resource-use reconciliation is claimed. Zero new measurement launches is not
+a verified zero-worker experiment or an inherited budget. Documentation tests
+and archive checks below are verification only, not diagnostic capture; they do
+not upgrade V36's inferred probe accounting or supply executing-code identity.
+
 - [ ] Verify actual process counts, category totals, resource use and per-worker
       association against approval; retain incomplete or unexpected work as failures.
 - [ ] Record what capture establishes and what it cannot. Request a new decision
       if bounds or stop rules prevent completion; do not launch more work to improve it.
 
+**Priority 5 disposition (2026-10-24):** N/A under the
+[approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates),
+not run, not passed. All nine execution boxes remain unchecked. A001/A002 remain
+unresolved/blocking; V37 remains active. No planning, execution, production change,
+scope exclusion or release is newly authorized. Reopening requires a new explicit
+decision and exact numerical approval before measurement. Priorities 8-10 retain
+applicable verification, preservation/guidance and the separate closure decision.
+
+Source: clean `1f4cf9e07f183e9a8e21a5698f478d7386df4ca4`, tree
+`2c0e85611be4360c632e305edc7a3a5bf2ff0985`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 4 bundle/archive is reverified (28 files);
+this checks integrity, not fresh allocation attribution. No tooling suite,
+runtime/API/consumer/AOT/native, benchmark or publication execution is claimed.
+Commands, exits, test reports and classpath hashes are preserved under
+`target/release-evidence/v37/priority5/`; the external seal follows.
+
+The Priority 5 disposition bundle seals **28 files** at
+`verification-evidence/v37-priority5/`, mirrored under Maven output. Manifest
+SHA-256: `cd28a29aa68f36ec531b0458c4ea6a25782e372fc4a897db00579e1c9548369d`.
+Archive `verification-evidence/v37-priority5-20261024.tar.gz` SHA-256:
+`ee0736fd89c7d797b33c40ffeb7eed38eebfbb7e48dc8af212116cce7b05aa92`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
+
 ## Priority 6 - Causal Review and Independent Finding Dispositions
 
 ### [ ] 6.1 Review each ordinary-mode explanation
+
+**N/A (2026-10-24, V37-P2-1):** No new capture exists for a post-investigation
+causal review. Priority 2's historical review remains the evidence basis, not a
+new explanation. Installed compiler tasks, elimination events and iteration
+envelopes do not identify the ordinary executing path; forced high modes do not
+supply that missing link for either profile.
 
 - [ ] Relate high/low observations to relevant compilation, installation,
       invalidation and class-load history under the frozen proof obligations.
@@ -214,6 +422,12 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 6.2 Separate tooling, runtime and measurement conclusions
 
+**N/A (2026-10-24, V37-P2-1):** No new tooling or runtime defect is reproduced,
+and no variability is newly explained. Existing process-association corrections
+retain their documented limits. Perturbation versus limited sampling remains
+unresolved; neither absent traced high modes nor clear reverse aggregates erase
+the primary flags. Original scores and contrary evidence remain unchanged.
+
 - [ ] Classify reproduced tooling defects, runtime defects, explained variability
       and unresolved limits; require affected evidence for stronger corrected claims.
 - [ ] Keep contrary observations and original scores. Any further experiment needs
@@ -221,14 +435,66 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 6.3 Record independent and combined dispositions
 
+**N/A (2026-10-24, V37-P2-1):** New post-investigation dispositions are not
+applicable. The stop-route ledger below carries forward the independent outcomes
+and obligations; it does not claim a new causal result or acceptance. Owners are
+unchanged from the [baseline ledger](BASELINE-SCOPE.md#narrow-finding-ledger).
+
 - [ ] Record A001/A002 and E001 outcomes, evidence, owners and reopening triggers;
       do not transfer AUTO_NO_REGISTRY or control acceptance to either profile.
 - [ ] Mark unexplained flags unresolved/blocking and identify closure implications;
       completing approved execution alone resolves no finding.
 
+| Finding | Carried-forward disposition and evidence | Owner | Reopening condition |
+|---|---|---|---|
+| **V37-A001 / AUTO_REGISTRY** | Unresolved/blocking. V36 has no ordinary high witness for this profile; forced non-inlining is not its ordinary cause. [Priority 2 review](FEASIBILITY-DECISION.md#21-missing-causal-observation). | Performance maintainer with metrics-integration review | A materially different bounded method for registry-selected ordinary high/low attribution, followed by explicit reopening and numerical execution approval. |
+| **V37-A002 / HOOK** | Unresolved/blocking independently of A001. Ordinary high stages 10 and 15 lack compiler/allocation attribution; low-only traced lanes do not explain them. [Priority 2 review](FEASIBILITY-DECISION.md#21-missing-causal-observation). | Performance maintainer with observer/hook review | A HOOK-specific bounded method linking ordinary high/low work to its cause without substituting another profile; the same reopening and execution gates apply. |
+| **V37-E001 / Attribution Feasibility and Evidence Limits** | Feasibility decision complete: approved stop V37-P2-1; attribution limits remain unresolved, not a newly reproduced tooling defect or repaired observation gap. [Approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates). | Benchmark tooling maintainer | A concrete exporter/format and worker/phase/code/allocation correlation design with uncertainty, rejection rules and resource accounting; any claimed tooling defect also needs a failing reproduction and affected evidence. |
+
+**Combined disposition:** A001/A002 remain unresolved/blocking. Neither profile
+inherits AUTO_NO_REGISTRY/control acceptance or the other's explanation. E001's
+stop decision completes feasibility governance only; it does not clear either
+allocation flag. Original >20% latency and >max(32 B/op, 5%) allocation review
+triggers remain unchanged. Full-scope closure remains blocked; only Priority 10
+can approve named exclusions, which would not be performance passes.
+
+**Priority 6 disposition (2026-10-24):** N/A under V37-P2-1, not run, not passed.
+All nine execution boxes remain unchecked. The ledger is preservation of the
+existing review, not new capture or a new no-change implementation approval.
+V37 remains active; gates 4.3 and 7.2 remain unapproved. Priorities 8-10 retain
+applicable verification, preservation/guidance and the separate closure decision.
+No production change, scope exclusion or release is selected.
+
+Source: clean `bef54721a19be6de7c6b23a4f98f87cc15441e66`, tree
+`0db17c445a1d0a945f6e8f95c92dcbfb5fc121ab`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 2 and 5 bundles/archives are reverified
+(104 files). Saved review consistency checks confirm the 48 stage records, HOOK
+high-stage identities, primary flags and unchanged executing-code uncertainty;
+these are not raw-stage reanalysis or fresh causal attribution. No tooling suite,
+runtime/API/consumer/AOT/native, benchmark or publication execution is claimed.
+Commands, exits, test reports and classpath hashes are preserved under
+`target/release-evidence/v37/priority6/`; the external seal follows.
+
+The Priority 6 disposition bundle seals **32 files** at
+`verification-evidence/v37-priority6/`, mirrored under Maven output. Manifest
+SHA-256: `5a62aff5a1fbf538531f715f06e48caf399a75ebd2e6034cb4146e6ba1b16fde`.
+Archive `verification-evidence/v37-priority6-20261024.tar.gz` SHA-256:
+`04579bbc7ea56fa20d43ec8a9c26804106d83dc0d2726e1bd3e2622486e5389f`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
+
 ## Priority 7 - Explicit Correction or No-Change Selection
 
 ### [ ] 7.1 Specify a bounded response to the evidence
+
+**N/A (2026-10-24, V37-P2-1):** No reproduced defect supports a new correction
+candidate on the approved stop route. Runtime and tooling remain unchanged; no
+optimization, benefit claim or rollback plan is selected. V34/V35's rejected
+candidates remain rejected; genuine registry/hook behavior is not disabled.
 
 - [ ] Prefer no production change for required behavior or inconclusive evidence;
       distinguish a scoped tooling correction from any proposed runtime optimization.
@@ -237,6 +503,12 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 7.2 Obtain implementation or no-change approval
 
+**N/A (2026-10-24, V37-P2-1):** No new implementation or no-change approval is
+requested or granted; gate 7.2 remains unapproved. Leaving production unchanged
+under the approved stop is not a new implementation decision or performance pass.
+Reopening requires a separate explicit decision and scoped correction approval
+before production edits; measurements still require numerical approval at 4.3.
+
 - [ ] Record explicit approval before any production edit; do not reinstate rejected
       V34/V35 candidates or disable genuine registry/hook behavior by default.
 - [ ] State that a no-change decision grants no extra experiments, performance
@@ -244,31 +516,77 @@ Create records when evidence exists, not empty placeholders. Suggested records:
 
 ### [ ] 7.3 Verify retained changes and rejected candidates
 
+**N/A (2026-10-24, V37-P2-1):** No runtime or tooling candidate was implemented,
+tested or rolled back in V37. No correction regression or rollback result is
+claimed. The documentation verification below checks only this disposition;
+Priority 8's applicable verification and evidence-reuse review remain required.
+
 - [ ] Verify focused positive/negative regressions for each retained change, including
       late/prototype discovery, ordering/supports, fresh metadata, mutation validation
       and subscription-local body/context/terminal ownership where affected.
 - [ ] Roll back a failed candidate and preserve its evidence; record justified N/A
       for unselected runtime implementation, not an unexecuted pass.
 
+**Priority 7 disposition (2026-10-24):** N/A under the
+[approved stop](FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates),
+not run, not passed. All nine execution boxes remain unchecked. A001/A002 remain
+unresolved/blocking; E001's feasibility stop does not resolve the attribution
+limits. V37 remains active, with implementation and release scope unselected.
+No extra experiment, scope exclusion or closure is authorized. Priorities 8-10
+retain applicable verification, preservation/guidance and the separate closure
+decision; the stop does not complete those gates.
+
+Source: clean `d2211be101d9fcd439152c1020920de9df247086`, tree
+`8b8a1252dfe376c35a817050f4f6296a401359fb`, plus the preserved checklist/test patch.
+Only this checklist and its documentation guard change; no production, tooling,
+version or V1-V36 changes. Verification passes **122 documentation cases per Boot
+row** (4.0.0/4.1.0), zero failures/errors/skips, with explicit GC disabled and
+`git diff --check`. The reused Priority 6 bundle/archive is reverified (32 files);
+this checks integrity, not correction acceptance or fresh causal attribution.
+No tooling suite, runtime/API/consumer/AOT/native, benchmark or publication
+execution is claimed. Commands, exits, test reports and classpath hashes are
+preserved under `target/release-evidence/v37/priority7/`; the external seal follows.
+
+The Priority 7 disposition bundle seals **28 files** at
+`verification-evidence/v37-priority7/`, mirrored under Maven output. Manifest
+SHA-256: `7bb656effb5b3141498b201d50ba375b3e01270cfff28e14511da28a2d3bc1c8`.
+Archive `verification-evidence/v37-priority7-20261024.tar.gz` SHA-256:
+`d32d4fcc665c841e8138391e1c7e25b85e5c2d1b2dddcbeeec92ea0ff19131b9`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
+
 ## Priority 8 - Matched Cost, Compatibility and Ownership Acceptance
 
-### [ ] 8.1 Decide applicability and approve any new scoring
+### [x] 8.1 Decide applicability and approve any new scoring
 
-- [ ] Freeze applicability and exact unchanged-input reuse limits before scoring;
+Applicability review complete. **New scoring N/A (2026-10-24, V37-P2-1):**
+no numerical budget is requested or approved; the unchecked execution item below
+is not an unrun pass. See [verification and reuse limits](VERIFICATION.md).
+
+- [x] Freeze applicability and exact unchanged-input reuse limits before scoring;
       changed shared default paths require the existing 60-row matrix.
 - [ ] Obtain a separate numerical budget for new scores, covering all processes
       and controls; unused diagnostic time does not authorize scored execution.
 
 ### [ ] 8.2 Establish independent and combined cost acceptance
 
-- [ ] Keep Central-only `4.4.2`, matched non-starter dependencies/harness, semantic
+**Review complete; acceptance blocked (2026-10-24):** A001/A002 remain
+unresolved/blocking independently and combined. The checked review tasks preserve
+evidence, not a performance pass; the acceptance heading stays unchecked.
+
+- [x] Keep Central-only `4.4.2`, matched non-starter dependencies/harness, semantic
       witnesses, both artifact orders and all raw samples/intervals.
-- [ ] Apply original review triggers, >20% latency and >max(32 B/op, 5%) allocation;
+- [x] Apply original review triggers, >20% latency and >max(32 B/op, 5%) allocation;
       retain primary flags through confirmation and distinguish scores from diagnostics.
 
-### [ ] 8.3 Verify compatibility, cross-path and ownership applicability
+### [x] 8.3 Verify compatibility, cross-path and ownership applicability
 
-- [ ] For tooling/docs-only work, run affected parser/workload/archive/readiness/
+**Fresh full/assembled/API/packaging/native execution N/A (2026-10-24):**
+unchanged inputs support exact historical reuse, not fresh execution. Applicable
+documentation, workload, tooling and integrity guards still require fresh results.
+
+- [x] For tooling/docs-only work, run affected parser/workload/archive/readiness/
       guidance guards and justify runtime-evidence reuse. On a feasibility stop,
       still verify the decision, links, lifecycle and applicable preserved evidence.
 - [ ] For runtime/fixture changes, verify affected public/factory/mock/assembled,
@@ -278,66 +596,179 @@ Create records when evidence exists, not empty placeholders. Suggested records:
       run applicable packaging and clean-source native compile/run. Record actual
       totals, failures and dated reuse/N/A, with controlled reachability where needed.
 
+**Priority 8 record (2026-10-24):** [Matched cost and verification](VERIFICATION.md).
+Source is clean `fd87028a863e1bbe53d62c6628d92f82f2715844`, tree
+`435497f99bd33e2c3319535eb84250cfb7b1b0f8`, plus the preserved documentation/test
+patch. The audit verifies 4,143 files across ten bundles/archives, 392 unchanged
+runtime/build/test/fixture inputs, 202 production/build/benchmark inputs and 39
+matched harness/build inputs. Historical classpaths remain unavailable at their
+121 original paths per artifact; shaded JARs and saved evidence remain intact.
+
+Both saved reviews reproduce exactly: 60 primary and four reverse rows per
+artifact, three primary allocation flags, zero primary latency flags and zero
+reverse flags. A001/A002 and their combination remain unaccepted; no scope
+exclusion, new worker, implementation approval, public claim or release follows.
+V37 remains active; Priorities 9-10 remain required. Applicable verification is
+complete; 8.2's full-scope cost acceptance remains blocked, not N/A or passed.
+
+Fresh verification passes **123 documentation and 40 untimed workload cases per
+Boot row** (163 cases per row, zero failures/errors/skips), **92 Python tooling
+tests**, baseline-provenance fixtures and `git diff --check`. Ordinary Java tests
+disable explicit GC. The first local driver stopped after the 92 successful
+tooling tests because it expected an obsolete total of 83; that failure and its
+passing log are preserved, with only remaining guards executed on continuation.
+Repeated documentation checks are not added to unique totals. No fresh full
+runtime, API, consumer, JVM/AOT/native, scoring or publication run is claimed.
+Evidence is under `target/release-evidence/v37/priority8/`; the external seal follows.
+
+The Priority 8 verification bundle seals **167 files** at
+`verification-evidence/v37-priority8/`, mirrored under Maven output. Manifest
+SHA-256: `a20c4b5859703f99bafac60347c2f3894a380f113d1de9685ad702f3d3020908`.
+Archive `verification-evidence/v37-priority8-20261024.tar.gz` SHA-256:
+`e4b2f6bdaf941149619f56c4c60c416cb98a04849543974443f5fdba720c12d0`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
+
 ## Priority 9 - Durable Evidence and Maintainer Guidance
 
-### [ ] 9.1 Seal and verify durable evidence
+### [x] 9.1 Seal and verify durable evidence
 
-- [ ] Seal reachable source or base-plus-patch, approvals, commands/exits,
+- [x] Seal reachable source or base-plus-patch, approvals, commands/exits,
       toolchains/dependencies, raw results, failures and file/archive hashes.
-- [ ] Verify copied and archived contents outside Maven output before cleanup;
+- [x] Verify copied and archived contents outside Maven output before cleanup;
       record location/access/backup limits without calling a local copy off-machine.
 
-### [ ] 9.2 Preserve historical truth and rejection guards
+### [x] 9.2 Preserve historical truth and rejection guards
 
-- [ ] Keep V35/V36 originals unchanged; test missing/corrupt/incomplete evidence
+- [x] Keep V35/V36 originals unchanged; test missing/corrupt/incomplete evidence
       rejection and distinguish regeneration from recovery of lost recordings.
-- [ ] Preserve actual process-accounting and executing-code limits; no missing
+- [x] Preserve actual process-accounting and executing-code limits; no missing
       mode, exhausted budget or inferred census becomes a passed gate.
 
-### [ ] 9.3 Reconcile maintainer and operations guidance
+### [x] 9.3 Reconcile maintainer and operations guidance
 
-- [ ] Align findings, intentional costs, supported alternatives and reopening
+- [x] Align findings, intentional costs, supported alternatives and reopening
       triggers with current docs/examples/metadata/readiness and baseline versions.
-- [ ] Check sanitized evidence boundaries; make no snapshot-upgrade remedy,
+- [x] Check sanitized evidence boundaries; make no snapshot-upgrade remedy,
       application-memory/mesh diagnosis, new telemetry or unsupported performance claim.
+
+**Priority 9 record (2026-10-25):** [Evidence and maintainer guidance](MAINTAINER-GUIDANCE.md).
+Clean starting source `2ee37be5f1d976c85b233ed1dc489a7dfb8895b8`, tree
+`1d7485b43c6f82d2d2fcc707a81946777bfd24f3`, plus the preserved documentation/test
+patch. Read-only verification checks **4,426 files across 15 bundles and archives**,
+including all V37 P1-P8 records and their original V35/V36 evidence, and **392
+unchanged runtime/build/test/fixture inputs**. Missing historical classpaths and
+lost recordings remain unavailable; the P8 obsolete-count driver failure remains
+preserved. Nothing is regenerated under an old run identity.
+
+Fresh checks pass **177 Java cases per Boot row** (4.0.0/4.1.0): 124 documentation,
+18 metadata/example and 35 properties cases, with zero failures/errors/skips.
+**92 Python tooling tests**, including missing/corrupt/incomplete archive negatives,
+baseline-provenance fixtures and `git diff --check` pass. Ordinary tests use
+explicit GC disabled, Java 21.0.8 and Maven 3.9.9; commands/exits, actual classpath
+hashes, reports and readiness are preserved. Final reruns are not extra unique
+cases. No new runtime full-suite, API, consumer, JVM/AOT/native, measured worker,
+signing or publication execution is claimed; Priority 8's reuse limits remain.
+
+A001/A002 stay independently and jointly unresolved/blocking. E001's approved
+feasibility stop does not resolve attribution. Guidance adds no feature, migration,
+telemetry or snapshot-upgrade remedy. V37 is active pending Priority 10's explicit
+named exclusion and separate no-release decision; the closure request alone is
+not recorded as approval of those exclusions. Evidence is retained under
+`target/release-evidence/v37/closure/`; the external Priority 9 seal follows.
+
+The Priority 9 preservation bundle seals **172 files** at
+`verification-evidence/v37-priority9/`, mirrored under Maven output. Manifest
+SHA-256: `3c0ad9ca8685ed77816143a643fa696fb625f1cd31b3c8d7dc136459b448ec8c`.
+Archive `verification-evidence/v37-priority9-20261025.tar.gz` SHA-256:
+`308e304445e21078799b70180b7f4f2cf8d2b93d6fa543982c98ab0cb390e00b`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
 
 ## Priority 10 - Scope Decision and Conditional Release or Closure
 
-### [ ] 10.1 Reconcile findings and closure scope
+### [x] 10.1 Reconcile findings and closure scope
 
-- [ ] Reconcile all three rows, including any feasibility stop, with evidence-backed
+- [x] Reconcile all three rows, including any feasibility stop, with evidence-backed
       dispositions. Full-scope closure requires acceptance, not merely completed runs.
-- [ ] If unresolved findings remain, obtain explicit named exclusion from closure
+- [x] If unresolved findings remain, obtain explicit named exclusion from closure
       obligations or keep V37 open; exclusion and no-release are not performance passes.
 
-### [ ] 10.2 Select release or no-release intent
+### [x] 10.2 Select release or no-release intent
 
-- [ ] Obtain a separate maintainer decision; consider a compatible patch first only
+- [x] Obtain a separate maintainer decision; consider a compatible patch first only
       for a justified retained change. `4.5.0-SNAPSHOT` selects no minor release.
-- [ ] For release, approve exact coordinates and update current inputs together.
+- [x] For release, approve exact coordinates and update current inputs together.
       Otherwise record no-release scope; future implementation/release stays unselected.
 
-### [ ] 10.3 Assemble immutable release or review evidence
+### [x] 10.3 Assemble immutable release or review evidence
 
-- [ ] Seal final decisions, delivered/rolled-back/unresolved scope, verification,
+- [x] Seal final decisions, delivered/rolled-back/unresolved scope, verification,
       approvals and hashes with reproducible provenance and verified durable copies.
-- [ ] For release, verify final packaging, signing/signatures and tag/source/workflow
+- [x] For release, verify final packaging, signing/signatures and tag/source/workflow
       separately. For no release, record unrun release gates as N/A, not passed.
 
-### [ ] 10.4 Verify publication or explicit no-release closure
+### [x] 10.4 Verify publication or explicit no-release closure
+
+**Release branch N/A on 2026-10-25 (V37-P10-1):** final-coordinate packaging,
+signing/signatures, tag/source/workflow, publication and isolated new-version
+Central consumption were not run, not passed. The unchecked release-only item
+below does not block approved no-release review closure.
 
 - [ ] For release, verify publication and isolated Central consumption separately;
       preparation is not final GO. Keep baseline `4.4.2` and V37 active until verified
       closure, then update current version references from the verified release.
-- [ ] For either branch, close checklist/roadmap/index/readiness together only after
+- [x] For either branch, close checklist/roadmap/index/readiness together only after
       the decision and applicable gates. Retain exclusions and unresolved flags;
       leave future scope unselected and preserve V1-V36 history.
 
+**Priority 10 decision (2026-10-25):** [V37-P10-1](RELEASE-DECISION.md).
+In response to the named-exclusion closure request, the maintainer instructed:
+"Complete the Priority 10 with review scope, no release". This approves reduced
+review scope: A001/AUTO_REGISTRY and A002/HOOK are excluded from closure obligations,
+not resolved or passed. E001 completes feasibility via the approved stop; its
+attribution limits remain. **GO for review closure, NO-GO for release or a
+performance all-clear.** No runtime correction, experiment budget or next release
+is selected. Historical N/A items and 8.2's blocked acceptance remain unchecked.
+
+Source is reachable `2ee37be5f1d976c85b233ed1dc489a7dfb8895b8`, tree
+`1d7485b43c6f82d2d2fcc707a81946777bfd24f3`, plus the complete verified
+base-plus-patch, including uncommitted P9 changes. The final read-only audit
+verifies **4,598 files across 16 bundles and complete archives** and **392 unchanged
+runtime/build/test/fixture inputs**. All earlier seals, failures, missing recordings
+and classpath limitations remain intact; no historical provenance is rewritten.
+
+Fresh checks pass **178 Java cases per Boot row** (4.0.0/4.1.0): 125 documentation,
+18 metadata/example and 35 properties cases, with zero failures/errors/skips.
+**92 Python tooling tests**, baseline-provenance fixtures and `git diff --check`
+pass. Ordinary tests disable explicit GC; Java 21.0.8/Maven 3.9.9, actual dependency
+hashes, commands/exits, reports and readiness are preserved. Final reruns do not
+increase unique totals. Runtime/API/consumer/JVM/AOT/native evidence remains exact
+Priority 8 historical reuse, not new execution. No new measurement worker,
+collection claim, signing or publication run is claimed.
+
+Roadmap/checklist/index/readiness now agree on completed review-only/no release,
+with `activeRoadmap=null`, `plannedFinalVersion=null`, `releaseLane=unselected`.
+Published baseline stays `4.4.2`, development stays `4.5.0-SNAPSHOT`; V1-V36 and
+future scope remain unchanged. Final source, decisions, approvals and verification
+are under `target/release-evidence/v37/priority10/`; the external seal follows.
+
+The Priority 10 closure bundle seals **179 files** at
+`verification-evidence/v37-priority10/`, mirrored under Maven output. Manifest
+SHA-256: `612a746752026379e168c8106f3e545e32ff289c5efd77a439a600858f8c3c47`.
+Archive `verification-evidence/v37-priority10-20261025.tar.gz` SHA-256:
+`2af61e02a062b577a92c210069a95ae0ac451f1fba32e25d350fc3575ded02ef`.
+Copied and archived contents and the complete base-plus-patch were verified.
+This external integrity paragraph is the only delta excluded from the sealed
+patch to avoid self-reference. Ignored local copies are not an off-machine backup.
+
 ## Completion Rule
 
-- [ ] Every required row has an evidence-backed disposition or an explicit named
+- [x] Every required row has an evidence-backed disposition or an explicit named
       closure exclusion; no stop/no-change/no-release decision silently clears it.
-- [ ] Applicable execution, approval, integrity and verification gates have actual
+- [x] Applicable execution, approval, integrity and verification gates have actual
       results or dated justified N/A; no inherited budget or diagnostic-score substitution.
-- [ ] Lifecycle, guidance and final evidence agree; no release is claimed without
+- [x] Lifecycle, guidance and final evidence agree; no release is claimed without
       independent signing/publication/consumer verification.

@@ -109,13 +109,13 @@ class DocumentationReleaseArtifactTest {
                     .findFirst()
                     .orElseThrow(() -> new AssertionError("Missing V" + version + " roadmap status"));
             if (version == 37) {
-                assertThat(roadmapStatus).isEqualTo("> **Status:** active");
+                assertThat(roadmapStatus).isEqualTo("> **Status:** completed; review-only, no release; explicitly reduced scope");
                 assertThat(indexRow).isEqualTo(
-                        "| V37 | [Roadmap](v37/ROADMAP.md) | [Checklist](v37/CHECKLIST.md) | Active |");
+                        "| V37 | [Roadmap](v37/ROADMAP.md) | [Checklist](v37/CHECKLIST.md) | Completed; review-only, no release; explicitly reduced scope |");
                 assertThat(checklist).exists();
                 assertThat(Files.readString(checklist).lines()
                         .filter(line -> line.startsWith("> **Status:**")).toList())
-                        .containsExactly("> **Status:** active");
+                        .containsExactly("> **Status:** completed; review-only, no release; explicitly reduced scope");
                 continue;
             }
             if (version == 36) {
@@ -218,7 +218,7 @@ class DocumentationReleaseArtifactTest {
         Path directory = root.resolve("roadmaps/v37");
         String roadmap = Files.readString(directory.resolve("ROADMAP.md"));
         assertThat(roadmap.lines().filter(line -> line.startsWith("> **Status:**")).toList())
-                .containsExactly("> **Status:** active");
+                .containsExactly("> **Status:** completed; review-only, no release; explicitly reduced scope");
         assertThat(roadmap.lines().filter(line -> line.matches("## \\d+\\. .+")).toList()).hasSize(10);
         assertThat(roadmap.lines().filter(line -> line.startsWith("| V37-")).toList()).hasSize(3);
         assertThat(roadmap.replaceAll("\\s+", " ")).contains(
@@ -237,7 +237,8 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("[x]");
         assertThat(directory.resolve("CHECKLIST.md")).exists();
         assertThat(Files.readString(root.resolve("roadmaps/README.md")))
-                .contains("(v37/ROADMAP.md)", "(v37/CHECKLIST.md)", "are active", "activeRoadmap=v37");
+                .contains("(v37/ROADMAP.md)", "(v37/CHECKLIST.md)", "are closed", "activeRoadmap=null",
+                        "(v37/RELEASE-DECISION.md)");
         assertThat(Files.readString(root.resolve("roadmaps/v36/CHECKLIST.md")))
                 .contains("> **Status:** completed; review-only, no release; explicitly reduced scope",
                         "### [x] 10.4", "A001/A002 excluded from closure only");
@@ -249,7 +250,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v37ChecklistMatchesRoadmapWithoutApprovingExperimentsOrCompletingWork() throws IOException {
+    void v37ChecklistMatchesRoadmapAndKeepsExperimentAndReleaseApprovalsSeparate() throws IOException {
         Path root = projectRoot();
         Path directory = root.resolve("roadmaps/v37");
         String roadmap = Files.readString(directory.resolve("ROADMAP.md"));
@@ -261,7 +262,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(priorities).hasSize(10);
         assertThat(checklist.lines().filter(line -> line.startsWith("## Priority ")).toList())
                 .containsExactlyElementsOf(priorities);
-        assertThat(checklist.lines().filter(line -> line.matches("### \\[ \\] \\d+\\.\\d+ .+")).toList())
+        assertThat(checklist.lines().filter(line -> line.matches("### \\[[ x]\\] \\d+\\.\\d+ .+")).toList())
                 .hasSize(31);
         for (String prefix : List.of("> **Status:**", "> **Theme:**", "> **Published baseline:**",
                 "> **Development coordinate:**", "> **Proposed scope:**", "> **Experiment authorization:**",
@@ -274,10 +275,10 @@ class DocumentationReleaseArtifactTest {
         assertThat(checklist.replaceAll("\\s+", " ")).contains(
                 "(ROADMAP.md)", "Creating this checklist completes no execution item", "V1-V36 stay closed",
                 "V37-A001 / AUTO_REGISTRY", "V37-A002 / HOOK", "V37-E001", "unresolved/blocking",
-                "### [ ] 2.3 Obtain proceed-to-plan or stop approval", "materially different",
+                "### [x] 2.3 Obtain proceed-to-plan or stop approval", "materially different",
                 "### [ ] 4.3 Obtain explicit investigation approval", "No numerical budget is selected",
                 "### [ ] 7.2 Obtain implementation or no-change approval", "no production edit before **7.2**",
-                "### [ ] 10.4 Verify publication or explicit no-release closure", "explicit named exclusion",
+                "### [x] 10.4 Verify publication or explicit no-release closure", "explicit named exclusion",
                 "document applicability in Priority 8", "Priority 9's evidence/guidance obligations",
                 "338 workers", "48/48 workers", "96 inferred internal", "194 accounted JVM",
                 "per-category and total process ceilings", "cumulative time", "memory/storage caps",
@@ -285,11 +286,288 @@ class DocumentationReleaseArtifactTest {
                 "Lost V35 P2-P8", "base-plus-patch", "target/release-evidence/v37/priority<N>/",
                 "before any cleanup", "both artifact orders", "60-row matrix", "Central-only",
                 ">20% latency", ">max(32 B/op, 5%)", "explicit GC disabled", "clean-source native",
-                "strict root and independent starter", "even if the first fails", "N/A, not passed")
-                .doesNotContain("[x]");
+                "strict root and independent starter", "even if the first fails", "N/A, not passed");
+        assertThat(checklist.substring(checklist.indexOf("## Priority 3 - "),
+                checklist.indexOf("## Priority 8 - "))).doesNotContain("[x]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
-                .contains("(../roadmaps/v37/CHECKLIST.md)", "activeRoadmap=v37", "plannedFinalVersion=null");
+                .contains("(../roadmaps/v37/CHECKLIST.md)", "activeRoadmap=null", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v37BaselinePreservesUnresolvedFindingsAndDistinguishesAvailableFromRunnableEvidence() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v37");
+        String baseline = Files.readString(directory.resolve("BASELINE-SCOPE.md"));
+        assertThat(baseline.replaceAll("\\s+", " ")).contains(
+                "2026-10-18", "4.4.2", "4.5.0-SNAPSHOT", "activeRoadmap=v37",
+                "plannedFinalVersion=null", "releaseLane=unselected", "V1-V36 stay closed",
+                "7e67a7ccec5ef8b0100d4b559d91e34ad8b8c2fc", "27293e32b6b7919060d35901c87b8004f1c9d93a",
+                "base-plus-patch", "not an ancestor", "5,132 files across 15 bundles",
+                "392 runtime/build/test/fixture inputs", "39 harness/build inputs", "121 JAR paths",
+                "all now absent", "not verified", "not fresh Central", "Lost V35 P2-P8",
+                "V37-A001 / AUTO_REGISTRY", "V37-A002 / HOOK", "V37-E001 / Attribution Feasibility",
+                "Unresolved/blocking", "Feasibility pending", "not a newly reproduced defect",
+                "**Owner:**", "**Evidence:**", "**Controls:**", "**Question:**", "**Proof obligation:**",
+                "**Stop conditions:**", "338 workers", "48/48 workers", "96 inferred internal probes",
+                "194 accounted JVM invocations", "zero new workers", "no numerical budget",
+                "C001-C005 and both C004 subrows", "2.3", "4.3", "7.2", "Priority 10",
+                "explicit GC disabled", "JMH 1.37", "Boot 4.0.0", "Boot 4.1.0",
+                "target/release-evidence/v37/priority1/", "no off-machine backup",
+                "No fresh full-module, API", "B/op is not retention or RSS");
+        assertThat(baseline.lines().filter(line -> line.startsWith("### V37-")).toList()).hasSize(3);
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        assertThat(checklist.substring(checklist.indexOf("## Priority 1 - "),
+                checklist.indexOf("## Priority 2 - ")))
+                .contains("### [x] 1.1", "### [x] 1.2", "### [x] 1.3", "(BASELINE-SCOPE.md)",
+                        "121 documentation cases per Boot row", "nine archive-verifier tests")
+                .doesNotContain("[ ]");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(BASELINE-SCOPE.md)");
+        assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v37/BASELINE-SCOPE.md)");
+        assertThat(Files.readString(root.resolve("roadmaps/v36/CHECKLIST.md")))
+                .contains("> **Status:** completed; review-only, no release; explicitly reduced scope",
+                        "A001/A002 excluded from closure only");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(baseline);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v37FeasibilityReviewRecordsApprovedStopWithoutClosingUnresolvedScope() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v37");
+        String decision = Files.readString(directory.resolve("FEASIBILITY-DECISION.md"));
+        assertThat(decision.replaceAll("\\s+", " ")).contains(
+                "6b0904dddddc6447a59e9f252847bff6ed7691b1", "1b3f5cba74075da315c197dd57e284ced79eb2db",
+                "1,938 files in five bundles", "48 saved stages", "60-row primary", "four-row reverse",
+                "three primary allocation flags", "zero primary latency flags", "no reverse flags",
+                "V37-A001", "V37-A002", "V37-E001", "Eight low", "Six low, two high", "10 and 15",
+                "1,542 relevant tasks/installations", "763 relevant tasks/installations",
+                "measurementInterval=null", "executingCodeIdentity=unverified", "timestamp sorting",
+                "Minimum Sufficient Evidence", "sampled allocating stack alone", "not a demonstrated ordinary cause",
+                "SampledObjectAlloc", "CompiledMethodLoad", "GenerateEvents", "mutable upstream reference",
+                "Inference from these sources and local code", "not a claim that the problem is impossible",
+                "V37-P2-1: approved stop before new measurement", "Approve stop (Recommended)",
+                "This completes **2.3**, not performance acceptance", "not passed",
+                "it did not close V37 or exclude either finding", "N/A for this approved stop",
+                "338 V35 workers", "48/48 V36 workers", "96 inferred probes", "194 accounted JVM invocations",
+                ">20% latency", ">max(32 B/op, 5%)", "No new worker", "4.3", "7.2", "Priority 10",
+                "C001-C005 and both C004 subrows", "plannedFinalVersion=null", "explicit GC disabled",
+                "target/release-evidence/v37/priority2/", "No fresh full runtime", "B/op is not retention/RSS");
+        assertThat(decision.lines().filter(line -> line.matches("\\| C[1-5]:.+")).toList()).hasSize(5);
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.substring(checklist.indexOf("## Priority 2 - "),
+                checklist.indexOf("## Priority 3 - "));
+        assertThat(priority).contains("### [x] 2.1", "### [x] 2.2", "### [x] 2.3",
+                "(FEASIBILITY-DECISION.md)", "Approve stop (Recommended)", "A001/A002 remain unresolved",
+                "122 documentation cases per Boot row", "36 deterministic tooling tests").doesNotContain("[ ]");
+        String capture = checklist.substring(checklist.indexOf("## Priority 3 - "),
+                checklist.indexOf("## Priority 4 - "));
+        assertThat(capture.replaceAll("\\s+", " ")).contains(
+                "### [ ] 3.1", "### [ ] 3.2", "### [ ] 3.3",
+                "Record N/A under approved stop (Recommended)", "No capture approach was selected",
+                "No investigation schedule or process budget", "No new capture/parser behavior or tooling fix",
+                "not run, not passed", "not fresh Priority 3 execution", "execution would still require 4.3 approval",
+                "A001/A002 remain unresolved/blocking", "V37 remains active", "Priorities 8-10",
+                "(FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates)").doesNotContain("[x]");
+        assertThat(capture.lines().filter(line -> line.startsWith("**N/A (2026-10-18, V37-P2-1):**")))
+                .hasSize(3);
+        assertThat(capture.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
+        String investigation = checklist.substring(checklist.indexOf("## Priority 4 - "),
+                checklist.indexOf("## Priority 5 - "));
+        assertThat(investigation.replaceAll("\\s+", " ")).contains(
+                "### [ ] 4.1", "### [ ] 4.2", "### [ ] 4.3",
+                "No investigation or capture method is selected", "no investigation plan is created",
+                "No numerical execution budget is selected", "not even a zero-worker approved schedule",
+                "Investigation approval is neither requested nor granted", "gate 4.3 remains unapproved",
+                "not run, not passed", "neither reopens planning nor authorizes measurement",
+                "A001/A002 remain unresolved/blocking", "V37 remains active", "Priorities 8-10",
+                "(FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates)").doesNotContain("[x]");
+        assertThat(investigation.lines().filter(line -> line.startsWith("**N/A (2026-10-18, V37-P2-1):**")))
+                .hasSize(3);
+        assertThat(investigation.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
+        String measurement = checklist.substring(checklist.indexOf("## Priority 5 - "),
+                checklist.indexOf("## Priority 6 - "));
+        assertThat(measurement.replaceAll("\\s+", " ")).contains(
+                "### [ ] 5.1", "### [ ] 5.2", "### [ ] 5.3",
+                "No schedule is approved and gate 4.3 remains unapproved",
+                "historical captures are not new execution", "No new ordinary or observed samples exist",
+                "Perturbation remains unresolved", "no pooling, score substitution or performance pass",
+                "No new capture process census", "not a verified zero-worker experiment",
+                "verification only, not diagnostic capture", "not run, not passed",
+                "A001/A002 remain unresolved/blocking", "V37 remains active", "Priorities 8-10",
+                "(FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates)").doesNotContain("[x]");
+        assertThat(measurement.lines().filter(line -> line.startsWith("**N/A (2026-10-24, V37-P2-1):**")))
+                .hasSize(3);
+        assertThat(measurement.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
+        String review = checklist.substring(checklist.indexOf("## Priority 6 - "),
+                checklist.indexOf("## Priority 7 - "));
+        assertThat(review.replaceAll("\\s+", " ")).contains(
+                "### [ ] 6.1", "### [ ] 6.2", "### [ ] 6.3",
+                "No new capture exists", "No new tooling or runtime defect is reproduced",
+                "Original scores and contrary evidence remain unchanged", "does not claim a new causal result or acceptance",
+                "A001/A002 remain unresolved/blocking", "AUTO_NO_REGISTRY/control acceptance",
+                "Full-scope closure remains blocked", "not run, not passed", "V37 remains active",
+                "gates 4.3 and 7.2 remain unapproved", "Priorities 8-10",
+                ">20% latency", ">max(32 B/op, 5%)", "(BASELINE-SCOPE.md#narrow-finding-ledger)")
+                .doesNotContain("[x]");
+        assertThat(review.lines().filter(line -> line.startsWith("**N/A (2026-10-24, V37-P2-1):**")))
+                .hasSize(3);
+        assertThat(review.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
+        assertThat(review.lines().filter(line -> line.startsWith("| **V37-A001 / AUTO_REGISTRY**")))
+                .singleElement().asString().contains("Unresolved/blocking", "no ordinary high witness",
+                        "metrics-integration review", "explicit reopening and numerical execution approval");
+        assertThat(review.lines().filter(line -> line.startsWith("| **V37-A002 / HOOK**")))
+                .singleElement().asString().contains("Unresolved/blocking independently", "10 and 15",
+                        "observer/hook review", "HOOK-specific bounded method");
+        assertThat(review.lines().filter(line -> line.startsWith("| **V37-E001 /")))
+                .singleElement().asString().contains("Feasibility decision complete: approved stop V37-P2-1",
+                        "attribution limits remain unresolved", "Benchmark tooling maintainer",
+                        "failing reproduction and affected evidence");
+        String correction = checklist.substring(checklist.indexOf("## Priority 7 - "),
+                checklist.indexOf("## Priority 8 - "));
+        assertThat(correction.replaceAll("\\s+", " ")).contains(
+                "### [ ] 7.1", "### [ ] 7.2", "### [ ] 7.3",
+                "No reproduced defect supports a new correction", "Runtime and tooling remain unchanged",
+                "genuine registry/hook behavior is not disabled", "gate 7.2 remains unapproved",
+                "not a new implementation decision or performance pass", "numerical approval at 4.3",
+                "No runtime or tooling candidate was implemented, tested or rolled back in V37",
+                "not run, not passed", "A001/A002 remain unresolved/blocking", "V37 remains active",
+                "implementation and release scope unselected", "Priorities 8-10",
+                "(FEASIBILITY-DECISION.md#23-approved-stop-and-remaining-gates)").doesNotContain("[x]");
+        assertThat(correction.lines().filter(line -> line.startsWith("**N/A (2026-10-24, V37-P2-1):**")))
+                .hasSize(3);
+        assertThat(correction.lines().filter(line -> line.startsWith("- [ ]"))).hasSize(6);
+        assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v37/FEASIBILITY-DECISION.md)");
+        assertThat(Files.readString(directory.resolve("ROADMAP.md"))).contains("(FEASIBILITY-DECISION.md)");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v37VerificationSeparatesHistoricalReuseAndFreshGuardsFromCostAcceptance() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v37");
+        String verification = Files.readString(directory.resolve("VERIFICATION.md"));
+        assertThat(verification.replaceAll("\\s+", " ")).contains(
+                "fd87028a863e1bbe53d62c6628d92f82f2715844", "435497f99bd33e2c3319535eb84250cfb7b1b0f8",
+                "V37-P2-1", "Applicability Frozen Before Verification", "No numerical budget",
+                "4,143 files in ten bundles", "392 runtime/build/test/fixture inputs",
+                "202 production/build/benchmark inputs", "39 harness/build inputs", "24,224 class entries",
+                "121 historical classpath files per artifact remain missing", "not freshly reverified",
+                "60 primary rows per artifact", "four reverse-confirmation rows per artifact",
+                "256 historical scored workers", "three primary allocation flags", "zero reverse flags",
+                ">20% latency", ">max(32 B/op, 5%)", "A001 / AUTO_REGISTRY", "A002 / HOOK",
+                "Combined A001 + A002", "**not accepted**", "E001", "acceptance heading remains unchecked",
+                "2,446 cases per row", "29 selected-consumer and one absence case per row",
+                "Six fixture cases per row", "16 / 5 / 2", "No changes.", "isolated Central",
+                "Both binary/source failure switches remain true", "caller-owned", "may outlive manager close", "Removed meters",
+                "92 Python tests successfully", "obsolete expectation of 83", "explicit GC disabled",
+                "123 documentation/readiness/link cases per Boot row", "40 V34WorkloadContractTest cases per Boot row",
+                "163 cases per row", "applicable verification complete; full-scope cost acceptance blocked",
+                "No public performance claim", "not clean-clone artifacts or off-machine backups",
+                "active", "plannedFinalVersion=null", "releaseLane=unselected", "Priorities 9-10 remain required");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.substring(checklist.indexOf("## Priority 8 - "),
+                checklist.indexOf("## Priority 9 - "));
+        assertThat(priority).contains("### [x] 8.1", "### [ ] 8.2", "### [x] 8.3", "Review complete; acceptance blocked",
+                "New scoring N/A (2026-10-24, V37-P2-1)", "no numerical budget is requested or approved",
+                "(VERIFICATION.md)", "three primary allocation flags", "A001/A002");
+        assertThat(priority).doesNotContain("### [x] 8.2", "[x] Obtain a separate numerical budget");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(verification);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v37GuidancePreservesStopEvidenceAndIndependentReopeningGates() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v37");
+        String guidance = Files.readString(directory.resolve("MAINTAINER-GUIDANCE.md"));
+        assertThat(guidance.replaceAll("\\s+", " ")).contains(
+                "2026-10-25", "2ee37be5f1d976c85b233ed1dc489a7dfb8895b8",
+                "1d7485b43c6f82d2d2fcc707a81946777bfd24f3", "4.4.2", "4.5.0-SNAPSHOT",
+                "A001 / AUTO_REGISTRY", "A002 / HOOK", "unresolved/blocking",
+                "E001 / attribution feasibility", "V37-P2-1 approved stop",
+                "zero measurement workers", "338 workers", "48/48", "96 inferred internal probes",
+                "194 accounted JVM", "not an observed census", "60 primary", "four reverse",
+                "three primary allocation flags", ">20% latency", ">max(32 B/op, 5%)",
+                "No public performance number", "caller-owned", "may outlive manager close",
+                "Removed meters", "expected 83 tests after 92 passed", "121 historical classpath paths",
+                "Missing V35 P2-P8", "No off-machine backup", "clean clone", "not a sanitizer",
+                "missing, corrupt, incomplete", "No new telemetry", "snapshot-upgrade remedy",
+                "target/release-evidence/v37/closure/", "verify-v36-evidence.py");
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.substring(checklist.indexOf("## Priority 9 - "),
+                checklist.indexOf("## Priority 10 - "));
+        assertThat(priority).contains("### [x] 9.1", "### [x] 9.2", "### [x] 9.3",
+                "4,426 files across 15 bundles and archives", "177 Java cases per Boot row",
+                "92 Python tooling tests", "MAINTAINER-GUIDANCE.md").doesNotContain("[ ]");
+        assertThat(Files.readString(root.resolve("roadmaps/README.md")))
+                .contains("(v37/MAINTAINER-GUIDANCE.md)");
+        for (String name : List.of("22-benchmarks.md", "25-performance-troubleshooting.md", "26-support-bundles.md")) {
+            assertThat(Files.readString(root.resolve("docs").resolve(name)))
+                    .contains("../roadmaps/v37/MAINTAINER-GUIDANCE.md");
+        }
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(guidance);
+        while (links.find()) {
+            String target = links.group(1);
+            if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
+        }
+    }
+
+    @Test
+    void v37ClosureRecordsNamedExclusionsWithoutPassingUnresolvedCostOrReleasing() throws IOException {
+        Path root = projectRoot();
+        Path directory = root.resolve("roadmaps/v37");
+        String decision = Files.readString(directory.resolve("RELEASE-DECISION.md"));
+        assertThat(decision.replaceAll("\\s+", " ")).contains(
+                "2026-10-25", "V37-P10-1", "Complete the Priority 10 with review scope, no release",
+                "GO for reduced-scope review closure; NO-GO for a V37 release", "without marking either passed",
+                "2ee37be5f1d976c85b233ed1dc489a7dfb8895b8", "base-plus-patch", "previously uncommitted P9",
+                "4.4.3", "4.4.2", "4.5.0-SNAPSHOT", "N/A on 2026-10-25 for the approved no-release branch",
+                "V37-P2-1 approved stop", "zero measurement workers", "338 workers", "48/48",
+                "96 inferred internal probes", "not an observed census", "gates 4.3 and 7.2 were never approved",
+                "Priority 8.2 remains unchecked", "excluded from closure only", ">max(32 B/op, 5%)",
+                "three primary allocation flags", "not fresh executions", "4,598 files across 16 bundles",
+                "392 unchanged runtime/build/test/fixture inputs", "178 Java cases per Boot row",
+                "125 documentation/readiness/link", "92 Python tooling tests", "Lost V35 P2-P8", "121 historical classpath paths",
+                "not an off-machine backup", "caller-owned", "not retained heap or RSS",
+                "activeRoadmap=null", "plannedFinalVersion=null", "releaseLane=unselected",
+                "V1-V36 history remains unchanged", "target/release-evidence/v37/priority10/",
+                "verification-evidence/v37-priority10/");
+        assertThat(decision.lines().filter(line -> line.startsWith("| A00")).toList())
+                .hasSize(2).allSatisfy(row -> assertThat(row)
+                        .contains("unresolved/blocking", "excluded from closure obligations", "not passed"));
+        for (String file : List.of("CHECKLIST.md", "ROADMAP.md", "RELEASE-DECISION.md")) {
+            assertThat(Files.readString(directory.resolve(file)).lines()
+                    .filter(line -> line.startsWith("> **Status:**")).toList())
+                    .containsExactly("> **Status:** completed; review-only, no release; explicitly reduced scope");
+        }
+        String checklist = Files.readString(directory.resolve("CHECKLIST.md"));
+        String priority = checklist.substring(checklist.indexOf("## Priority 10 - "));
+        assertThat(priority).contains("### [x] 10.1", "### [x] 10.2", "### [x] 10.3", "### [x] 10.4",
+                "Release branch N/A on 2026-10-25", "not run, not passed");
+        assertThat(priority.lines().filter(line -> line.contains("[ ]")).toList())
+                .containsExactly("- [ ] For release, verify publication and isolated Central consumption separately;");
+        assertThat(checklist).contains("### [ ] 8.2", "### [ ] 4.3", "### [ ] 7.2")
+                .doesNotContain("### [x] 8.2", "### [x] 4.3", "### [x] 7.2");
+        assertThat(Files.readString(root.resolve("roadmaps/README.md")))
+                .contains("(v37/RELEASE-DECISION.md)", "activeRoadmap=null");
+        assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
+                .contains("(../roadmaps/v37/RELEASE-DECISION.md)", "activeRoadmap=null");
+        Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
         while (links.find()) {
             String target = links.group(1);
             if (!target.contains(":")) assertThat(directory.resolve(target).normalize()).as(target).exists();
@@ -320,7 +598,7 @@ class DocumentationReleaseArtifactTest {
                 .doesNotContain("[x]");
         assertThat(directory.resolve("CHECKLIST.md")).exists();
         assertThat(Files.readString(root.resolve("roadmaps/README.md")))
-                .contains("(v36/ROADMAP.md)", "(v36/CHECKLIST.md)", "activeRoadmap=v37", "(v36/RELEASE-DECISION.md)");
+                .contains("(v36/ROADMAP.md)", "(v36/CHECKLIST.md)", "activeRoadmap=null", "(v36/RELEASE-DECISION.md)");
         String previous = Files.readString(root.resolve("roadmaps/v35/CHECKLIST.md"));
         assertThat(previous).contains("> **Status:** completed; review-only, no release; explicitly reduced scope",
                 "### [ ] 10.2", "### [x] 12.4");
@@ -365,7 +643,7 @@ class DocumentationReleaseArtifactTest {
                 "target/release-evidence/v36/priority<N>/", "before any cleanup", "explicit reduced-scope approval");
         assertThat(checklist.substring(checklist.indexOf("## Priority 10 - "))).doesNotContain("[ ]");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
-                .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=v37", "plannedFinalVersion=null");
+                .contains("(../roadmaps/v36/CHECKLIST.md)", "activeRoadmap=null", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
         while (links.find()) {
             String target = links.group(1);
@@ -823,9 +1101,9 @@ class DocumentationReleaseArtifactTest {
                     .containsExactly("> **Status:** completed; review-only, no release; explicitly reduced scope");
         }
         assertThat(Files.readString(root.resolve("roadmaps/README.md")))
-                .contains("(v36/RELEASE-DECISION.md)", "activeRoadmap=v37", "A001/A002 remain unresolved");
+                .contains("(v36/RELEASE-DECISION.md)", "activeRoadmap=null", "A001/A002 remain unresolved");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
-                .contains("(../roadmaps/v36/RELEASE-DECISION.md)", "activeRoadmap=v37");
+                .contains("(../roadmaps/v36/RELEASE-DECISION.md)", "activeRoadmap=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(decision);
         while (links.find()) {
             String target = links.group(1);
@@ -910,7 +1188,7 @@ class DocumentationReleaseArtifactTest {
                 "### [x] 12.4 Verify publication or explicit no-release closure");
         assertThat(Files.readString(root.resolve("roadmaps/README.md"))).contains("(v35/CHECKLIST.md)");
         assertThat(Files.readString(root.resolve("docs/20-native-release-compatibility.md")))
-                .contains("(../roadmaps/v35/CHECKLIST.md)", "activeRoadmap=v37", "plannedFinalVersion=null");
+                .contains("(../roadmaps/v35/CHECKLIST.md)", "activeRoadmap=null", "plannedFinalVersion=null");
         Matcher links = Pattern.compile("\\]\\(([^)#]+)(?:#[^)]*)?\\)").matcher(checklist);
         while (links.find()) {
             String target = links.group(1);
@@ -1406,7 +1684,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(roadmap).doesNotContain("not adopted for execution",
                 "There is no V34 execution checklist yet", "An execution checklist will be created");
         assertThat(Files.readString(projectRoot().resolve("docs/20-native-release-compatibility.md")))
-                .contains("(../roadmaps/v34/CHECKLIST.md)", "activeRoadmap=v37", "plannedFinalVersion=null")
+                .contains("(../roadmaps/v34/CHECKLIST.md)", "activeRoadmap=null", "plannedFinalVersion=null")
                 .doesNotContain("No V34 execution roadmap or next release scope is selected.",
                         "activeRoadmap=v34");
     }
@@ -2187,7 +2465,7 @@ class DocumentationReleaseArtifactTest {
     }
 
     @Test
-    void v37ReadinessStaysActiveAcrossVersionStatesUntilChecklistClosure() throws IOException {
+    void v37ReadinessRemainsClosedAcrossVersionStatesAfterReviewClosure() throws IOException {
         Path root = projectRoot();
         List<ReleaseVersionContract> states = List.of(
                 releaseVersionContract("4.5.0-SNAPSHOT", "4.4.2", "## [Unreleased]\n"),
@@ -2199,7 +2477,7 @@ class DocumentationReleaseArtifactTest {
             Map<String, Object> readiness = releaseReadiness(root, version, "4.4.2", state,
                     benchmarkEvidence(version, "4.4.2", state, false), List.of(), List.of());
 
-            assertThat(readiness).as(state.releaseState()).containsEntry("activeRoadmap", "v37");
+            assertThat(readiness).as(state.releaseState()).containsEntry("activeRoadmap", null);
             assertThat(readiness.get("releaseCandidate"))
                     .isEqualTo(majorReleaseCandidate(version, state));
         }
@@ -6238,7 +6516,7 @@ class DocumentationReleaseArtifactTest {
         assertThat(readiness.path("apiCompatibilityBaselineVersion").asText())
                 .isEqualTo(generated.path("apiCompatibilityBaselineVersion").asText());
         assertThat(readiness.path("apiCompatibilityBaselineMatchesProjectVersion").asBoolean()).isFalse();
-        assertThat(readiness.path("activeRoadmap").asText()).isEqualTo("v37");
+        assertThat(readiness.path("activeRoadmap").isNull()).isTrue();
         assertThat(readiness.path("releaseLane").asText()).isEqualTo("unselected");
         assertThat(readiness.path("releaseCandidate").path("version").asText()).isEqualTo("4.5.0");
         assertThat(readiness.path("releaseCandidate").path("status").asText()).isEqualTo("deferred");

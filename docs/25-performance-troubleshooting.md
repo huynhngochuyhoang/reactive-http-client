@@ -168,6 +168,13 @@ snapshot-upgrade remedy, Kubernetes/Istio/Envoy diagnosis or pod-memory all-clea
 review-only/no release. It excludes A001/A002 from closure, not from the findings
 or future attribution requirements.
 
+[V37's feasibility review and guidance](../roadmaps/v37/MAINTAINER-GUIDANCE.md)
+stop before further measurement, retaining both unresolved flags and their
+independent reopening requirements. There is no new production fix, configuration
+or migration requirement; correctness verification is not cost acceptance.
+[V37's review-only closure](../roadmaps/v37/RELEASE-DECISION.md) excludes A001/A002
+from closure obligations only; both allocation findings remain unresolved.
+
 B/op measures allocation per operation, not retained heap. Compare time-aligned
 post-GC heap, direct/native memory, protocol-aware pool gauges, threads and RSS
 under the existing [memory-triage procedure](30-operations-troubleshooting.md#cache-memory-triage-420).

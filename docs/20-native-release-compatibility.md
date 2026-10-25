@@ -1149,18 +1149,19 @@ Central publication as deferred until an explicit release-cut transition removes
 the snapshot suffix.
 
 V32 is published and archived at `4.4.1`; V33 is published and archived at `4.4.2`.
-The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=v37` and
-`plannedFinalVersion=null`; V34-V36 are closed review-only with no production
-improvement retained. V35 and V36 have explicitly approved reduced scopes, not
+The current reactor is `4.5.0-SNAPSHOT`, with `activeRoadmap=null` and
+`plannedFinalVersion=null`; V34-V37 are closed review-only with no production
+improvement retained. V35-V37 have explicitly approved reduced scopes, not
 full-scope performance acceptance. [V36's execution checklist](../roadmaps/v36/CHECKLIST.md)
 and [closure decision](../roadmaps/v36/RELEASE-DECISION.md) retain A001/A002 as
 unresolved, excluded from closure rather than passed. No release is selected.
 Signing, publication and new-version Central consumption are N/A for that
 no-release branch, not executed passes. Generated pending manual commands do
-not reopen V34-V36 or select a release. [V37's execution checklist](../roadmaps/v37/CHECKLIST.md)
-permits baseline/evidence review, bounded deterministic synthetic tests and
-planning only; experiments, production changes and release remain separately
-gated and unselected. Readiness
+not reopen V34-V37 or select a release. [V37's execution checklist](../roadmaps/v37/CHECKLIST.md)
+and [closure decision](../roadmaps/v37/RELEASE-DECISION.md) record review-only/no
+release with A001/AUTO_REGISTRY and A002/HOOK excluded from closure obligations,
+not passed. V37 selected no new measurement or production change; future scope
+remains unselected. Readiness
 follows checklist lifecycle, including a final-version cut, until verified closure.
 V33 remained active through the release cut until verified publication and
 checklist closure; a version suffix
